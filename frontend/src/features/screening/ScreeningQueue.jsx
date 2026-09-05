@@ -57,16 +57,26 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
 
   const pendingApps = applications.filter(app => app.status === 'pending_screening');
 
+  // Helper to map stakeholder type to valid vertical code
+  const mapStakeholderToVertical = (type) => {
+    if (!type) return 'STARTUP';
+    const lower = String(type).toLowerCase();
+    if (lower.includes('startup')) return 'STARTUP';
+    if (lower.includes('student') || lower.includes('researcher')) return 'HRD';
+    if (lower.includes('school')) return 'SCHOOL';
+    if (lower.includes('institution')) return 'LAB_NET';
+    if (lower.includes('industry')) return 'INDUSTRY';
+    if (lower.includes('government')) return 'INDUSTRY';
+    if (lower.includes('expert')) return 'EXPERT';
+    if (lower.includes('collab') || lower.includes('mou')) return 'COLLAB';
+    if (lower.includes('tech') || lower.includes('tdp')) return 'TECH_DEV';
+    if (lower.includes('skill')) return 'SKILL';
+    return 'STARTUP';
+  };
+
   const determineApprovalAuthority = (app, vertical) => {
-    // Decision Routing Matrix:
-    // General Onboarding of normal profiles -> Automated / Operations
-    // Program participation -> Pillar Lead
-    // Startup Project Allocation -> Startups Pillar + PD (strategic)
-    // Industry/Govt engagement -> PD
-    // Expert onboarding (senior) -> PD
-    // MoUs / strategic collaborations -> PD
-    
-    if (app.isStrategic || app.fundingRequested > 1000000) {
+    if (!app) return 'operations';
+    if (app.isStrategic || (app.fundingRequested && Number(app.fundingRequested) > 1000000)) {
       return 'pd'; // Strategic escalates to PD
     }
     
@@ -102,7 +112,7 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
     }
 
     const updatedHistory = [
-      ...selectedApp.history,
+      ...(selectedApp.history || []),
       {
         date: new Date().toLocaleString('en-GB'),
         action: targetStatus === 'approved' ? 'Approved (General Onboarding)' : `Routed for ${authAuthority.toUpperCase()} Approval`,
@@ -169,7 +179,7 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
                           className="btn btn-secondary btn-sm"
                           onClick={() => {
                             setSelectedApp(app);
-                            setVerticalAssign(app.stakeholderType); // Default assign match
+                            setVerticalAssign(mapStakeholderToVertical(app.stakeholderType));
                           }}
                         >
                           Verify & Route
@@ -224,14 +234,20 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
                   <span className="val">{selectedApp.location}</span>
                 </div>
               )}
-              <div className="detail-row">
-                <span className="label">Focus Area:</span>
-                <span className="val">{selectedApp.nmIcpsAlign}</span>
-              </div>
-              {selectedApp.intentOfEngagement && selectedApp.intentOfEngagement.length > 0 && (
+              {selectedApp.nmIcpsAlign && (
+                <div className="detail-row">
+                  <span className="label">Focus Area:</span>
+                  <span className="val">{selectedApp.nmIcpsAlign}</span>
+                </div>
+              )}
+              {selectedApp.intentOfEngagement && (
                 <div className="detail-row">
                   <span className="label">Intent:</span>
-                  <span className="val">{selectedApp.intentOfEngagement.join(', ')}</span>
+                  <span className="val">
+                    {Array.isArray(selectedApp.intentOfEngagement) 
+                      ? selectedApp.intentOfEngagement.join(', ') 
+                      : String(selectedApp.intentOfEngagement)}
+                  </span>
                 </div>
               )}
               {selectedApp.dynamicInputs && Object.keys(selectedApp.dynamicInputs).length > 0 && (
@@ -240,7 +256,7 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
                   <span className="val text-accent">
                     {Object.entries(selectedApp.dynamicInputs)
                       .filter(([k, v]) => k !== 'category' && v)
-                      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+                      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : (typeof v === 'object' && v !== null ? JSON.stringify(v) : v)}`)
                       .join(' | ')}
                   </span>
                 </div>

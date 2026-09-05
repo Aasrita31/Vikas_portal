@@ -903,7 +903,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 <input 
                   type="text"
                   className={`form-control ${formErrors.otherDomain ? 'input-error' : ''}`}
-                  placeholder="e.g. Quantum Sensing, Agritech Satellites, Marine Robotics"
                   value={formData.otherDomain}
                   onChange={(e) => {
                     setFormData({...formData, otherDomain: e.target.value});
@@ -999,7 +998,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. Sub-meter NavIC receiver, Edge AI telemetry"
                       value={formData.startupDomain}
                       onChange={(e) => setFormData({...formData, startupDomain: e.target.value})}
                     />
@@ -1029,7 +1027,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                   <textarea 
                     className="form-control"
                     rows="3"
-                    placeholder="Describe laboratory proofs of concept, field trials conducted, or past funding received..."
                     value={formData.startupPreviousWork}
                     onChange={(e) => setFormData({...formData, startupPreviousWork: e.target.value})}
                   />
@@ -1048,7 +1045,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. NavIC RF Front-ends, Satellite Photogrammetry, GeoAI"
                       value={formData.expertAreaOfExpertise}
                       onChange={(e) => setFormData({...formData, expertAreaOfExpertise: e.target.value})}
                       required
@@ -1062,7 +1058,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. 15+ years in Aerospace & Navigation"
                       value={formData.expertExperience}
                       onChange={(e) => setFormData({...formData, expertExperience: e.target.value})}
                       required
@@ -1078,7 +1073,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. IISc Bangalore / ISRO SAC / Independent"
                       value={formData.expertAffiliation}
                       onChange={(e) => setFormData({...formData, expertAffiliation: e.target.value})}
                       required
@@ -1179,7 +1173,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. Electrical Engineering / Prof. S. Ananth"
                       value={formData.studentDepartment}
                       onChange={(e) => setFormData({...formData, studentDepartment: e.target.value})}
                     />
@@ -1211,7 +1204,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. VidyaGIS Mapping / Atal Tinkering Robotics Lab"
                       value={formData.schoolInterest}
                       onChange={(e) => setFormData({...formData, schoolInterest: e.target.value})}
                     />
@@ -1229,7 +1221,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. Strategic R&D Cell / Remote Sensing Directorate"
                       value={formData.industryDepartment}
                       onChange={(e) => setFormData({...formData, industryDepartment: e.target.value})}
                     />
@@ -1269,7 +1260,6 @@ export default function OnboardingForm({ onSubmitApplication }) {
               <textarea 
                 className={`form-control text-area-large ${formErrors.problemStatement ? 'input-error' : ''}`}
                 rows="5"
-                placeholder="Describe your technological focus, the real-world problem you address, required lab testbeds, or how you intend to collaborate with IITTNiF..."
                 value={formData.problemStatement}
                 onChange={(e) => {
                   setFormData({...formData, problemStatement: e.target.value});

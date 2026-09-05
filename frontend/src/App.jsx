@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle2, Info, AlertTriangle, X, Award, FileText } from 'lucide-react';
 import Header from './components/Header';
 import Dashboard from './features/monitoring/Dashboard';
 import OnboardingForm from './features/entry/OnboardingForm';
@@ -14,6 +15,55 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState('pd'); // Initialize to PD for full preview access
   const [overviewKey, setOverviewKey] = useState(0);
 
+  // System Notifications State (Loaded from localStorage or empty)
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem('VIKAS_NOTIFICATIONS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(n => 
+          !n.message?.includes('Priya Nair') && 
+          !n.message?.includes('Quantum-Shield') &&
+          !n.message?.includes('AeroSpatial')
+        );
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  // Floating Toast Notification State
+  const [toast, setToast] = useState(null);
+
+  const showToast = (title, message, type = 'success', fileNumber = null) => {
+    setToast({ id: Date.now(), title, message, type, fileNumber });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  // Persist notifications to localStorage
+  useEffect(() => {
+    localStorage.setItem('VIKAS_NOTIFICATIONS', JSON.stringify(notifications));
+  }, [notifications]);
+
+  const handleClearNotifications = () => {
+    setNotifications([]);
+    localStorage.removeItem('VIKAS_NOTIFICATIONS');
+  };
+
+  const handleNotificationClick = (notif) => {
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    if (notif.tab) {
+      handleTabChange(notif.tab);
+    }
+  };
+
   const handleTabChange = (tabId) => {
     if (tabId === 'overview' || tabId === 'engagement') {
       window.history.pushState({}, '', '/');
@@ -22,230 +72,127 @@ export default function App() {
     setActiveTab(tabId);
   };
 
-  // Initial High-Fidelity Mock Data representing different layers
-  const [applications, setApplications] = useState([
-    {
-      name: "AeroSpatial Drone Systems",
-      contactPerson: "Dr. R. Raman",
-      email: "raman@aerospatial.co.in",
-      phone: "+91 98450 12345",
-      stakeholderType: "STARTUP",
-      trl: 5,
-      description: "Autonomous micro-UAV systems for agricultural mapping and spatial GIS analysis in rural areas.",
-      nmIcpsAlign: "Autonomous Systems and Robotics",
-      documentName: "pitch_deck_aero.pdf",
-      isStrategic: false,
-      fundingRequested: "1500000",
-      fileNumber: "VIKAS/2026/STARTUP/ONBOARD/101",
-      status: "approved",
-      assignedVertical: "STARTUP",
-      approvalAuthority: "pillar_lead",
-      eSignature: "Dr. M. S. Prasad (Startups Lead)",
-      approvalDate: "12/08/2026",
-      screeningNotes: "Verified prototype. TRL 5 is appropriate. Recommended for startup support.",
-      history: [
-        {
-          date: "10/08/2026, 10:30:15",
-          action: "File Created & Onboarded",
-          user: "Public Portal (Auto)",
-          details: "Initial submission completed successfully."
-        },
-        {
-          date: "11/08/2026, 14:22:10",
-          action: "Routed for PILLAR_LEAD Approval",
-          user: "Operations Anchor",
-          details: "Assigned Vertical: STARTUP. Document authenticity verified."
-        },
-        {
-          date: "12/08/2026, 11:05:40",
-          action: "Digitally Approved & Signed",
-          user: "Pillar Lead (Dr. M. S. Prasad)",
-          details: "Approved vertical enrollment in STARTUP. E-Signature logged."
-        }
-      ]
-    },
-    {
-      name: "PNT Precision Receiver Prototype",
-      contactPerson: "Prof. S. Ananth",
-      email: "s.ananth@iitt.ac.in",
-      phone: "+91 81234 56789",
-      stakeholderType: "TDP",
-      trl: 4,
-      description: "Development of indigenous GPS/NavIC compatible receiver for highly accurate Positioning, Navigation, and Timing (PNT).",
-      nmIcpsAlign: "Sensors, Actuators & Internet of Things (IoT)",
-      documentName: "tdp_proposal_pnt.pdf",
-      isStrategic: false,
-      fundingRequested: "3200000",
-      fileNumber: "VIKAS/2026/TECH_DEV/ONBOARD/204",
-      status: "approved",
-      assignedVertical: "TECH_DEV",
-      approvalAuthority: "pillar_lead",
-      eSignature: "Dr. K. Raghavan (TDP Lead)",
-      approvalDate: "18/08/2026",
-      screeningNotes: "Strong academic linkage. TRL 4 validation completed.",
-      history: [
-        {
-          date: "15/08/2026, 09:12:00",
-          action: "File Created & Onboarded",
-          user: "Public Portal (Auto)",
-          details: "TDP application logged."
-        },
-        {
-          date: "16/08/2026, 16:45:30",
-          action: "Routed for PILLAR_LEAD Approval",
-          user: "Operations Anchor",
-          details: "Assigned Vertical: TECH_DEV. Forwarded to TDP Pillar."
-        },
-        {
-          date: "18/08/2026, 15:30:12",
-          action: "Digitally Approved & Signed",
-          user: "Pillar Lead (Dr. K. Raghavan)",
-          details: "Approved R&D project allocation. Verification complete."
-        }
-      ]
-    },
-    {
-      name: "Strategic alliance with ISRO Geo-Spatial Center",
-      contactPerson: "Dr. G. Venkat",
-      email: "venkat@isro.gov.in",
-      phone: "+91 94440 98765",
-      stakeholderType: "COLLAB",
-      trl: 3,
-      description: "MoU for spatial data sharing, teacher training for VidyaGIS school programs, and joint pilot projects.",
-      nmIcpsAlign: "Spatial GIS Mapping & VidyaGIS",
-      documentName: "mou_draft_isro.pdf",
-      isStrategic: true,
-      fundingRequested: "0",
-      fileNumber: "VIKAS/2026/COLLAB/ONBOARD/309",
-      status: "pending_approval",
-      assignedVertical: "COLLAB",
-      approvalAuthority: "pd",
-      screeningNotes: "MoU draft reviewed by collaborations cell. Strategic value is high. Escalated for PD sign-off.",
-      history: [
-        {
-          date: "25/08/2026, 11:20:00",
-          action: "File Created & Onboarded",
-          user: "Public Portal (Auto)",
-          details: "MoU draft logged in registry."
-        },
-        {
-          date: "27/08/2026, 10:15:45",
-          action: "Routed for PD Approval",
-          user: "Operations Anchor",
-          details: "Assigned Vertical: COLLAB. Flags: Strategic Engagement (PD Sign-off Mandatory)."
-        }
-      ]
-    },
-    {
-      name: "Dr. Priya Nair - Postdoctoral Fellow Recruitment",
-      contactPerson: "Dr. Priya Nair",
-      email: "priya.nair@outlook.com",
-      phone: "+91 78901 23456",
-      stakeholderType: "FELLOW",
-      trl: 3,
-      description: "Recruitment as Chanakya Fellow for postdoctoral research in AI and advanced sensor telemetry.",
-      nmIcpsAlign: "Artificial Intelligence & Machine Learning",
-      documentName: "resume_priya_nair.pdf",
-      isStrategic: false,
-      fundingRequested: "800000",
-      fileNumber: "VIKAS/2026/HRD/ONBOARD/411",
-      status: "pending_approval",
-      assignedVertical: "HRD",
-      approvalAuthority: "pillar_lead",
-      screeningNotes: "Credentials and publications verified by HRD cell. Meets selection criteria.",
-      history: [
-        {
-          date: "28/08/2026, 14:00:00",
-          action: "File Created & Onboarded",
-          user: "Public Portal (Auto)",
-          details: "HRD fellowship registry completed."
-        },
-        {
-          date: "29/08/2026, 11:35:10",
-          action: "Routed for PILLAR_LEAD Approval",
-          user: "Operations Anchor",
-          details: "Assigned Vertical: HRD. Recommended for Pillar Lead sign-off."
-        }
-      ]
-    },
-    {
-      name: "Quantum-Shield Cybersecurity",
-      contactPerson: "Siddharth Sen",
-      email: "sid@quantumshield.io",
-      phone: "+91 99990 12345",
-      stakeholderType: "STARTUP",
-      trl: 3,
-      description: "Development of hardware-based cryptomodules to shield cyber physical power grids from intrusion.",
-      nmIcpsAlign: "Cyber Physical Systems",
-      documentName: "proposal_quantum_shield.pdf",
-      isStrategic: false,
-      fundingRequested: "500000",
-      fileNumber: "VIKAS/2026/STARTUP/ONBOARD/512",
-      status: "pending_screening",
-      history: [
-        {
-          date: "30/08/2026, 16:45:00",
-          action: "File Created & Onboarded",
-          user: "Public Portal (Auto)",
-          details: "Application submitted and queued for operations screening."
-        }
-      ]
-    },
-    {
-      name: "VidyaGIS Teacher Upskilling - Tirupati Region",
-      contactPerson: "Mrs. Leela Devi",
-      email: "leela.gis@edu.org",
-      phone: "+91 90001 90002",
-      stakeholderType: "SCHOOL",
-      trl: 3,
-      description: "Upskilling workshop for science and geography teachers on spatial GIS tools and spatial reasoning.",
-      nmIcpsAlign: "Spatial GIS Mapping & VidyaGIS",
-      documentName: "workshop_agenda.pdf",
-      isStrategic: false,
-      fundingRequested: "200000",
-      fileNumber: "VIKAS/2026/SCHOOL/ONBOARD/603",
-      status: "pending_screening",
-      history: [
-        {
-          date: "31/08/2026, 10:20:00",
-          action: "File Created & Onboarded",
-          user: "Public Portal (Auto)",
-          details: "School spatial workshop proposal registered."
-        }
-      ]
-    }
-  ]);
+  // Applications State: Only stores and displays real registrations from user submissions
+  const [applications, setApplications] = useState(() => {
+    try {
+      const saved = localStorage.getItem('VIKAS_ONBOARDING_APPLICATIONS');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Exclude legacy mock templates
+        const realOnly = parsed.filter(a => 
+          !['AeroSpatial Drone Systems', 'PNT Precision Receiver Prototype', 'Strategic alliance with ISRO Geo-Spatial Center', 'Dr. Priya Nair - Postdoctoral Fellow Recruitment', 'Quantum-Shield Cybersecurity', 'VidyaGIS Teacher Upskilling - Tirupati Region'].includes(a.name) &&
+          a.contactPerson !== 'Dr. Priya Nair' &&
+          a.contactPerson !== 'Dr. R. Raman'
+        );
+        return realOnly;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  // Persist all user registrations across page reloads
+  useEffect(() => {
+    localStorage.setItem('VIKAS_ONBOARDING_APPLICATIONS', JSON.stringify(applications));
+  }, [applications]);
 
   // Operations Handlers
   const handleAddNewApplication = (newApp) => {
     setApplications(prev => [newApp, ...prev]);
+
+    const newNotif = {
+      id: Date.now(),
+      type: 'info',
+      title: 'New Stakeholder Onboarded',
+      message: `Registration for ${newApp.name} (${newApp.fileNumber}) submitted. Awaiting Operations screening.`,
+      fileNumber: newApp.fileNumber,
+      timestamp: 'Just now',
+      read: false,
+      tab: 'screening'
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+    showToast(
+      'Registration Successfully Logged',
+      `File ${newApp.fileNumber} has been logged in registry and queued for screening.`,
+      'info',
+      newApp.fileNumber
+    );
   };
 
   const handleRouteApplication = (fileNumber, updates) => {
+    let routedApp = null;
     setApplications(prev => prev.map(app => {
       if (app.fileNumber === fileNumber) {
-        return { ...app, ...updates };
+        routedApp = { ...app, ...updates };
+        return routedApp;
       }
       return app;
     }));
-    
-    // Automatically switch sub-tabs depending on target status
-    if (updates.status === 'approved') {
-      setActiveTab('verticals');
+
+    const isDirectApproval = updates.status === 'approved';
+    const newNotif = {
+      id: Date.now(),
+      type: isDirectApproval ? 'approval_success' : 'routed',
+      title: isDirectApproval ? 'File Directly Approved & Enrolled' : 'File Routed for Authorization',
+      message: isDirectApproval 
+        ? `File ${fileNumber} (${routedApp?.name || 'Entity'}) approved and assigned to ${updates.assignedVertical || 'Vertical'}.`
+        : `File ${fileNumber} (${routedApp?.name || 'Entity'}) routed to ${updates.approvalAuthority === 'pd' ? 'Project Director (PD)' : 'Pillar Lead'} for sign-off.`,
+      fileNumber: fileNumber,
+      timestamp: 'Just now',
+      read: false,
+      tab: isDirectApproval ? 'overview' : 'approval'
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+    showToast(
+      isDirectApproval ? 'File Approved & Enrolled' : 'File Screened & Routed',
+      isDirectApproval 
+        ? `File ${fileNumber} is enrolled in ${updates.assignedVertical} vertical.`
+        : `File ${fileNumber} forwarded for ${updates.approvalAuthority === 'pd' ? 'PD' : 'Pillar Lead'} authorization.`,
+      isDirectApproval ? 'success' : 'info',
+      fileNumber
+    );
+
+    if (isDirectApproval) {
+      setActiveTab('overview');
     } else {
-      setActiveTab('features');
-      setFeatureSubTab('approval');
+      setActiveTab('approval');
     }
   };
 
   const handleApproveApplication = (fileNumber, updates) => {
+    let approvedApp = null;
     setApplications(prev => prev.map(app => {
       if (app.fileNumber === fileNumber) {
-        return { ...app, ...updates };
+        approvedApp = { ...app, ...updates };
+        return approvedApp;
       }
       return app;
     }));
-    setActiveTab('verticals');
+
+    const officerTitle = currentRole === 'pd' ? 'Project Director' : 'Pillar Lead';
+    const signer = updates.eSignature ? `${officerTitle} (${updates.eSignature})` : officerTitle;
+
+    // Add to Notification Center
+    const newNotif = {
+      id: Date.now(),
+      type: 'approval_success',
+      title: 'File Digitally Authorized & Signed',
+      message: `File ${fileNumber} (${approvedApp?.name || 'Entity'}) has been authorized by ${signer} and enrolled into the ${approvedApp?.assignedVertical || 'assigned'} vertical.`,
+      fileNumber: fileNumber,
+      timestamp: 'Just now',
+      read: false,
+      tab: 'overview'
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+
+    // Trigger Floating Toast Banner
+    showToast(
+      'Authorization & E-Sign Complete!',
+      `File ${fileNumber} (${approvedApp?.name || 'Record'}) is now officially authorized and enrolled in the ${approvedApp?.assignedVertical || 'Vertical'} vertical.`,
+      'success',
+      fileNumber
+    );
+
+    setActiveTab('overview');
   };
 
   const handleRejectApplication = (fileNumber, updates) => {
@@ -255,8 +202,26 @@ export default function App() {
       }
       return app;
     }));
-    setActiveTab('features');
-    setFeatureSubTab('screening');
+
+    const newNotif = {
+      id: Date.now(),
+      type: 'info',
+      title: 'File Sent Back to Screening',
+      message: `File ${fileNumber} returned to operations queue with revision remarks.`,
+      fileNumber: fileNumber,
+      timestamp: 'Just now',
+      read: false,
+      tab: 'screening'
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+    showToast(
+      'File Returned to Screening',
+      `File ${fileNumber} was sent back with remarks.`,
+      'warning',
+      fileNumber
+    );
+
+    setActiveTab('screening');
   };
 
   // Navigation handlers
@@ -451,10 +416,158 @@ export default function App() {
           pendingTotalCount={pendingTotalCount}
           pendingScreeningCount={pendingScreeningCount}
           pendingApprovalCount={pendingApprovalCount}
+          notifications={notifications}
+          onClearNotifications={handleClearNotifications}
+          onNotificationClick={handleNotificationClick}
         />
+
+        {/* Floating Toast Notification Banner */}
+        {toast && (
+          <div className={`floating-toast-alert animate-slide-down ${toast.type || 'success'}`}>
+            <div className="toast-icon-wrap">
+              {toast.type === 'success' ? (
+                <CheckCircle2 size={20} className="toast-icon-success" />
+              ) : toast.type === 'warning' ? (
+                <AlertTriangle size={20} className="toast-icon-warning" />
+              ) : (
+                <Info size={20} className="toast-icon-info" />
+              )}
+            </div>
+
+            <div className="toast-body">
+              <div className="toast-header-row">
+                <span className="toast-title">{toast.title}</span>
+                {toast.fileNumber && (
+                  <span className="toast-file-badge font-mono">{toast.fileNumber}</span>
+                )}
+              </div>
+              <p className="toast-message">{toast.message}</p>
+            </div>
+
+            <button 
+              className="btn-toast-dismiss" 
+              onClick={() => setToast(null)}
+              title="Dismiss notification"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+
         <div className="content-body">
           {renderActiveMainTab()}
         </div>
+
+        <style>{`
+          .floating-toast-alert {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            z-index: 9999;
+            min-width: 340px;
+            max-width: 440px;
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            background: #ffffff;
+            border: 1px solid #10b981;
+            box-shadow: 0 12px 32px rgba(16, 185, 129, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            animation: toastSlideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+
+          .floating-toast-alert.warning {
+            border-color: #f59e0b;
+            box-shadow: 0 12px 32px rgba(245, 158, 11, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+          }
+
+          .floating-toast-alert.info {
+            border-color: #0284c7;
+            box-shadow: 0 12px 32px rgba(2, 132, 199, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+          }
+
+          @keyframes toastSlideDown {
+            from {
+              opacity: 0;
+              transform: translateY(-20px) scale(0.96);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+
+          .toast-icon-wrap {
+            flex-shrink: 0;
+            margin-top: 1px;
+          }
+
+          .toast-icon-success {
+            color: #10b981;
+          }
+
+          .toast-icon-warning {
+            color: #f59e0b;
+          }
+
+          .toast-icon-info {
+            color: #0284c7;
+          }
+
+          .toast-body {
+            flex: 1;
+          }
+
+          .toast-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+          }
+
+          .toast-title {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #111827;
+          }
+
+          .toast-file-badge {
+            font-size: 10px;
+            font-weight: 700;
+            background-color: #f3f4f6;
+            color: #374151;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+          }
+
+          .toast-message {
+            font-size: 12px;
+            color: #4b5563;
+            line-height: 1.4;
+            margin: 0;
+          }
+
+          .btn-toast-dismiss {
+            background: transparent;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+          }
+
+          .btn-toast-dismiss:hover {
+            color: #111827;
+            background-color: #f3f4f6;
+          }
+        `}</style>
       </main>
     </div>
   );

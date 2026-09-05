@@ -99,7 +99,7 @@ export const SAMPLE_DEMO_DATA = {
 };
 
 export const INITIAL_FORM_DATA = {
-  // Step 1: Applicant Details (Blank by default so placeholders/watermarks show)
+  // Step 1: Applicant Details
   applicantName: '',
   organization: '',
   department: '',
@@ -669,7 +669,7 @@ export default function TdpProposalApplicationFlow({
                 <input 
                   type="text" 
                   className={`form-control-input ${validationErrors.applicantName ? 'input-error' : ''}`}
-                  placeholder="e.g. Prof. S. Ananth / Dr. Rajesh Verma"
+                  placeholder="Enter Name"
                   value={formData.applicantName}
                   onChange={(e) => updateField('applicantName', e.target.value)}
                 />
@@ -681,7 +681,6 @@ export default function TdpProposalApplicationFlow({
                 <input 
                   type="text" 
                   className={`form-control-input ${validationErrors.organization ? 'input-error' : ''}`}
-                  placeholder="e.g. IIT Tirupati / CSIR Lab / ABC Tech Pvt Ltd"
                   value={formData.organization}
                   onChange={(e) => updateField('organization', e.target.value)}
                 />
@@ -693,7 +692,6 @@ export default function TdpProposalApplicationFlow({
                 <input 
                   type="text" 
                   className={`form-control-input ${validationErrors.department ? 'input-error' : ''}`}
-                  placeholder="e.g. Dept. of Electrical Engineering / Robotics Lab"
                   value={formData.department}
                   onChange={(e) => updateField('department', e.target.value)}
                 />
@@ -705,7 +703,6 @@ export default function TdpProposalApplicationFlow({
                 <input 
                   type="text" 
                   className={`form-control-input ${validationErrors.designation ? 'input-error' : ''}`}
-                  placeholder="e.g. Associate Professor & PI"
                   value={formData.designation}
                   onChange={(e) => updateField('designation', e.target.value)}
                 />
@@ -717,7 +714,6 @@ export default function TdpProposalApplicationFlow({
                 <input 
                   type="email" 
                   className={`form-control-input ${validationErrors.email ? 'input-error' : ''}`}
-                  placeholder="e.g. pi@institution.ac.in"
                   value={formData.email}
                   onChange={(e) => updateField('email', e.target.value)}
                 />
@@ -769,7 +765,6 @@ export default function TdpProposalApplicationFlow({
                 <input 
                   type="text" 
                   className={`form-control-input ${validationErrors.projectTitle ? 'input-error' : ''}`}
-                  placeholder="Enter full technical project title..."
                   value={formData.projectTitle}
                   onChange={(e) => updateField('projectTitle', e.target.value)}
                 />
@@ -828,7 +823,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={3}
                   className={`form-control-textarea ${validationErrors.problemStatement ? 'input-error' : ''}`}
-                  placeholder="Detail the exact technical limitation, operational challenge, or national strategic gap addressed..."
                   value={formData.problemStatement}
                   onChange={(e) => updateField('problemStatement', e.target.value)}
                 />
@@ -840,7 +834,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={2}
                   className="form-control-textarea"
-                  placeholder="Briefly state baseline research, patents, or exploratory laboratory prototypes completed prior to this proposal..."
                   value={formData.background}
                   onChange={(e) => updateField('background', e.target.value)}
                 />
@@ -851,7 +844,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={2}
                   className={`form-control-textarea ${validationErrors.aim ? 'input-error' : ''}`}
-                  placeholder="State the primary translational aim of the project..."
                   value={formData.aim}
                   onChange={(e) => updateField('aim', e.target.value)}
                 />
@@ -863,7 +855,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={3}
                   className={`form-control-textarea ${validationErrors.proposedSolution ? 'input-error' : ''}`}
-                  placeholder="Describe your proposed architecture, subsystem components, and translation pathway..."
                   value={formData.proposedSolution}
                   onChange={(e) => updateField('proposedSolution', e.target.value)}
                 />
@@ -875,7 +866,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={2}
                   className={`form-control-textarea ${validationErrors.innovation ? 'input-error' : ''}`}
-                  placeholder="Highlight what makes your solution technically superior to existing global solutions..."
                   value={formData.innovation}
                   onChange={(e) => updateField('innovation', e.target.value)}
                 />
@@ -887,7 +877,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={2}
                   className="form-control-textarea"
-                  placeholder="Expected prototypes, hardware boards, patent filings, or open algorithms generated..."
                   value={formData.expectedOutcomes}
                   onChange={(e) => updateField('expectedOutcomes', e.target.value)}
                 />
@@ -913,7 +902,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={3}
                   className={`form-control-textarea ${validationErrors.methodology ? 'input-error' : ''}`}
-                  placeholder="Step-by-step experimental design, algorithm formulation, circuit modeling, and fabrication strategy..."
                   value={formData.methodology}
                   onChange={(e) => updateField('methodology', e.target.value)}
                 />
@@ -925,7 +913,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={3}
                   className={`form-control-textarea ${validationErrors.hardwareRequirements ? 'input-error' : ''}`}
-                  placeholder="ASICs, FPGA chips, PCB components, RF amplifiers, sensors, thermal test chambers..."
                   value={formData.hardwareRequirements}
                   onChange={(e) => updateField('hardwareRequirements', e.target.value)}
                 />
@@ -937,7 +924,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={3}
                   className={`form-control-textarea ${validationErrors.softwareRequirements ? 'input-error' : ''}`}
-                  placeholder="Simulation suites, EDA software, deep learning frameworks, embedded toolchains..."
                   value={formData.softwareRequirements}
                   onChange={(e) => updateField('softwareRequirements', e.target.value)}
                 />
@@ -949,7 +935,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={2}
                   className="form-control-textarea"
-                  placeholder="Satellite imagery, NavIC RF raw dumps, GIS layers, sensor telemetry benchmarks..."
                   value={formData.datasetRequirements}
                   onChange={(e) => updateField('datasetRequirements', e.target.value)}
                 />
@@ -990,7 +975,6 @@ export default function TdpProposalApplicationFlow({
                 <textarea 
                   rows={2}
                   className="form-control-textarea"
-                  placeholder="Indicate industry partners identified for co-development, technology transfer, or commercial testing..."
                   value={formData.industryCollaborationRequirement}
                   onChange={(e) => updateField('industryCollaborationRequirement', e.target.value)}
                 />
@@ -1041,7 +1025,7 @@ export default function TdpProposalApplicationFlow({
                 <input 
                   type="text" 
                   className={`form-control-input ${validationErrors.facultyMentorPI ? 'input-error' : ''}`}
-                  placeholder="e.g. Prof. S. Ananth (Lead Investigator)"
+                  placeholder="Enter Name"
                   value={formData.facultyMentorPI}
                   onChange={(e) => updateField('facultyMentorPI', e.target.value)}
                 />
@@ -1071,14 +1055,12 @@ export default function TdpProposalApplicationFlow({
                       <input 
                         type="text" 
                         className="form-control-input flex-1" 
-                        placeholder="Milestone Title..."
                         value={m.title}
                         onChange={(e) => handleUpdateMilestone(mIdx, 'title', e.target.value)}
                       />
                       <input 
                         type="text" 
                         className="form-control-input flex-1" 
-                        placeholder="Target Evidence / Output..."
                         value={m.targetOutput}
                         onChange={(e) => handleUpdateMilestone(mIdx, 'targetOutput', e.target.value)}
                       />
@@ -1116,7 +1098,6 @@ export default function TdpProposalApplicationFlow({
                       <input 
                         type="text" 
                         className="form-control-input flex-1" 
-                        placeholder="Deliverable Description (Hardware/Firmware/Report)..."
                         value={d.description}
                         onChange={(e) => handleUpdateDeliverable(dIdx, 'description', e.target.value)}
                       />
@@ -1154,21 +1135,19 @@ export default function TdpProposalApplicationFlow({
                       <input 
                         type="text" 
                         className="form-control-input flex-1" 
-                        placeholder="Member Full Name..."
+                        placeholder="Enter Name"
                         value={member.name}
                         onChange={(e) => handleUpdateTeamMember(memberIdx, 'name', e.target.value)}
                       />
                       <input 
                         type="text" 
                         className="form-control-input flex-1" 
-                        placeholder="Role (e.g. Co-PI / RF Engineer)..."
                         value={member.role}
                         onChange={(e) => handleUpdateTeamMember(memberIdx, 'role', e.target.value)}
                       />
                       <input 
                         type="email" 
                         className="form-control-input flex-1" 
-                        placeholder="Email Address..."
                         value={member.email}
                         onChange={(e) => handleUpdateTeamMember(memberIdx, 'email', e.target.value)}
                       />
@@ -1316,7 +1295,7 @@ export default function TdpProposalApplicationFlow({
               <input 
                 type="text" 
                 className={`form-control-input ${validationErrors.authorizedSigner ? 'input-error' : ''}`}
-                placeholder="e.g. Prof. S. Ananth"
+                placeholder="Enter Name"
                 value={formData.authorizedSigner}
                 onChange={(e) => updateField('authorizedSigner', e.target.value)}
               />

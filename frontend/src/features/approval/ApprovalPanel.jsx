@@ -81,7 +81,7 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
     }
 
     const updatedHistory = [
-      ...selectedApp.history,
+      ...(selectedApp.history || []),
       {
         date: new Date().toLocaleString('en-GB'),
         action: 'Digitally Approved & Signed',
@@ -110,7 +110,7 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
     }
 
     const updatedHistory = [
-      ...selectedApp.history,
+      ...(selectedApp.history || []),
       {
         date: new Date().toLocaleString('en-GB'),
         action: 'Application Rejected & Escalated Back',
@@ -248,7 +248,6 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
                 <textarea 
                   className="form-control"
                   rows="3"
-                  placeholder="Record strategic directions, advisory assignments, or milestone details..."
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                 ></textarea>
@@ -260,7 +259,7 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
                   <input 
                     type="text" 
                     className="form-control font-signature"
-                    placeholder="Type your full name to E-Sign..."
+                    placeholder="Enter Name"
                     value={signatureName}
                     onChange={(e) => setSignatureName(e.target.value)}
                     required

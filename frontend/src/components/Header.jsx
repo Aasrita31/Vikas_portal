@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, User, ChevronDown, Bell } from 'lucide-react';
+import { ShieldCheck, User, Bell } from 'lucide-react';
 
 export default function Header({ 
   currentRole, 
@@ -8,16 +8,12 @@ export default function Header({
   setActiveTab,
   pendingTotalCount = 0,
   pendingScreeningCount = 0,
-  pendingApprovalCount = 0
+  pendingApprovalCount = 0,
+  notifications = [],
+  onClearNotifications,
+  onNotificationClick
 }) {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  const roles = [
-    { id: 'public', label: 'Public / Stakeholder', desc: 'Can submit new onboarding requests & track status' },
-    { id: 'operations', label: 'Operations Anchor', desc: 'Performs screening, validations & routes files' },
-    { id: 'pillar_lead', label: 'Pillar Lead', desc: 'Reviews program files & approves vertical allocations' },
-    { id: 'pd', label: 'Project Director (PD)', desc: 'Final strategic approvals, MoUs, high-value files' }
-  ];
+  const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
 
   // The Platform Navigation Steps matching the 7-Step SOP
   const mainNavs = [
@@ -29,56 +25,90 @@ export default function Header({
     { id: 'flow', label: '6. System Flow' }
   ];
 
-  const activeRoleName = roles.find(r => r.id === currentRole)?.label || currentRole;
-
-  const handleRoleChange = (roleId) => {
-    setCurrentRole(roleId);
-    setDropdownOpen(false);
-  };
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <header className="navbar-header-grid">
       {/* Column 1: Left Controls & Persona Switcher */}
       <div className="navbar-controls-left">
-        {/* Persona Selector Dropdown */}
-        <div className="role-selector-container">
+        {/* User Profile Avatar */}
+        <div className="user-profile-container" title="User Profile">
+          <div className="user-profile-avatar">
+            <User size={18} />
+          </div>
+        </div>
+
+        {/* Notifications Button & Dropdown */}
+        <div className="notif-selector-container" style={{ position: 'relative' }}>
           <button 
-            className="role-selector-btn-light" 
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            onBlur={() => setTimeout(() => setDropdownOpen(false), 200)}
+            className="navbar-icon-btn-light" 
+            title="View Notifications"
+            onClick={() => {
+              setNotifDropdownOpen(!notifDropdownOpen);
+              setDropdownOpen(false);
+            }}
           >
-            <div className="role-avatar-light">
-              <User size={15} />
-            </div>
-            <div className="role-btn-info-light">
-              <span className="role-label-light">Active Role</span>
-              <span className="role-name-light">{activeRoleName.split(' ')[0]}</span>
-            </div>
-            <ChevronDown size={14} className={`chevron-icon-light ${dropdownOpen ? 'rotated' : ''}`} />
+            <Bell size={17} />
+            {(unreadCount > 0 || pendingTotalCount > 0) && (
+              <span className="btn-dot-indicator-light"></span>
+            )}
           </button>
 
-          {dropdownOpen && (
-            <div className="role-dropdown-light animate-fade-in">
-              <div className="dropdown-header-light">Switch System Persona</div>
-              {roles.map((role) => (
-                <button
-                  key={role.id}
-                  onClick={() => handleRoleChange(role.id)}
-                  className={`dropdown-item-light ${currentRole === role.id ? 'active' : ''}`}
-                >
-                  <div className="dropdown-item-label-light">{role.label}</div>
-                  <div className="dropdown-item-desc-light">{role.desc}</div>
-                </button>
-              ))}
+          {notifDropdownOpen && (
+            <div className="notif-dropdown-light animate-fade-in">
+              <div className="notif-dropdown-header">
+                <div className="notif-title-row">
+                  <span className="notif-title-text">System Alerts & Notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="badge badge-danger" style={{ fontSize: '10px' }}>
+                      {unreadCount} New
+                    </span>
+                  )}
+                </div>
+                {notifications.length > 0 && onClearNotifications && (
+                  <button 
+                    className="btn-clear-notifs" 
+                    onClick={onClearNotifications}
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              <div className="notif-list-scroll">
+                {notifications.length === 0 ? (
+                  <div className="notif-empty-state">
+                    <Bell size={24} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+                    <span>No new notifications</span>
+                  </div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div 
+                      key={notif.id} 
+                      className={`notif-item-card ${notif.read ? 'read' : 'unread'}`}
+                      onClick={() => {
+                        if (onNotificationClick) onNotificationClick(notif);
+                        setNotifDropdownOpen(false);
+                      }}
+                    >
+                      <div className="notif-item-top">
+                        <span className={`notif-type-pill ${notif.type || 'info'}`}>
+                          {notif.type === 'approval_success' ? 'Authorized' : notif.type === 'routed' ? 'Routed' : 'Update'}
+                        </span>
+                        <span className="notif-time-text">{notif.timestamp}</span>
+                      </div>
+                      <h4 className="notif-item-title">{notif.title}</h4>
+                      <p className="notif-item-message">{notif.message}</p>
+                      {notif.fileNumber && (
+                        <div className="notif-file-pill font-mono">{notif.fileNumber}</div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>
-
-        {/* Notifications */}
-        <button className="navbar-icon-btn-light" title="View Notifications">
-          <Bell size={17} />
-          {pendingTotalCount > 0 && <span className="btn-dot-indicator-light"></span>}
-        </button>
 
         {/* Permission Banner */}
         <div className="permission-tag-pill">
@@ -252,122 +282,31 @@ export default function Header({
           border: 1px solid #fecaca;
         }
 
-        /* Role Selector */
-        .role-selector-container {
-          position: relative;
-        }
-
-        .role-selector-btn-light {
+        /* Profile Avatar */
+        .user-profile-container {
           display: flex;
           align-items: center;
-          gap: 8px;
+        }
+
+        .user-profile-avatar {
+          width: 36px;
+          height: 36px;
+          border-radius: var(--radius-full);
           background-color: var(--bg-primary);
           border: 1px solid var(--border-color);
-          padding: 5px 10px;
-          border-radius: var(--radius-md);
-          cursor: pointer;
-          transition: all var(--transition-fast);
-        }
-
-        .role-selector-btn-light:hover {
-          border-color: var(--border-color-active);
-          box-shadow: var(--shadow-sm);
-        }
-
-        .role-avatar-light {
-          width: 24px;
-          height: 24px;
-          border-radius: var(--radius-full);
-          background-color: var(--color-accent-glow);
           color: var(--color-accent);
           display: flex;
           align-items: center;
           justify-content: center;
-        }
-
-        .role-btn-info-light {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          text-align: left;
-        }
-
-        .role-label-light {
-          font-size: 8.5px;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          font-weight: 700;
-          line-height: 1;
-        }
-
-        .role-name-light {
-          font-size: 11px;
-          font-weight: 700;
-          color: var(--text-primary);
-          line-height: 1.2;
-        }
-
-        .chevron-icon-light {
-          color: var(--text-muted);
-          transition: transform var(--transition-fast);
-        }
-
-        .chevron-icon-light.rotated {
-          transform: rotate(180deg);
-        }
-
-        .role-dropdown-light {
-          position: absolute;
-          top: calc(100% + 8px);
-          left: 0;
-          width: 260px;
-          background-color: var(--bg-surface);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-md);
-          box-shadow: var(--shadow-lg);
-          padding: 6px;
-          z-index: 200;
-        }
-
-        .dropdown-header-light {
-          font-size: 10px;
-          font-weight: 700;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          padding: 6px 10px;
-          letter-spacing: 0.5px;
-        }
-
-        .dropdown-item-light {
-          width: 100%;
-          text-align: left;
-          padding: 8px 10px;
-          border-radius: var(--radius-sm);
-          background: transparent;
-          border: none;
           cursor: pointer;
-          transition: background var(--transition-fast);
+          transition: all var(--transition-fast);
+          box-shadow: var(--shadow-sm);
         }
 
-        .dropdown-item-light:hover {
-          background-color: var(--bg-primary);
-        }
-
-        .dropdown-item-light.active {
+        .user-profile-avatar:hover {
+          border-color: var(--color-accent);
           background-color: var(--color-accent-glow);
-        }
-
-        .dropdown-item-label-light {
-          font-size: 12px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-
-        .dropdown-item-desc-light {
-          font-size: 10px;
-          color: var(--text-secondary);
-          margin-top: 2px;
-          line-height: 1.3;
+          transform: scale(1.04);
         }
 
         .navbar-icon-btn-light {
@@ -394,10 +333,158 @@ export default function Header({
           position: absolute;
           top: 6px;
           right: 6px;
-          width: 6px;
-          height: 6px;
+          width: 7px;
+          height: 7px;
           border-radius: var(--radius-full);
-          background-color: var(--color-accent);
+          background-color: #ef4444;
+          box-shadow: 0 0 6px #ef4444;
+        }
+
+        /* Notifications Dropdown */
+        .notif-dropdown-light {
+          position: absolute;
+          top: calc(100% + 8px);
+          left: 0;
+          width: 320px;
+          background-color: var(--bg-surface);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          box-shadow: var(--shadow-lg);
+          z-index: 210;
+          overflow: hidden;
+        }
+
+        .notif-dropdown-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          background-color: var(--bg-primary);
+          border-bottom: 1px solid var(--border-color);
+        }
+
+        .notif-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .notif-title-text {
+          font-size: 11.5px;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .btn-clear-notifs {
+          background: transparent;
+          border: none;
+          font-size: 10.5px;
+          color: var(--color-accent);
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .btn-clear-notifs:hover {
+          text-decoration: underline;
+        }
+
+        .notif-list-scroll {
+          max-height: 360px;
+          overflow-y: auto;
+          padding: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .notif-empty-state {
+          padding: 30px 16px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          color: var(--text-muted);
+          font-size: 12px;
+        }
+
+        .notif-item-card {
+          padding: 10px 12px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--border-color);
+          background-color: var(--bg-primary);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+
+        .notif-item-card:hover {
+          border-color: var(--color-accent);
+          background-color: var(--bg-surface);
+        }
+
+        .notif-item-card.unread {
+          border-left: 3px solid var(--color-accent);
+          background-color: var(--color-accent-glow);
+        }
+
+        .notif-item-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 4px;
+        }
+
+        .notif-type-pill {
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          padding: 2px 6px;
+          border-radius: var(--radius-full);
+          letter-spacing: 0.3px;
+        }
+
+        .notif-type-pill.approval_success {
+          background-color: #d1fae5;
+          color: #065f46;
+        }
+
+        .notif-type-pill.routed {
+          background-color: #e0f2fe;
+          color: #0369a1;
+        }
+
+        .notif-type-pill.info {
+          background-color: #f3f4f6;
+          color: #374151;
+        }
+
+        .notif-time-text {
+          font-size: 10px;
+          color: var(--text-muted);
+        }
+
+        .notif-item-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin: 0 0 2px 0;
+        }
+
+        .notif-item-message {
+          font-size: 11px;
+          color: var(--text-secondary);
+          line-height: 1.35;
+          margin: 0;
+        }
+
+        .notif-file-pill {
+          display: inline-block;
+          font-size: 10px;
+          color: var(--color-accent);
+          background-color: rgba(var(--color-accent-rgb), 0.1);
+          padding: 2px 6px;
+          border-radius: 4px;
+          margin-top: 6px;
+          font-weight: 600;
         }
       `}</style>
     </header>

@@ -1336,7 +1336,7 @@ export default function TdpProjectExecutionWorkspace({
             <div className="repo-details-box mt-20">
               <div className="repo-card-item">
                 <div className="repo-icon-wrap">
-                  <Github size={24} className="text-primary" />
+                  <GitBranch size={24} className="text-primary" />
                 </div>
                 <div className="repo-content-flex">
                   <div className="repo-title-row">
@@ -1463,7 +1463,6 @@ export default function TdpProjectExecutionWorkspace({
                 <label className="form-label">3. Tools / Datasets / Methods Used *</label>
                 <input 
                   type="text" 
-                  placeholder="e.g. Vivado Design Suite, MATLAB RF Blockset, PNT Signal Generator, Sentinel-2 L2A raster..."
                   value={weeklyFormData.toolsDatasetsMethodsUsed}
                   onChange={(e) => setWeeklyFormData({ ...weeklyFormData, toolsDatasetsMethodsUsed: e.target.value })}
                   className="form-control"
@@ -1476,7 +1475,6 @@ export default function TdpProjectExecutionWorkspace({
                 <label className="form-label">5. Results / Outputs *</label>
                 <textarea 
                   rows="2"
-                  placeholder="Specific outputs generated (e.g. fabricated test rig PCB, baseband simulation benchmark, telemetry graphs)..."
                   value={weeklyFormData.resultsOutputs}
                   onChange={(e) => setWeeklyFormData({ ...weeklyFormData, resultsOutputs: e.target.value })}
                   className="form-control"
@@ -1490,7 +1488,6 @@ export default function TdpProjectExecutionWorkspace({
                   <label className="form-label">6. Challenges Encountered</label>
                   <textarea 
                     rows="2"
-                    placeholder="Technical bottlenecks, signal noise, hardware supply delay..."
                     value={weeklyFormData.challenges}
                     onChange={(e) => setWeeklyFormData({ ...weeklyFormData, challenges: e.target.value })}
                     className="form-control"
@@ -1502,7 +1499,6 @@ export default function TdpProjectExecutionWorkspace({
                   <label className="form-label">7. Solutions Implemented</label>
                   <textarea 
                     rows="2"
-                    placeholder="Mitigation strategy, workaround, alternative algorithm..."
                     value={weeklyFormData.solutions}
                     onChange={(e) => setWeeklyFormData({ ...weeklyFormData, solutions: e.target.value })}
                     className="form-control"
@@ -1516,7 +1512,6 @@ export default function TdpProjectExecutionWorkspace({
                   <label className="form-label">8. Support Needed from IITTNiF</label>
                   <input 
                     type="text"
-                    placeholder="e.g. Anechoic chamber booking, GPU cluster allocation..."
                     value={weeklyFormData.supportNeeded}
                     onChange={(e) => setWeeklyFormData({ ...weeklyFormData, supportNeeded: e.target.value })}
                     className="form-control"
@@ -1690,7 +1685,6 @@ export default function TdpProjectExecutionWorkspace({
                 <label className="form-label">Evidence Document / File Name *</label>
                 <input 
                   type="text" 
-                  placeholder="e.g. NavIC_Baseband_Simulation_Report_v1.pdf"
                   value={milestoneFormData.evidenceFileName}
                   onChange={(e) => setMilestoneFormData({ ...milestoneFormData, evidenceFileName: e.target.value, evidence: e.target.value })}
                   className="form-control font-mono"
@@ -1757,7 +1751,6 @@ export default function TdpProjectExecutionWorkspace({
                 <label className="form-label">Deliverable Package File Name *</label>
                 <input 
                   type="text" 
-                  placeholder="e.g. Deliverable_D1_Package.zip"
                   value={deliverableFormData.evidenceFileName}
                   onChange={(e) => setDeliverableFormData({ ...deliverableFormData, evidenceFileName: e.target.value, evidence: e.target.value })}
                   className="form-control font-mono"
