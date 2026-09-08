@@ -18,7 +18,7 @@ export default function Header({
   // The Platform Navigation Steps matching the 7-Step SOP
   const mainNavs = [
     { id: 'entry', label: '1. Entry & Data Capture' },
-    { id: 'screening', label: '2. Screening & Routing', count: pendingScreeningCount },
+    { id: 'screening', label: '2. Screening', count: pendingScreeningCount },
     { id: 'approval', label: '3. Approval', count: pendingApprovalCount },
     { id: 'overview', label: '4. Engagement (Verticals)' },
     { id: 'tracking', label: '5. Tracking & Outcomes' },

@@ -35,7 +35,7 @@ flowchart TD
         S1 --> S2 --> S3 --> S4
     end
 
-    subgraph Layer2["2. Screening & Intelligent Routing (Operations)"]
+    subgraph Layer2["2. Screening (Operations)"]
         S5["Operations Anchor Review\n(Document verification & eligibility check)"]:::opsStyle
         S6{"Is File Complete & Valid?"}:::opsStyle
         S7["Return to Applicant for Revision"]:::opsStyle
