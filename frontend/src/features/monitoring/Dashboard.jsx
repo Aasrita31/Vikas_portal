@@ -17,7 +17,11 @@ import {
   Link
 } from 'lucide-react';
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function Dashboard({ applications = [], onNavigateToTab }) {
+  const { currentUser, currentRole, isApplicant } = useAuth();
+
   // The 5 Expected Outcomes defined in the official VIKAS specification
   const expectedOutcomes = [
     {
@@ -117,6 +121,41 @@ export default function Dashboard({ applications = [], onNavigateToTab }) {
 
   return (
     <div className="outcomes-dashboard animate-fade-in">
+      {/* Role-Governed Monitoring Header Banner */}
+      <div className="card role-monitoring-banner mb-20" style={{ marginBottom: '20px', padding: '16px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-sm)', background: 'rgba(var(--color-accent-rgb), 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+              {currentUser.avatarBadge || '📊'}
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="font-bold text-accent" style={{ fontSize: '14px' }}>{currentUser.roleLabel || currentRole.toUpperCase()}</span>
+                <span className="badge badge-secondary" style={{ fontSize: '11px' }}>Internal Monitoring Scope</span>
+              </div>
+              <p style={{ margin: '2px 0 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                {currentRole === 'operations' && 'Operations Intake SLA: Total Applications registered, active screening queue throughput, and vertical routing metrics.'}
+                {currentRole === 'pillar_lead' && `Vertical Monitoring: Portfolio oversight for ${currentUser.assignedVertical || 'assigned vertical'}, delegated project milestones, and outcome deliverables.`}
+                {currentRole === 'pd' && 'Directorate Governance: Institutional compliance across all 9 verticals, strategic project health, and DST NM-ICPS impact milestones.'}
+                {currentRole === 'execution' && 'Program Execution: Active TDP contracts, milestone completion velocities, and mentor verification turnaround.'}
+                {currentRole === 'admin' && 'Central Administration: Full audit trail, authority matrix compliance, and digital signature records.'}
+                {isApplicant && 'Applicant View: External stakeholder read-only summary of institutional outcomes and strategic mission indicators.'}
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Active Applications</span>
+              <strong className="font-mono text-accent" style={{ fontSize: '16px' }}>{applications.length}</strong>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Approved Stakeholders</span>
+              <strong className="font-mono text-success" style={{ fontSize: '16px' }}>{applications.filter(a => a.status === 'approved').length}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 1. Expected Outcomes Section */}
       <div className="section-block">
         <div className="section-header-row">

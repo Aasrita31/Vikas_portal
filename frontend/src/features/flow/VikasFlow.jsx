@@ -25,7 +25,9 @@ import {
   Link,
   Bookmark,
   TrendingUp,
-  HelpCircle
+  HelpCircle,
+  Shield,
+  Lock
 } from 'lucide-react';
 
 export default function VikasFlow() {
@@ -39,6 +41,8 @@ export default function VikasFlow() {
         id: "1",
         name: "1. Entry Point",
         desc: "Single-window portal entry point.",
+        ownerRole: "External Stakeholder / Applicant",
+        roleClass: "role-applicant",
         icon: ArrowRight,
         children: [
           { name: "Registration Form (Unlisted)", icon: FileText, desc: "Onboarding submission entry logs" }
@@ -48,6 +52,8 @@ export default function VikasFlow() {
         id: "2",
         name: "2. Stakeholder Type Selection",
         desc: "Categorize type of engagement.",
+        ownerRole: "External Stakeholder / Applicant",
+        roleClass: "role-applicant",
         icon: Users,
         children: [
           { name: "Expert", icon: UserCheck, desc: "Senior advisory network review panel" },
@@ -63,6 +69,8 @@ export default function VikasFlow() {
         id: "3",
         name: "3. Data Capture",
         desc: "Capturing domain alignment and intents.",
+        ownerRole: "External Stakeholder / Applicant",
+        roleClass: "role-applicant",
         icon: FileText,
         children: [
           { name: "Profile Details", icon: User, desc: "Applicant credential checks" },
@@ -84,6 +92,8 @@ export default function VikasFlow() {
         id: "4",
         name: "4. Screening Layer",
         desc: "Operational validation and classification.",
+        ownerRole: "Operations Team (Strict)",
+        roleClass: "role-operations",
         icon: Layers,
         children: [
           { name: "Basic Validation", icon: CheckCircle, desc: "Document check & authenticity validation" },
@@ -94,6 +104,8 @@ export default function VikasFlow() {
         id: "5",
         name: "5. Routing Engine",
         desc: "Intelligent assignment to active streams.",
+        ownerRole: "Operations Team (Strict)",
+        roleClass: "role-operations",
         icon: GitBranch,
         children: [
           { name: "Technology Development", icon: Cpu, desc: "6.1 TDP prototype translation" },
@@ -109,8 +121,10 @@ export default function VikasFlow() {
       },
       {
         id: "6",
-        name: "6. PD Oversight Layer",
-        desc: "Governance authorizations and tags.",
+        name: "6. PD Oversight & Authority Matrix",
+        desc: "Pillar Lead & Project Director sign-offs.",
+        ownerRole: "Pillar Lead / Project Director",
+        roleClass: "role-approval",
         icon: Award,
         children: [
           { name: "Strategic Approval (if required)", icon: ShieldCheck, desc: "PD sign-off on strategic files" },
@@ -121,6 +135,8 @@ export default function VikasFlow() {
         id: "7",
         name: "7. Engagement Layer",
         desc: "Structuring allocations and setups.",
+        ownerRole: "Authorized Internal Staff",
+        roleClass: "role-execution",
         icon: Activity,
         children: [
           { name: "Project Allocation", icon: FileText, desc: "Assigning TDP contracts" },
@@ -133,6 +149,8 @@ export default function VikasFlow() {
         id: "8",
         name: "8. Execution Layer",
         desc: "Active deployment in labs and domains.",
+        ownerRole: "Authorized Internal Staff",
+        roleClass: "role-execution",
         icon: Settings,
         children: [
           { name: "Labs / Teams / Startups", icon: Cpu, desc: "Deployment in SPRI/PNT active labs" },
@@ -143,6 +161,8 @@ export default function VikasFlow() {
         id: "9",
         name: "9. Tracking & Monitoring",
         desc: "Milestone checks and KPI dashboards.",
+        ownerRole: "Directorate & Monitoring (Applicant Read-Only)",
+        roleClass: "role-monitoring",
         icon: LineChart,
         children: [
           { name: "Dashboard", icon: FileText, desc: "Live operational file dashboard" },
@@ -163,6 +183,8 @@ export default function VikasFlow() {
         id: "10",
         name: "10. Output",
         desc: "Final outcome vectors.",
+        ownerRole: "Directorate & Impact Evaluation",
+        roleClass: "role-monitoring",
         icon: CheckCircle,
         children: [
           { name: "Technology Development", icon: Cpu, desc: "Indigenized technology translation" },
@@ -198,6 +220,54 @@ export default function VikasFlow() {
           <RotateCcw size={16} />
         </button>
         <span className="zoom-indicator">{(zoom * 100).toFixed(0)}%</span>
+      </div>
+
+      {/* Role-Based Governance Banner & Legend */}
+      <div className="flow-governance-legend card">
+        <div className="legend-header">
+          <div className="legend-title">
+            <Shield size={16} className="text-accent" />
+            <span>VIKAS Architecture Role-Based Governance Model</span>
+          </div>
+          <span className="legend-rule-badge">Strict Separation of Duties Enforced</span>
+        </div>
+        <div className="legend-items-row">
+          <div className="legend-item">
+            <span className="legend-dot dot-applicant"></span>
+            <div>
+              <strong>Stages 1–3: External Stakeholder</strong>
+              <p>Entry, profile capture & domain intents. Zero internal authority.</p>
+            </div>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot dot-operations"></span>
+            <div>
+              <strong>Stages 4–5: Internal Operations</strong>
+              <p>Document verification, categorization & routing. Cannot approve.</p>
+            </div>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot dot-approval"></span>
+            <div>
+              <strong>Stage 6: Authority Matrix</strong>
+              <p>Pillar Lead (Delegated) / Project Director (Executive & E-Sign).</p>
+            </div>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot dot-execution"></span>
+            <div>
+              <strong>Stages 7–8: Execution Staff</strong>
+              <p>Workspaces, milestones & deliverable audits. Internal staff only.</p>
+            </div>
+          </div>
+          <div className="legend-item">
+            <span className="legend-dot dot-monitoring"></span>
+            <div>
+              <strong>Stages 9–10: Directorate & Monitoring</strong>
+              <p>KPI scorecards & outcomes. Applicant view is strictly read-only.</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Guide Banner */}
@@ -246,6 +316,10 @@ export default function VikasFlow() {
                         <StageIcon size={16} />
                       </div>
                       <h3>{stage.name}</h3>
+                    </div>
+                    <div className={`stage-role-pill ${stage.roleClass}`}>
+                      <Lock size={10} />
+                      <span>{stage.ownerRole}</span>
                     </div>
                     <p>{stage.desc}</p>
                   </div>
@@ -356,6 +430,130 @@ export default function VikasFlow() {
           color: var(--text-primary);
           min-width: 36px;
           text-align: right;
+        }
+
+        /* Governance Legend */
+        .flow-governance-legend {
+          padding: 14px 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(var(--color-primary-rgb), 0.02) 100%);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+        }
+
+        .legend-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 8px;
+        }
+
+        .legend-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .legend-rule-badge {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          background: rgba(16, 185, 129, 0.1);
+          color: #10b981;
+          border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .legend-items-row {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 12px;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+        }
+
+        .legend-item strong {
+          display: block;
+          font-size: 11px;
+          color: var(--text-primary);
+          line-height: 1.3;
+        }
+
+        .legend-item p {
+          font-size: 10px;
+          color: var(--text-muted);
+          line-height: 1.3;
+          margin-top: 2px;
+        }
+
+        .legend-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          margin-top: 4px;
+          flex-shrink: 0;
+        }
+
+        .dot-applicant { background-color: #3b82f6; }
+        .dot-operations { background-color: #f59e0b; }
+        .dot-approval { background-color: #8b5cf6; }
+        .dot-execution { background-color: #10b981; }
+        .dot-monitoring { background-color: #06b6d4; }
+
+        /* Stage Role Pill */
+        .stage-role-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-size: 9px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+        }
+
+        .stage-role-pill.role-applicant {
+          background: rgba(59, 130, 246, 0.1);
+          color: #3b82f6;
+          border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .stage-role-pill.role-operations {
+          background: rgba(245, 158, 11, 0.1);
+          color: #f59e0b;
+          border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        .stage-role-pill.role-approval {
+          background: rgba(139, 92, 246, 0.12);
+          color: #a78bfa;
+          border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .stage-role-pill.role-execution {
+          background: rgba(16, 185, 129, 0.1);
+          color: #10b981;
+          border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .stage-role-pill.role-monitoring {
+          background: rgba(6, 182, 212, 0.1);
+          color: #06b6d4;
+          border: 1px solid rgba(6, 182, 212, 0.25);
         }
 
         /* Guide Banner */

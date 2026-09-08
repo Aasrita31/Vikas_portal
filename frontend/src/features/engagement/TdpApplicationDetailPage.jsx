@@ -29,8 +29,10 @@ import {
   PauseCircle,
   XCircle,
   AlertTriangle,
-  Zap
+  Zap,
+  ShieldAlert
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function TdpApplicationDetailPage({ 
   applicationId, 
@@ -38,6 +40,8 @@ export default function TdpApplicationDetailPage({
   onNavigateToApply,
   onNavigateToExecution
 }) {
+  const { currentUser, currentRole, isApplicant, canAdvanceStage, authFetch } = useAuth();
+  const [accessDeniedError, setAccessDeniedError] = useState(false);
   const [appData, setAppData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('timeline'); // 'timeline' | 'proposal' | 'milestones' | 'testbeds' | 'team' | 'documents' | 'audit'
@@ -54,8 +58,14 @@ export default function TdpApplicationDetailPage({
   // Fetch application detail from backend
   const fetchDetail = async () => {
     setLoading(true);
+    setAccessDeniedError(false);
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/applications/${applicationId}`);
+      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/applications/${applicationId}`);
+      if (res.status === 403) {
+        setAccessDeniedError(true);
+        setLoading(false);
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setAppData(data);
@@ -297,6 +307,11 @@ export default function TdpApplicationDetailPage({
   };
 
   const executeStageTransition = async (stageId, status, stageName, remarks) => {
+    if (isApplicant || !canAdvanceStage) {
+      alert('Access Denied: External applicants are strictly forbidden from executing stage transitions or review approvals.');
+      return;
+    }
+
     setIsTransitioning(true);
     setTransitionSuccessMessage('');
 
@@ -305,11 +320,11 @@ export default function TdpApplicationDetailPage({
       status: status,
       currentStage: stageName,
       reviewerRemarks: finalRemarks,
-      actor: 'IITTNiF Technical Advisory Committee'
+      actor: `${currentUser.name} (${currentUser.roleLabel || currentUser.role})`
     };
 
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/applications/${appData.applicationNumber}/status`, {
+      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/applications/${appData.applicationNumber}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -435,6 +450,29 @@ export default function TdpApplicationDetailPage({
       remarks: found ? found.remarks : 'Awaiting completion of preceding stages.'
     };
   });
+
+  if (accessDeniedError) {
+    return (
+      <div className="techdev-detail-page tdp-app-detail-page animate-fade-in">
+        <div className="detail-top-nav">
+          <button className="btn-back-link" onClick={onBack}>
+            <ArrowLeft size={16} />
+            <span>Back to Applications Tracking</span>
+          </button>
+        </div>
+        <div className="card access-denied-card" style={{ textAlign: 'center', padding: '48px', maxWidth: '640px', margin: '40px auto' }}>
+          <ShieldAlert size={48} className="text-danger" style={{ margin: '0 auto 16px' }} />
+          <h3>Access Restricted: Confidential Application Record</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Under VIKAS role-based privacy rules, external applicants can only view their own registered proposal dossiers.
+          </p>
+          <button className="btn btn-primary" onClick={onBack}>
+            <ArrowLeft size={16} /> Return to Projects
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="techdev-detail-page tdp-app-detail-page animate-fade-in">
@@ -607,118 +645,141 @@ export default function TdpApplicationDetailPage({
               </div>
             </div>
 
-            {/* Stage Progression Action Console */}
-            <div className="card stage-progression-action-card mt-16">
-              <div className="stage-action-header">
-                <div className="stage-action-title-group">
-                  <div className="stage-action-icon-pill">
-                    <ShieldCheck size={20} className="text-emerald" />
-                  </div>
-                  <div>
-                    <h4 className="stage-action-heading">IITTNiF Evaluation & Governance Control</h4>
-                    <p className="stage-action-subtext">
-                      Advance proposal through the single-window review lifecycle, certification, and execution stages.
-                    </p>
-                  </div>
-                </div>
-                <div className="stage-action-right-badge">
-                  <span className="badge badge-emerald font-mono">
-                    <Activity size={12} /> Active Stage 0{getCurrentActiveStageId()}
-                  </span>
-                </div>
-              </div>
-
-              {transitionSuccessMessage && (
-                <div className="stage-transition-success-banner mt-12 animate-fade-in">
-                  <CheckCircle2 size={16} className="text-emerald" />
-                  <span>{transitionSuccessMessage}</span>
-                </div>
-              )}
-
-              <div className="stage-action-body-grid mt-16">
-                {/* 1-Click Advance Button */}
-                <div className="stage-advance-quick-col">
-                  {getCurrentActiveStageId() < 8 ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary-cta w-full"
-                      disabled={isTransitioning}
-                      onClick={() => {
-                        const nextId = getCurrentActiveStageId() + 1;
-                        const nextObj = STAGES_CONFIG.find(s => s.id === nextId);
-                        if (nextObj) {
-                          executeStageTransition(nextObj.id, nextObj.status, nextObj.name, `Advanced to Stage 0${nextId}: ${nextObj.name} by committee evaluation.`);
-                        }
-                      }}
-                    >
-                      {isTransitioning ? (
-                        <>
-                          <RefreshCw size={15} className="animate-spin" />
-                          <span>Advancing Stage...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap size={15} />
-                          <span>Advance to Stage 0{getCurrentActiveStageId() + 1}: {STAGES_CONFIG.find(s => s.id === getCurrentActiveStageId() + 1)?.name}</span>
-                          <ChevronRight size={15} />
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <div className="stage-completed-badge-box">
-                      <CheckCircle size={18} className="text-emerald" />
-                      <span>All 8 Single-Window Stages Completed & Certified</span>
+            {/* Stage Progression Action Console — Strictly for Authorized Reviewers, Hidden from Applicants */}
+            {!isApplicant && canAdvanceStage ? (
+              <div className="card stage-progression-action-card mt-16">
+                <div className="stage-action-header">
+                  <div className="stage-action-title-group">
+                    <div className="stage-action-icon-pill">
+                      <ShieldCheck size={20} className="text-emerald" />
                     </div>
-                  )}
+                    <div>
+                      <h4 className="stage-action-heading">IITTNiF Evaluation & Governance Control</h4>
+                      <p className="stage-action-subtext">
+                        Advance proposal through the single-window review lifecycle, certification, and execution stages.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="stage-action-right-badge">
+                    <span className="badge badge-emerald font-mono">
+                      <Activity size={12} /> Active Stage 0{getCurrentActiveStageId()}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Direct Jump Selector & Remarks */}
-                <div className="stage-jump-custom-col">
-                  <div className="stage-jump-controls-flex">
-                    <div className="stage-select-wrap">
-                      <label className="stage-ctrl-label">Select Stage:</label>
-                      <select 
-                        className="form-control-select"
-                        value={selectedTargetStageId}
-                        onChange={(e) => setSelectedTargetStageId(Number(e.target.value))}
+                {transitionSuccessMessage && (
+                  <div className="stage-transition-success-banner mt-12 animate-fade-in">
+                    <CheckCircle2 size={16} className="text-emerald" />
+                    <span>{transitionSuccessMessage}</span>
+                  </div>
+                )}
+
+                <div className="stage-action-body-grid mt-16">
+                  {/* 1-Click Advance Button */}
+                  <div className="stage-advance-quick-col">
+                    {getCurrentActiveStageId() < 8 ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary-cta w-full"
                         disabled={isTransitioning}
+                        onClick={() => {
+                          const nextId = getCurrentActiveStageId() + 1;
+                          const nextObj = STAGES_CONFIG.find(s => s.id === nextId);
+                          if (nextObj) {
+                            executeStageTransition(nextObj.id, nextObj.status, nextObj.name, `Advanced to Stage 0${nextId}: ${nextObj.name} by committee evaluation.`);
+                          }
+                        }}
                       >
-                        {STAGES_CONFIG.map(s => (
-                          <option key={s.id} value={s.id}>
-                            Stage 0{s.id}: {s.name} ({s.status})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-outline stage-apply-btn"
-                      disabled={isTransitioning}
-                      onClick={() => {
-                        const target = STAGES_CONFIG.find(s => s.id === selectedTargetStageId);
-                        if (target) {
-                          executeStageTransition(target.id, target.status, target.name, transitionRemarks);
-                        }
-                      }}
-                    >
-                      <span>Update Stage</span>
-                    </button>
+                        {isTransitioning ? (
+                          <>
+                            <RefreshCw size={15} className="animate-spin" />
+                            <span>Advancing Stage...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap size={15} />
+                            <span>Advance to Stage 0{getCurrentActiveStageId() + 1}: {STAGES_CONFIG.find(s => s.id === getCurrentActiveStageId() + 1)?.name}</span>
+                            <ChevronRight size={15} />
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="stage-completed-badge-box">
+                        <CheckCircle size={18} className="text-emerald" />
+                        <span>All 8 Single-Window Stages Completed & Certified</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="stage-remarks-input-wrap mt-10">
-                    <input 
-                      type="text" 
-                      className="form-control-input"
-                      placeholder="Optional evaluation remarks / committee justification..."
-                      value={transitionRemarks}
-                      onChange={(e) => setTransitionRemarks(e.target.value)}
-                      disabled={isTransitioning}
-                    />
+                  {/* Direct Jump Selector & Remarks */}
+                  <div className="stage-jump-custom-col">
+                    <div className="stage-jump-controls-flex">
+                      <div className="stage-select-wrap">
+                        <label className="stage-ctrl-label">Select Stage:</label>
+                        <select 
+                          className="form-control-select"
+                          value={selectedTargetStageId}
+                          onChange={(e) => setSelectedTargetStageId(Number(e.target.value))}
+                          disabled={isTransitioning}
+                        >
+                          {STAGES_CONFIG.map(s => (
+                            <option key={s.id} value={s.id}>
+                              Stage 0{s.id}: {s.name} ({s.status})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-outline stage-apply-btn"
+                        disabled={isTransitioning}
+                        onClick={() => {
+                          const target = STAGES_CONFIG.find(s => s.id === selectedTargetStageId);
+                          if (target) {
+                            executeStageTransition(target.id, target.status, target.name, transitionRemarks);
+                          }
+                        }}
+                      >
+                        <span>Update Stage</span>
+                      </button>
+                    </div>
+
+                    <div className="stage-remarks-input-wrap mt-10">
+                      <input 
+                        type="text" 
+                        className="form-control-input"
+                        placeholder="Optional evaluation remarks / committee justification..."
+                        value={transitionRemarks}
+                        onChange={(e) => setTransitionRemarks(e.target.value)}
+                        disabled={isTransitioning}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="card applicant-stage-info-card mt-16">
+                <div className="stage-action-header">
+                  <div className="stage-action-title-group">
+                    <div className="stage-action-icon-pill">
+                      <ShieldCheck size={20} className="text-emerald" />
+                    </div>
+                    <div>
+                      <h4 className="stage-action-heading">Official Evaluation & Review Lifecycle</h4>
+                      <p className="stage-action-subtext">
+                        Proposal progression is certified exclusively by authorized IITTNiF review bodies and Pillar Leads. Status changes and committee feedback will appear below as they are certified.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="stage-action-right-badge">
+                    <span className="badge badge-emerald font-mono">
+                      <Activity size={12} /> Active Stage 0{getCurrentActiveStageId()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* The 8-Stage Visual Progression Timeline */}
             <div className="card eight-stage-timeline-card mt-20">

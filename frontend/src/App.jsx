@@ -1,19 +1,243 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Info, AlertTriangle, X, Award, FileText } from 'lucide-react';
+import { AuthProvider, useAuth, ROLES } from './context/AuthContext';
 import Header from './components/Header';
 import Dashboard from './features/monitoring/Dashboard';
 import OnboardingForm from './features/entry/OnboardingForm';
+import ApplicantMyApplications from './features/entry/ApplicantMyApplications';
 import ScreeningQueue from './features/screening/ScreeningQueue';
 import ApprovalPanel from './features/approval/ApprovalPanel';
 import EngagementsList from './features/engagement/EngagementsList';
 import AuditLogs from './features/audit/AuditLogs';
 import VikasFlow from './features/flow/VikasFlow';
 import UnsavedChangesModal from './components/UnsavedChangesModal';
+import { 
+  NOTIFICATION_EVENTS, 
+  createNotification, 
+  SEED_NOTIFICATIONS 
+} from './services/notificationService';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState('entry'); // Default to Step 1: Entry & Data Capture
-  const [featureSubTab, setFeatureSubTab] = useState('onboard'); // Sub navigation within features: onboard, screening, approval, audit
-  const [currentRole, setCurrentRole] = useState('pd'); // Initialize to PD for full preview access
+const INITIAL_SEED_APPLICATIONS = [
+  {
+    fileNumber: 'IITTNIF-2026-007',
+    userId: 'usr_app_aasrita_reddy',
+    name: 'NavIC Dual-Band Embedded Sensor Subsystem',
+    applicantName: 'Aasrita Reddy',
+    contactPerson: 'Aasrita Reddy',
+    email: 'aasritareddy.c@gmail.com',
+    organization: 'IITTNiF',
+    location: 'Tirupati',
+    phone: '9493562799',
+    stakeholderType: 'Startup',
+    domains: ['PNT / NavIC / GNSS', 'IoT / Sensor Fusion'],
+    status: 'pending_screening',
+    submissionDate: '08/09/2026',
+    description: 'Indigenous low-power NavIC L5/S-band embedded tracking receiver prototype for spatial mapping and asset telemetry.',
+    isStrategic: false,
+    history: [
+      {
+        date: '08/09/2026, 11:30:00',
+        action: 'File Created & Onboarded',
+        user: 'Aasrita Reddy (Applicant)',
+        details: 'Registered as STARTUP under PNT / NavIC / GNSS. Awaiting initial operations screening.'
+      }
+    ]
+  },
+  {
+    fileNumber: 'IITTNIF-2026-001',
+    userId: 'usr_app_startup',
+    name: 'AeroNav Autonomous Drone Swarm for Agricultural Mapping',
+    applicantName: 'Vikram Sharma',
+    contactPerson: 'Vikram Sharma',
+    email: 'startup@vikas.in',
+    organization: 'AeroGeo Robotics Pvt Ltd',
+    phone: '+91 98765 43210',
+    stakeholderType: 'Startup',
+    domains: ['PNT / NavIC / GNSS', 'Geo-Intelligence'],
+    status: 'pending_screening',
+    submissionDate: '02/09/2026',
+    description: 'Indigenous UAV platform integrating dual-frequency NavIC receivers for cadastral survey.',
+    isStrategic: false,
+    history: [
+      {
+        date: '02/09/2026, 10:30:00',
+        action: 'File Created & Onboarded',
+        user: 'Vikram Sharma (Applicant)',
+        details: 'Application submitted for Technology Development & Incubation.'
+      }
+    ]
+  },
+  {
+    fileNumber: 'IITTNIF-2026-002',
+    name: 'Sub-GHz NavIC Ground Receiver Node Prototype',
+    applicantName: 'Vikram Sharma',
+    contactPerson: 'Vikram Sharma',
+    email: 'startup@vikas.in',
+    organization: 'AeroGeo Robotics Pvt Ltd',
+    phone: '+91 98765 43210',
+    stakeholderType: 'Startup',
+    domains: ['Embedded Systems', 'IoT / Sensor Fusion'],
+    status: 'pending_approval',
+    approvalAuthority: 'pillar_lead',
+    assignedVertical: 'Startups & Business Enablement',
+    submissionDate: '28/08/2026',
+    description: 'Compact ground receiver node for real-time asset telemetry.',
+    isStrategic: false,
+    history: [
+      {
+        date: '28/08/2026, 11:00:00',
+        action: 'File Created & Onboarded',
+        user: 'Vikram Sharma (Applicant)',
+        details: 'Initial registration submitted.'
+      },
+      {
+        date: '29/08/2026, 14:15:00',
+        action: 'Screening Completed & Routed',
+        user: 'Operations Officer',
+        details: 'Verified completeness. Routed to Pillar Lead for authorization.'
+      }
+    ]
+  },
+  {
+    fileNumber: 'IITTNIF-2026-003',
+    name: 'Edge AI Vision Module for Precision Robotic Agriculture',
+    applicantName: 'Aarav Patel',
+    contactPerson: 'Aarav Patel',
+    email: 'student@vikas.in',
+    organization: 'IIT Tirupati Research Lab',
+    phone: '+91 91234 56789',
+    stakeholderType: 'Student / Researcher',
+    domains: ['Computer Vision / GeoAI', 'Digital Twin'],
+    status: 'approved',
+    approvalAuthority: 'pillar_lead',
+    assignedVertical: 'Academic Collaborations',
+    submissionDate: '15/08/2026',
+    eSignature: 'Dr. K. S. Rao (Pillar Lead)',
+    description: 'Low-latency edge AI model for crop disease classification using spectral imaging.',
+    isStrategic: false,
+    history: [
+      {
+        date: '15/08/2026, 09:30:00',
+        action: 'File Created & Onboarded',
+        user: 'Aarav Patel (Applicant)',
+        details: 'Proposal submitted for research grant.'
+      },
+      {
+        date: '18/08/2026, 16:00:00',
+        action: 'Authorized & E-Signed',
+        user: 'Pillar Lead',
+        details: 'Formal approval granted. Enrolled into Academic Collaborations vertical.'
+      }
+    ]
+  },
+  {
+    fileNumber: 'IITTNIF-2026-004',
+    name: 'National Geospatial Intelligence Data Integration Initiative',
+    applicantName: 'Dr. Rajesh Varma',
+    contactPerson: 'Dr. Rajesh Varma',
+    email: 'rajesh@isro.gov.in',
+    organization: 'National Remote Sensing Centre (NRSC)',
+    phone: '+91 94444 12345',
+    stakeholderType: 'Government',
+    domains: ['Spatial Intelligence', 'Geo-Intelligence'],
+    status: 'pending_approval',
+    approvalAuthority: 'pd',
+    assignedVertical: 'Strategic Alliances & National Missions',
+    submissionDate: '01/09/2026',
+    description: 'Strategic data gateway linking regional NM-ICPS hubs with national geospatial repository.',
+    isStrategic: true,
+    history: [
+      {
+        date: '01/09/2026, 14:00:00',
+        action: 'File Created & Onboarded',
+        user: 'Dr. Rajesh Varma (Govt Lead)',
+        details: 'Strategic memorandum proposal submitted.'
+      },
+      {
+        date: '02/09/2026, 11:30:00',
+        action: 'Operations Verified & Escalate',
+        user: 'Operations Officer',
+        details: 'Marked as high-impact strategic file. Forwarded to Project Director for executive sign-off.'
+      }
+    ]
+  },
+  {
+    fileNumber: 'IITTNIF-2026-005',
+    name: 'NavIC-Precision RTK Localization Unit for Precision Farming',
+    applicantName: 'Vikram Sharma',
+    contactPerson: 'Vikram Sharma',
+    email: 'startup@vikas.in',
+    organization: 'AeroGeo Robotics Pvt Ltd',
+    phone: '+91 98765 43210',
+    stakeholderType: 'Startup',
+    domains: ['PNT / NavIC / GNSS', 'IoT / Sensor Fusion'],
+    status: 'approved',
+    approvalAuthority: 'pd',
+    assignedVertical: '6.2 Startups & Business Enablement',
+    submissionDate: '10/08/2026',
+    approvalDate: '24/08/2026',
+    lastUpdated: '24/08/2026, 17:30:00',
+    eSignature: 'Dr. Roshan K. Srivastav (Project Director, IITTNiF)',
+    description: 'Centimeter-accurate dual-band NavIC/GPS RTK ground sensor node designed for autonomous tractor guidance and drone boundary surveying.',
+    isStrategic: false,
+    history: [
+      {
+        date: '10/08/2026, 11:15:00',
+        action: 'File Created & Onboarded',
+        user: 'Vikram Sharma (Applicant)',
+        details: 'Initial proposal submitted for Startup Ecosystem Onboarding.'
+      },
+      {
+        date: '12/08/2026, 14:20:00',
+        action: 'Screening Completed & Routed',
+        user: 'Operations Officer',
+        details: 'Technical parameters verified. Routed to Startups Pillar Lead.'
+      },
+      {
+        date: '24/08/2026, 17:30:00',
+        action: 'Formally Authorized & E-Signed',
+        user: 'Dr. Roshan K. Srivastav (Project Director)',
+        details: 'Approved for formal onboarding into Vertical 6.2 (Startups & Business Enablement).'
+      }
+    ]
+  },
+  {
+    fileNumber: 'IITTNIF-2026-006',
+    name: 'Consumer Social Messaging App for Campus Students',
+    applicantName: 'Vikram Sharma',
+    contactPerson: 'Vikram Sharma',
+    email: 'startup@vikas.in',
+    organization: 'AeroGeo Robotics Pvt Ltd',
+    phone: '+91 98765 43210',
+    stakeholderType: 'Startup',
+    domains: ['Computer Vision / GeoAI'],
+    status: 'rejected',
+    submissionDate: '01/08/2026',
+    rejectionDate: '08/08/2026',
+    lastUpdated: '08/08/2026, 15:00:00',
+    description: 'Social networking chat mobile application for university students with geo-tagging.',
+    isStrategic: false,
+    history: [
+      {
+        date: '01/08/2026, 09:00:00',
+        action: 'File Created & Onboarded',
+        user: 'Vikram Sharma (Applicant)',
+        details: 'Registration logged in portal.'
+      },
+      {
+        date: '08/08/2026, 15:00:00',
+        action: 'Application Evaluated — Declined',
+        user: 'Operations Secretariat',
+        details: 'Proposal does not meet NM-ICPS Cyber-Physical Systems mandate.'
+      }
+    ]
+  }
+];
+
+function AppContent() {
+  const { currentRole, currentUser, isApplicant, canScreen, canRoute, canApprove, canApproveApplication } = useAuth();
+  const [activeTab, setActiveTab] = useState(isApplicant ? 'entry' : 'overview');
+  const [featureSubTab, setFeatureSubTab] = useState('onboard');
   const [overviewKey, setOverviewKey] = useState(0);
 
   // Unsaved Changes & Navigation Guard States
@@ -21,6 +245,13 @@ export default function App() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(null);
   const [preventDialogs, setPreventDialogs] = useState(false);
+
+  // Role Guard: If activeTab becomes forbidden when persona changes, redirect safely to applicant entry
+  useEffect(() => {
+    if (isApplicant && (activeTab === 'screening' || activeTab === 'approval')) {
+      setActiveTab('entry');
+    }
+  }, [currentRole, isApplicant, activeTab]);
 
   // Browser-level reload/close interceptor when form has unsaved inputs
   useEffect(() => {
@@ -34,21 +265,39 @@ export default function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges, preventDialogs]);
 
-  // System Notifications State (Loaded from localStorage or empty)
+  // System & Applicant Notifications State (seeded with standard workflow events)
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('VIKAS_NOTIFICATIONS');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.filter(n => 
-          !n.message?.includes('Priya Nair') && 
-          !n.message?.includes('Quantum-Shield') &&
-          !n.message?.includes('AeroSpatial')
-        );
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map(n => n.id));
+          const missingSeeds = SEED_NOTIFICATIONS.filter(s => !existingIds.has(s.id));
+          if (missingSeeds.length > 0) {
+            return [...parsed, ...missingSeeds];
+          }
+          return parsed;
+        }
       }
     } catch (e) {}
-    return [];
+    return SEED_NOTIFICATIONS;
   });
+
+  // Toggle single notification read state
+  const handleToggleReadNotification = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: !n.read } : n));
+  };
+
+  // Mark all notifications as read for current user
+  const handleMarkAllNotificationsRead = (recipientEmail) => {
+    setNotifications(prev => prev.map(n => {
+      if (!recipientEmail || (n.recipientEmail && n.recipientEmail.toLowerCase() === recipientEmail.toLowerCase())) {
+        return { ...n, read: true };
+      }
+      return n;
+    }));
+  };
 
   // Floating Toast Notification State
   const [toast, setToast] = useState(null);
@@ -94,6 +343,17 @@ export default function App() {
 
   const handleTabChange = (tabId) => {
     if (tabId === activeTab) return;
+
+    // Strict RBAC Navigation Guard: Applicants cannot enter internal workflow tabs
+    if (isApplicant && (tabId === 'screening' || tabId === 'approval')) {
+      showToast(
+        'Access Denied',
+        'External applicants cannot access internal operations screening or approval matrices.',
+        'warning'
+      );
+      return;
+    }
+
     if (hasUnsavedChanges && !preventDialogs) {
       setPendingNavigation({ type: 'tab', target: tabId });
       setShowLeaveModal(true);
@@ -104,6 +364,12 @@ export default function App() {
 
   const handleFeatureSubTabChange = (tabId) => {
     if (tabId === featureSubTab) return;
+
+    if (isApplicant && (tabId === 'screening' || tabId === 'approval')) {
+      showToast('Access Restricted', 'Internal actions restricted to authorized officers.', 'warning');
+      return;
+    }
+
     if (hasUnsavedChanges && !preventDialogs) {
       setPendingNavigation({ type: 'subtab', target: tabId });
       setShowLeaveModal(true);
@@ -133,22 +399,34 @@ export default function App() {
     setPendingNavigation(null);
   };
 
-  // Applications State: Only stores and displays real registrations from user submissions
+  // Applications State: seeded with structured records, with auto-merge for demonstration records
   const [applications, setApplications] = useState(() => {
     try {
       const saved = localStorage.getItem('VIKAS_ONBOARDING_APPLICATIONS');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        // Exclude legacy mock templates
-        const realOnly = parsed.filter(a => 
-          !['AeroSpatial Drone Systems', 'PNT Precision Receiver Prototype', 'Strategic alliance with ISRO Geo-Spatial Center', 'Dr. Priya Nair - Postdoctoral Fellow Recruitment', 'Quantum-Shield Cybersecurity', 'VidyaGIS Teacher Upskilling - Tirupati Region'].includes(a.name) &&
-          a.contactPerson !== 'Dr. Priya Nair' &&
-          a.contactPerson !== 'Dr. R. Raman'
-        );
-        return realOnly;
+        let parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Backfill userId if missing from legacy storage
+          parsed = parsed.map(app => {
+            if (app.userId) return app;
+            if (app.email?.toLowerCase() === 'aasritareddy.c@gmail.com' || app.fileNumber === 'IITTNIF-2026-007') {
+              return { ...app, userId: 'usr_app_aasrita_reddy' };
+            }
+            if (app.email?.toLowerCase() === 'student@vikas.in') {
+              return { ...app, userId: 'usr_app_researcher' };
+            }
+            return { ...app, userId: 'usr_app_startup' };
+          });
+          const existingFileNos = new Set(parsed.map(a => a.fileNumber));
+          const missingSeeds = INITIAL_SEED_APPLICATIONS.filter(s => !existingFileNos.has(s.fileNumber));
+          if (missingSeeds.length > 0) {
+            return [...missingSeeds, ...parsed];
+          }
+          return parsed;
+        }
       }
     } catch (e) {}
-    return [];
+    return INITIAL_SEED_APPLICATIONS;
   });
 
   // Persist all user registrations across page reloads
@@ -158,28 +436,65 @@ export default function App() {
 
   // Operations Handlers
   const handleAddNewApplication = (newApp) => {
-    setApplications(prev => [newApp, ...prev]);
-
-    const newNotif = {
-      id: Date.now(),
-      type: 'info',
-      title: 'New Stakeholder Onboarded',
-      message: `Registration for ${newApp.name} (${newApp.fileNumber}) submitted. Awaiting Operations screening.`,
-      fileNumber: newApp.fileNumber,
-      timestamp: 'Just now',
-      read: false,
-      tab: 'screening'
+    const stampedApp = {
+      ...newApp,
+      userId: newApp.userId || currentUser?.id || 'usr_app_aasrita_reddy',
+      email: newApp.email || currentUser?.email || 'aasritareddy.c@gmail.com',
+      applicantName: newApp.name || newApp.applicantName || newApp.contactPerson || currentUser?.name || 'Aasrita Reddy',
+      contactPerson: newApp.contactPerson || newApp.applicantName || newApp.name || currentUser?.name || 'Aasrita Reddy',
+      organization: newApp.organization || currentUser?.organization || 'IITTNiF',
+      phone: newApp.phone || currentUser?.phone || '9493562799',
+      location: newApp.location || currentUser?.location || 'Tirupati',
+      stakeholderType: newApp.stakeholderType || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup'
     };
+
+    setApplications(prev => [stampedApp, ...prev]);
+
+    // Dispatch formal Application Submitted notification
+    const newNotif = createNotification({
+      event: NOTIFICATION_EVENTS.APPLICATION_SUBMITTED,
+      fileNumber: stampedApp.fileNumber,
+      recipientEmail: stampedApp.email,
+      recipientName: stampedApp.contactPerson,
+      type: 'info'
+    });
     setNotifications(prev => [newNotif, ...prev]);
+
     showToast(
       'Registration Successfully Logged',
-      `File ${newApp.fileNumber} has been logged in registry and queued for screening.`,
+      `File ${stampedApp.fileNumber} has been logged in registry and queued for screening.`,
       'info',
-      newApp.fileNumber
+      stampedApp.fileNumber
     );
+
+    // If applicant, steer directly to My Applications & Status tracker
+    if (isApplicant) {
+      setActiveTab('tracking');
+    }
   };
 
   const handleRouteApplication = (fileNumber, updates) => {
+    // 1. Strict Authority Gate: Screening and routing is restricted to Operations and Admin
+    if (!canRoute) {
+      showToast(
+        'Authority Violation',
+        'Only Operations Officers and Administrators are authorized to execute routing and classification.',
+        'warning'
+      );
+      return;
+    }
+
+    // 2. Conflict of Interest Gate: Cannot screen or route own application
+    const targetApp = applications.find(a => a.fileNumber === fileNumber);
+    if (targetApp && currentUser?.email && targetApp.email && targetApp.email.toLowerCase() === currentUser.email.toLowerCase()) {
+      showToast(
+        'Conflict of Interest',
+        'Officers cannot screen or route applications they submitted as an applicant.',
+        'warning'
+      );
+      return;
+    }
+
     let routedApp = null;
     setApplications(prev => prev.map(app => {
       if (app.fileNumber === fileNumber) {
@@ -189,66 +504,145 @@ export default function App() {
       return app;
     }));
 
+    // Handle "Return for Correction" workflow state
+    if (updates.status === 'returned_for_correction') {
+      const correctionNotif = createNotification({
+        event: NOTIFICATION_EVENTS.CORRECTION_REQUESTED,
+        fileNumber,
+        recipientEmail: routedApp?.email || currentUser?.email,
+        recipientName: routedApp?.contactPerson,
+        type: 'warning'
+      });
+      setNotifications(prev => [correctionNotif, ...prev]);
+
+      showToast(
+        'Correction Requested',
+        `File ${fileNumber} returned for stakeholder revision.`,
+        'warning',
+        fileNumber
+      );
+      setActiveTab('screening');
+      return;
+    }
+
     const isDirectApproval = updates.status === 'approved';
-    const newNotif = {
-      id: Date.now(),
-      type: isDirectApproval ? 'approval_success' : 'routed',
-      title: isDirectApproval ? 'File Directly Approved & Enrolled' : 'File Routed for Authorization',
-      message: isDirectApproval 
-        ? `File ${fileNumber} (${routedApp?.name || 'Entity'}) approved and assigned to ${updates.assignedVertical || 'Vertical'}.`
-        : `File ${fileNumber} (${routedApp?.name || 'Entity'}) routed to ${updates.approvalAuthority === 'pd' ? 'Project Director (PD)' : 'Pillar Lead'} for sign-off.`,
-      fileNumber: fileNumber,
-      timestamp: 'Just now',
-      read: false,
-      tab: isDirectApproval ? 'overview' : 'approval'
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-    showToast(
-      isDirectApproval ? 'File Approved & Enrolled' : 'File Screened & Routed',
-      isDirectApproval 
-        ? `File ${fileNumber} is enrolled in ${updates.assignedVertical} vertical.`
-        : `File ${fileNumber} forwarded for ${updates.approvalAuthority === 'pd' ? 'PD' : 'Pillar Lead'} authorization.`,
-      isDirectApproval ? 'success' : 'info',
-      fileNumber
-    );
 
     if (isDirectApproval) {
+      const approvedNotif = createNotification({
+        event: NOTIFICATION_EVENTS.APPLICATION_APPROVED,
+        fileNumber,
+        recipientEmail: routedApp?.email || currentUser?.email,
+        recipientName: routedApp?.contactPerson,
+        extra: { vertical: updates.assignedVertical },
+        type: 'success'
+      });
+      setNotifications(prev => [approvedNotif, ...prev]);
+
+      showToast(
+        'File Approved & Enrolled',
+        `File ${fileNumber} is enrolled in ${updates.assignedVertical} vertical.`,
+        'success',
+        fileNumber
+      );
       setActiveTab('overview');
     } else {
+      // Dispatch 3 workflow events for the applicant:
+      // 1. Screening Completed
+      const screenedNotif = createNotification({
+        event: NOTIFICATION_EVENTS.SCREENING_COMPLETED,
+        fileNumber,
+        recipientEmail: routedApp?.email || currentUser?.email,
+        recipientName: routedApp?.contactPerson,
+        type: 'info'
+      });
+      // 2. Application Routed to Vertical
+      const routedNotif = createNotification({
+        event: NOTIFICATION_EVENTS.APPLICATION_ROUTED,
+        fileNumber,
+        recipientEmail: routedApp?.email || currentUser?.email,
+        recipientName: routedApp?.contactPerson,
+        extra: { vertical: updates.assignedVertical },
+        type: 'info'
+      });
+      // 3. Approval Pending under Authority Matrix
+      const pendingNotif = createNotification({
+        event: NOTIFICATION_EVENTS.APPROVAL_PENDING,
+        fileNumber,
+        recipientEmail: routedApp?.email || currentUser?.email,
+        recipientName: routedApp?.contactPerson,
+        extra: { authority: updates.approvalAuthority },
+        type: 'warning'
+      });
+
+      setNotifications(prev => [pendingNotif, routedNotif, screenedNotif, ...prev]);
+
+      showToast(
+        'File Screened & Routed',
+        `File ${fileNumber} forwarded for ${updates.approvalAuthority === 'pd' ? 'PD' : 'Pillar Lead'} authorization.`,
+        'info',
+        fileNumber
+      );
       setActiveTab('approval');
     }
   };
 
   const handleApproveApplication = (fileNumber, updates) => {
+    // 1. Authority Matrix Gate: Verify current persona has authority to approve this specific file
+    const targetApp = applications.find(a => a.fileNumber === fileNumber);
+    if (canApproveApplication && targetApp) {
+      const authCheck = canApproveApplication(targetApp);
+      if (!authCheck.canApprove) {
+        showToast(
+          'Authority Matrix Violation',
+          authCheck.reason || 'You are not authorized to approve this application under the VIKAS Authority Matrix.',
+          'warning'
+        );
+        return;
+      }
+    }
+
     let approvedApp = null;
+    const approvalDate = updates.approvalDate || new Date().toLocaleDateString('en-GB');
+
     setApplications(prev => prev.map(app => {
       if (app.fileNumber === fileNumber) {
-        approvedApp = { ...app, ...updates };
+        approvedApp = { 
+          ...app, 
+          ...updates, 
+          status: 'approved',
+          approvalDate: approvalDate,
+          lastUpdated: new Date().toLocaleString('en-GB')
+        };
         return approvedApp;
       }
       return app;
     }));
 
-    const officerTitle = currentRole === 'pd' ? 'Project Director' : 'Pillar Lead';
-    const signer = updates.eSignature ? `${officerTitle} (${updates.eSignature})` : officerTitle;
+    // 1. Dispatch official Application Approved notification with exact required text:
+    const approvedNotif = createNotification({
+      event: NOTIFICATION_EVENTS.APPLICATION_APPROVED,
+      fileNumber,
+      recipientEmail: approvedApp?.email || currentUser?.email,
+      recipientName: approvedApp?.contactPerson,
+      extra: { vertical: approvedApp?.assignedVertical },
+      type: 'success'
+    });
 
-    // Add to Notification Center
-    const newNotif = {
-      id: Date.now(),
-      type: 'approval_success',
-      title: 'File Digitally Authorized & Signed',
-      message: `File ${fileNumber} (${approvedApp?.name || 'Entity'}) has been authorized by ${signer} and enrolled into the ${approvedApp?.assignedVertical || 'assigned'} vertical.`,
-      fileNumber: fileNumber,
-      timestamp: 'Just now',
-      read: false,
-      tab: 'overview'
-    };
-    setNotifications(prev => [newNotif, ...prev]);
+    // 2. Dispatch Engagement Assigned notification
+    const engagementNotif = createNotification({
+      event: NOTIFICATION_EVENTS.ENGAGEMENT_ASSIGNED,
+      fileNumber,
+      recipientEmail: approvedApp?.email || currentUser?.email,
+      recipientName: approvedApp?.contactPerson,
+      extra: { vertical: approvedApp?.assignedVertical },
+      type: 'info'
+    });
 
-    // Trigger Floating Toast Banner
+    setNotifications(prev => [engagementNotif, approvedNotif, ...prev]);
+
     showToast(
       'Authorization & E-Sign Complete!',
-      `File ${fileNumber} (${approvedApp?.name || 'Record'}) is now officially authorized and enrolled in the ${approvedApp?.assignedVertical || 'Vertical'} vertical.`,
+      `File ${fileNumber} (${approvedApp?.name || 'Record'}) is now officially authorized and enrolled in ${approvedApp?.assignedVertical || 'Vertical'}.`,
       'success',
       fileNumber
     );
@@ -257,41 +651,63 @@ export default function App() {
   };
 
   const handleRejectApplication = (fileNumber, updates) => {
+    const isFormalRejection = updates.status === 'rejected';
+    const targetApp = applications.find(a => a.fileNumber === fileNumber);
+
+    // If issuing formal rejection at approval stage, check authority matrix
+    if (isFormalRejection && targetApp && canApproveApplication) {
+      const authCheck = canApproveApplication(targetApp);
+      if (!authCheck.canApprove) {
+        showToast(
+          'Authority Matrix Violation',
+          authCheck.reason || 'You are not authorized to decline this application under the VIKAS Authority Matrix.',
+          'warning'
+        );
+        return;
+      }
+    }
+
+    let updatedTargetApp = null;
+
     setApplications(prev => prev.map(app => {
       if (app.fileNumber === fileNumber) {
-        return { ...app, ...updates, status: 'pending_screening' };
+        updatedTargetApp = { 
+          ...app, 
+          ...updates, 
+          status: updates.status || (isFormalRejection ? 'rejected' : 'pending_screening'),
+          rejectionDate: isFormalRejection ? (updates.rejectionDate || new Date().toLocaleDateString('en-GB')) : app.rejectionDate,
+          lastUpdated: new Date().toLocaleString('en-GB')
+        };
+        return updatedTargetApp;
       }
       return app;
     }));
 
-    const newNotif = {
-      id: Date.now(),
-      type: 'info',
-      title: 'File Sent Back to Screening',
-      message: `File ${fileNumber} returned to operations queue with revision remarks.`,
-      fileNumber: fileNumber,
-      timestamp: 'Just now',
-      read: false,
-      tab: 'screening'
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-    showToast(
-      'File Returned to Screening',
-      `File ${fileNumber} was sent back with remarks.`,
-      'warning',
-      fileNumber
-    );
+    if (isFormalRejection) {
+      const rejectNotif = createNotification({
+        event: NOTIFICATION_EVENTS.APPLICATION_REJECTED,
+        fileNumber,
+        recipientEmail: updatedTargetApp?.email || currentUser?.email,
+        recipientName: updatedTargetApp?.contactPerson,
+        type: 'error'
+      });
+      setNotifications(prev => [rejectNotif, ...prev]);
 
-    setActiveTab('screening');
-  };
-
-  // Navigation handlers
-  const handleNavigateFromDashboard = (targetTab) => {
-    if (targetTab === 'audit') {
-      setActiveTab('features');
-      setFeatureSubTab('audit');
+      showToast(
+        'Application Decision Issued',
+        `File ${fileNumber} status marked as Application Declined.`,
+        'warning',
+        fileNumber
+      );
+      setActiveTab('overview');
     } else {
-      setActiveTab(targetTab);
+      showToast(
+        'File Returned to Screening',
+        `File ${fileNumber} was sent back with remarks.`,
+        'info',
+        fileNumber
+      );
+      setActiveTab('screening');
     }
   };
 
@@ -299,7 +715,7 @@ export default function App() {
   const pendingScreeningCount = applications.filter(app => app.status === 'pending_screening').length;
   const pendingApprovalCount = applications.filter(app => {
     if (app.status !== 'pending_approval') return false;
-    if (currentRole === 'pd') return true;
+    if (currentRole === 'pd' || currentRole === 'admin') return true;
     if (currentRole === 'pillar_lead') return app.approvalAuthority === 'pillar_lead';
     return false;
   }).length;
@@ -325,6 +741,18 @@ export default function App() {
           />
         );
       case 'screening':
+        if (isApplicant) {
+          return (
+            <ApplicantMyApplications 
+              applications={applications} 
+              onNavigateToTab={(tab) => handleTabChange(tab)} 
+              notifications={notifications}
+              onToggleReadNotification={handleToggleReadNotification}
+              onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+              onClearNotifications={handleClearNotifications}
+            />
+          );
+        }
         return (
           <ScreeningQueue 
             currentRole={currentRole} 
@@ -333,6 +761,18 @@ export default function App() {
           />
         );
       case 'approval':
+        if (isApplicant) {
+          return (
+            <ApplicantMyApplications 
+              applications={applications} 
+              onNavigateToTab={(tab) => handleTabChange(tab)} 
+              notifications={notifications}
+              onToggleReadNotification={handleToggleReadNotification}
+              onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+              onClearNotifications={handleClearNotifications}
+            />
+          );
+        }
         return (
           <ApprovalPanel 
             currentRole={currentRole} 
@@ -344,6 +784,18 @@ export default function App() {
       case 'engagement':
         return <EngagementsList key={`engagement-${overviewKey}`} applications={applications} onNavigateToTab={(tab) => handleTabChange(tab)} />;
       case 'tracking':
+        if (isApplicant) {
+          return (
+            <ApplicantMyApplications 
+              applications={applications} 
+              onNavigateToTab={(tab) => handleTabChange(tab)} 
+              notifications={notifications}
+              onToggleReadNotification={handleToggleReadNotification}
+              onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+              onClearNotifications={handleClearNotifications}
+            />
+          );
+        }
         return <Dashboard applications={applications} onNavigateToTab={(tab) => handleTabChange(tab)} />;
       case 'flow':
         return <VikasFlow />;
@@ -352,141 +804,10 @@ export default function App() {
     }
   };
 
-  // Secondary sub-tab rendering inside Content Body when "Features" is selected
-  const renderFeaturesLayout = () => {
-    const subTabs = [
-      { id: 'onboard', label: 'Onboard Stakeholder', badge: null },
-      { id: 'screening', label: 'Screening Queue', badge: pendingScreeningCount },
-      { id: 'approval', label: 'Approval Matrix', badge: pendingApprovalCount },
-      { id: 'audit', label: 'Audit Logs', badge: null }
-    ];
-
-    const renderFeatureComponent = () => {
-      switch (featureSubTab) {
-        case 'onboard':
-          return (
-            <OnboardingForm 
-              onSubmitApplication={handleAddNewApplication} 
-              onDirtyChange={(isDirty) => setHasUnsavedChanges(isDirty)}
-            />
-          );
-        case 'screening':
-          return (
-            <ScreeningQueue 
-              currentRole={currentRole} 
-              applications={applications} 
-              onRouteApplication={handleRouteApplication} 
-            />
-          );
-        case 'approval':
-          return (
-            <ApprovalPanel 
-              currentRole={currentRole} 
-              applications={applications} 
-              onApproveApplication={handleApproveApplication}
-              onRejectApplication={handleRejectApplication}
-            />
-          );
-        case 'audit':
-          return <AuditLogs applications={applications} />;
-        default:
-          return (
-            <OnboardingForm 
-              onSubmitApplication={handleAddNewApplication} 
-              onDirtyChange={(isDirty) => setHasUnsavedChanges(isDirty)}
-            />
-          );
-      }
-    };
-
-    return (
-      <div className="features-layout-wrap animate-fade-in">
-        {/* Sub-tab Navigation Bar */}
-        <div className="features-subnav-card card">
-          <div className="subnav-container">
-            {subTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleFeatureSubTabChange(tab.id)}
-                className={`subnav-btn ${featureSubTab === tab.id ? 'active' : ''}`}
-              >
-                {tab.label}
-                {tab.badge > 0 && (
-                  <span className={`subnav-badge ${tab.id === 'approval' ? 'badge-danger' : 'badge-warning'}`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Feature Sub Tab Content */}
-        <div className="feature-subcontent mt-24">
-          {renderFeatureComponent()}
-        </div>
-
-        <style>{`
-          .features-subnav-card {
-            padding: 8px 16px;
-            border-radius: var(--radius-md);
-            margin-bottom: 24px;
-          }
-
-          .subnav-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            overflow-x: auto;
-          }
-
-          .subnav-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            padding: 8px 16px;
-            font-family: 'Outfit', sans-serif;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            transition: all var(--transition-fast);
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-          }
-
-          .subnav-btn:hover {
-            color: var(--text-primary);
-            background-color: var(--bg-primary);
-          }
-
-          .subnav-btn.active {
-            color: var(--color-accent);
-            background-color: var(--color-accent-glow);
-          }
-
-          .subnav-badge {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 1px 6px;
-            border-radius: var(--radius-full);
-          }
-
-          .mt-24 {
-            margin-top: 24px;
-          }
-        `}</style>
-      </div>
-    );
-  };
-
   return (
     <div className="app-container">
       <main className="main-content">
         <Header 
-          currentRole={currentRole} 
-          setCurrentRole={setCurrentRole} 
           activeTab={activeTab} 
           setActiveTab={handleTabChange}
           pendingTotalCount={pendingTotalCount}
@@ -656,5 +977,13 @@ export default function App() {
         `}</style>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { ShieldAlert, CheckSquare, Forward, Info, FileText, Paperclip, ExternalLink } from 'lucide-react';
+import { ShieldAlert, CheckSquare, Forward, Info, FileText, Paperclip, ExternalLink, Lock, AlertTriangle } from 'lucide-react';
+import { useAuth, ROLES } from '../../context/AuthContext';
 
 export default function ScreeningQueue({ currentRole, applications, onRouteApplication }) {
+  const { currentUser, canRoute, canScreen, isApplicant } = useAuth();
   const [selectedApp, setSelectedApp] = useState(null);
   const [verticalAssign, setVerticalAssign] = useState('STARTUP');
   const [notes, setNotes] = useState('');
@@ -19,36 +21,50 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
     { id: 'EXPERT', label: '6.9 Experts & Advisory Network' }
   ];
 
-  // Restrict view if user is in public/stakeholder role
-  if (currentRole === 'public') {
+  // Restrict access: Applicants can NEVER access internal operations screening
+  if (isApplicant) {
     return (
       <div className="card access-denied-card animate-fade-in">
         <ShieldAlert size={48} className="text-danger" />
-        <h3>Access Restricted</h3>
-        <p>The Screening and Verification Queue is restricted to internal operational roles.</p>
+        <h3>Access Restricted: Operational Workflow</h3>
+        <p>
+          The Screening and Verification Queue is restricted to internal operational roles.
+        </p>
+        <div className="business-rule-banner">
+          <strong>Mandatory Business Rule:</strong> An applicant or external stakeholder must never be able to perform internal workflow actions such as screening, verification, routing, classification, or approval.
+        </div>
         <div className="hint-box">
-          <strong>Tip to evaluate:</strong> Switch your persona to <strong>Operations Anchor</strong> in the top header menu to access screening tools.
+          <strong>Evaluation Note:</strong> Switch your persona to <strong>Operations / Screening Anchor</strong> in the top header menu to evaluate screening operations.
         </div>
         
         <style>{`
           .access-denied-card {
             text-align: center;
-            padding: 48px;
-            max-width: 600px;
+            padding: 48px 32px;
+            max-width: 640px;
             margin: 40px auto;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 16px;
           }
-          .hint-box {
-            background-color: rgba(226, 184, 87, 0.05);
-            border: 1px solid rgba(226, 184, 87, 0.2);
-            padding: 12px;
+          .business-rule-banner {
+            background-color: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            padding: 12px 16px;
             border-radius: var(--radius-md);
-            font-size: 13px;
+            font-size: 12.5px;
+            color: var(--color-danger);
+            line-height: 1.4;
+          }
+          .hint-box {
+            background-color: rgba(var(--color-accent-rgb), 0.08);
+            border: 1px solid rgba(var(--color-accent-rgb), 0.2);
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            font-size: 12.5px;
             color: var(--text-secondary);
-            margin-top: 12px;
+            margin-top: 4px;
           }
         `}</style>
       </div>
@@ -103,6 +119,17 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
     e.preventDefault();
     if (!selectedApp) return;
 
+    if (!canRoute) {
+      alert('Access Denied: Screening & Routing actions are strictly restricted to Operations Officers.');
+      return;
+    }
+
+    const isConflict = selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase();
+    if (isConflict) {
+      alert('Conflict of Interest: You cannot screen or route an application you submitted.');
+      return;
+    }
+
     const authAuthority = determineApprovalAuthority(selectedApp, verticalAssign);
     let targetStatus = 'pending_approval';
     
@@ -136,6 +163,21 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
   return (
     <div className="screening-layout animate-fade-in">
       <div className="queue-container">
+        {/* Oversight Notice Banner for Non-Operations Internal Roles */}
+        {!canRoute && (
+          <div className="card oversight-banner-card mb-16" style={{ marginBottom: '16px', padding: '14px 18px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <ShieldAlert size={22} style={{ color: '#d97706', flexShrink: 0 }} />
+              <div>
+                <strong style={{ color: '#b45309', fontSize: '13.5px' }}>Operational Oversight Active (Read-Only):</strong>
+                <p style={{ margin: '2px 0 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                  Screening, classification, and routing actions are strictly restricted to the Operations Officer. Action buttons are locked for your role ({currentUser.roleLabel || currentRole.toUpperCase()}).
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="card">
           <div className="card-header">
             <h3>Incoming Screening Queue</h3>
@@ -176,13 +218,20 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
                       </td>
                       <td>
                         <button 
-                          className="btn btn-secondary btn-sm"
+                          className={`btn ${canRoute ? 'btn-secondary' : 'btn-outline'} btn-sm`}
                           onClick={() => {
                             setSelectedApp(app);
                             setVerticalAssign(mapStakeholderToVertical(app.stakeholderType));
                           }}
                         >
-                          Verify & Route
+                          {canRoute ? (
+                            <span>Verify & Route</span>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Lock size={12} />
+                              <span>Inspect (Oversight)</span>
+                            </span>
+                          )}
                         </button>
                       </td>
                     </tr>
@@ -339,13 +388,76 @@ export default function ScreeningQueue({ currentRole, applications, onRouteAppli
                   placeholder="Check credentials, confirm TRL, verify attachments, and note observations..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  disabled={!canRoute}
                 ></textarea>
               </div>
 
-              <div className="panel-actions">
-                <button type="submit" className="btn btn-primary w-full">
-                  <Forward size={16} />
-                  Execute Route Classification
+              {/* Conflict of Interest Notice */}
+              {selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase() && (
+                <div className="alert-box alert-danger mt-12 mb-14" style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: '#ef4444', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <AlertTriangle size={16} className="text-danger flex-shrink-0" />
+                  <span><strong>Conflict of Interest:</strong> You cannot screen or route an application registered under your own account.</span>
+                </div>
+              )}
+
+              {/* Role Boundary Notice */}
+              {!canRoute && (
+                <div className="alert-box alert-warning mt-12 mb-14" style={{ padding: '10px 14px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', color: '#b45309', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Lock size={16} className="text-warning flex-shrink-0" />
+                  <span><strong>Restricted Action:</strong> Screening and routing actions are strictly restricted to Operations Officers. Actions disabled for {currentUser.roleLabel || currentRole.toUpperCase()}.</span>
+                </div>
+              )}
+
+              <div className="panel-actions" style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline"
+                  disabled={!canRoute || (selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase())}
+                  style={{ 
+                    flex: 1, 
+                    borderColor: '#f59e0b', 
+                    color: '#b45309',
+                    opacity: (!canRoute || (selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase())) ? 0.5 : 1,
+                    cursor: (!canRoute || (selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase())) ? 'not-allowed' : 'pointer'
+                  }}
+                  onClick={() => {
+                    if (!canRoute) return;
+                    if (!notes) {
+                      alert('Please provide remarks explaining what corrections are required.');
+                      return;
+                    }
+                    const updatedHistory = [
+                      ...(selectedApp.history || []),
+                      {
+                        date: new Date().toLocaleString('en-GB'),
+                        action: 'Returned for Stakeholder Correction',
+                        user: `Operations Anchor (${currentRole})`,
+                        details: `Returned with remarks: ${notes}`
+                      }
+                    ];
+                    onRouteApplication(selectedApp.fileNumber, {
+                      status: 'returned_for_correction',
+                      screeningNotes: notes,
+                      history: updatedHistory
+                    });
+                    setSelectedApp(null);
+                    setNotes('');
+                  }}
+                >
+                  Return for Correction
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={!canRoute || (selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase())}
+                  style={{ 
+                    flex: 1.2,
+                    opacity: (!canRoute || (selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase())) ? 0.5 : 1,
+                    cursor: (!canRoute || (selectedApp.email && currentUser?.email && selectedApp.email.toLowerCase() === currentUser.email.toLowerCase())) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {!canRoute ? <Lock size={16} /> : <Forward size={16} />}
+                  <span>Execute Route</span>
                 </button>
               </div>
             </form>

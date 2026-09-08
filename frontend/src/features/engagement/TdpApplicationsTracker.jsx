@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { 
   ArrowLeft, 
   Search, 
@@ -64,6 +65,7 @@ export default function TdpApplicationsTracker({
   onNavigateToExecution,
   applications = [] 
 }) {
+  const { currentUser, isApplicant, authFetch } = useAuth();
   const [tdpApps, setTdpApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,19 +75,11 @@ export default function TdpApplicationsTracker({
   const [copiedAppNo, setCopiedAppNo] = useState(null);
   const [filterUserOnly, setFilterUserOnly] = useState(false);
 
-  // Authenticated user identity
-  const currentUser = {
-    name: 'Prof. S. Ananth',
-    email: 's.ananth@iitt.ac.in',
-    org: 'IIT Tirupati',
-    role: 'Lead Investigator'
-  };
-
-  // Fetch from backend
+  // Fetch from backend using authenticated fetch with RBAC headers
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/v1/vikas/technology-development/applications');
+      const res = await authFetch('http://localhost:5000/api/v1/vikas/technology-development/applications');
       if (res.ok) {
         const data = await res.json();
         setTdpApps(data);
@@ -101,10 +95,25 @@ export default function TdpApplicationsTracker({
 
   useEffect(() => {
     fetchApplications();
-  }, []);
+  }, [currentUser]);
 
   const fallbackLocalData = () => {
     setTdpApps([
+      {
+        applicationNumber: 'IITTNIF-TDP-2026-1029',
+        status: 'Under Screening',
+        currentStage: 'Initial Screening',
+        submittedDate: '02/09/2026',
+        lastUpdated: '03/09/2026, 10:00:00',
+        applicantName: 'Vikram Sharma',
+        email: 'startup@vikas.in',
+        organization: 'AeroGeo Robotics Pvt Ltd',
+        projectTitle: 'Autonomous NavIC Drone System for Rural Cadastral Mapping',
+        technologyDomain: 'PNT / NavIC / GNSS',
+        currentTrl: 3,
+        targetTrl: 6,
+        budgetApproved: '₹ 25,00,000'
+      },
       {
         applicationNumber: 'IITTNIF-TDP-2026-8421',
         status: 'Technical Review',
@@ -250,9 +259,25 @@ export default function TdpApplicationsTracker({
     );
   };
 
+  // Record-level Scoping: external applicants can only see their own applications
+  const isUserMatch = (app) => {
+    if (!currentUser) return false;
+    const userEmail = currentUser.email?.toLowerCase();
+    const userName = currentUser.name?.toLowerCase();
+    const appEmail = app.email?.toLowerCase();
+    const appName = app.applicantName?.toLowerCase();
+    const contact = app.contactPerson?.toLowerCase();
+
+    return (appEmail && userEmail && appEmail === userEmail) ||
+           (appName && userName && appName === userName) ||
+           (contact && userName && contact === userName);
+  };
+
+  const scopedApps = isApplicant ? tdpApps.filter(isUserMatch) : tdpApps;
+
   // Filtered applications
-  const filteredApps = tdpApps.filter(app => {
-    if (filterUserOnly && app.email !== currentUser.email && app.applicantName !== currentUser.name) {
+  const filteredApps = scopedApps.filter(app => {
+    if (!isApplicant && filterUserOnly && !isUserMatch(app)) {
       return false;
     }
 
@@ -278,10 +303,10 @@ export default function TdpApplicationsTracker({
     return true;
   });
 
-  const totalCount = tdpApps.length;
-  const underReviewCount = tdpApps.filter(a => ['Under Screening', 'Technical Review', 'Mentor Review', 'Submitted'].includes(a.status)).length;
-  const approvedCount = tdpApps.filter(a => ['Approved', 'In Progress'].includes(a.status)).length;
-  const completedCount = tdpApps.filter(a => a.status === 'Completed').length;
+  const totalCount = scopedApps.length;
+  const underReviewCount = scopedApps.filter(a => ['Under Screening', 'Technical Review', 'Mentor Review', 'Submitted'].includes(a.status)).length;
+  const approvedCount = scopedApps.filter(a => ['Approved', 'In Progress'].includes(a.status)).length;
+  const completedCount = scopedApps.filter(a => a.status === 'Completed').length;
 
   return (
     <div className="techdev-detail-page tdp-tracker-page animate-fade-in">
@@ -327,27 +352,36 @@ export default function TdpApplicationsTracker({
         <div className="user-session-banner mt-16">
           <div className="user-session-left">
             <div className="user-avatar-circle">
-              <span>SA</span>
+              <span>{currentUser?.name ? currentUser.name.split(' ').map(n => n[0]).join('').slice(0, 2) : 'U'}</span>
             </div>
             <div className="user-session-info">
               <div className="user-name-line">
-                <strong>{currentUser.name}</strong>
-                <span className="badge badge-emerald font-mono">Authenticated Applicant</span>
+                <strong>{currentUser?.name || 'User'}</strong>
+                <span className="badge badge-emerald font-mono">
+                  {isApplicant ? 'Authenticated External Applicant' : 'Internal Authorized Officer'}
+                </span>
               </div>
               <span className="user-meta-sub">
-                {currentUser.email} • {currentUser.org} • {currentUser.role}
+                {currentUser?.email} • {currentUser?.org || 'VIKAS Platform'} • {currentUser?.role || 'Stakeholder'}
               </span>
             </div>
           </div>
 
           <div className="user-session-actions">
-            <button 
-              className={`btn btn-sm ${filterUserOnly ? 'btn-emerald-active' : 'btn-outline'}`}
-              onClick={() => setFilterUserOnly(!filterUserOnly)}
-            >
-              <ShieldCheck size={14} />
-              <span>{filterUserOnly ? 'Showing My Proposals' : 'Show All Institutional Proposals'}</span>
-            </button>
+            {isApplicant ? (
+              <span className="badge badge-emerald font-mono" style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <ShieldCheck size={14} />
+                <span>Strict Access: My Proposals Only</span>
+              </span>
+            ) : (
+              <button 
+                className={`btn btn-sm ${filterUserOnly ? 'btn-emerald-active' : 'btn-outline'}`}
+                onClick={() => setFilterUserOnly(!filterUserOnly)}
+              >
+                <ShieldCheck size={14} />
+                <span>{filterUserOnly ? 'Showing My Proposals' : 'Show All Institutional Proposals'}</span>
+              </button>
+            )}
             <button 
               className="btn btn-icon-sm"
               onClick={fetchApplications}

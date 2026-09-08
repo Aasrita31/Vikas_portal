@@ -29,8 +29,10 @@ import {
   FileCheck,
   Clock
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
+  const { currentUser, isApplicant, authFetch } = useAuth();
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -125,6 +127,25 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
       onDirtyChange(isDirty);
     }
   }, [formData, submittedData, onDirtyChange]);
+
+  // Auto-populate verified applicant data from active user record (e.g. Aasrita Reddy)
+  React.useEffect(() => {
+    if (isApplicant && currentUser) {
+      setFormData(prev => ({
+        ...prev,
+        name: prev.name || currentUser.name || '',
+        organization: prev.organization || currentUser.organization || '',
+        email: prev.email || currentUser.email || '',
+        phone: prev.phone || currentUser.phone || '',
+        location: prev.location || currentUser.location || '',
+        stakeholderType: prev.stakeholderType || (
+          currentUser.stakeholderType === 'STARTUP' ? 'Startup' :
+          currentUser.stakeholderType === 'STUDENT_RESEARCHER' ? 'Student / Researcher' :
+          currentUser.applicantType || 'Startup'
+        )
+      }));
+    }
+  }, [currentUser, isApplicant]);
 
   // Available Stakeholder Types
   const stakeholderTypes = [
@@ -518,6 +539,8 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
       },
 
       // Backwards-compatible mappings for ScreeningQueue and App state
+      userId: currentUser?.id || 'usr_app_aasrita_reddy',
+      user_id: currentUser?.id || 'usr_app_aasrita_reddy',
       contactPerson: formData.name,
       nmIcpsAlign: formData.domains.join(', '),
       description: formData.problemStatement,
@@ -532,11 +555,20 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
         {
           date: new Date().toLocaleString('en-GB'),
           action: 'File Created & Onboarded',
-          user: 'VIKAS Portal (Auto)',
+          user: `${formData.name} (Applicant)`,
           details: `Registered as ${formData.stakeholderType === 'Other' ? `Other (${formData.otherStakeholderType})` : formData.stakeholderType} under ${formData.domains.join(', ')}. Awaiting initial screening.`
         }
       ]
     };
+
+    // Attempt backend persistence to store real application entity linked with user_id
+    try {
+      authFetch('http://localhost:5000/api/v1/onboarding/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionPayload)
+      }).catch(err => console.debug('Backend sync notice:', err));
+    } catch (e) {}
 
     if (onSubmitApplication) {
       onSubmitApplication(submissionPayload);

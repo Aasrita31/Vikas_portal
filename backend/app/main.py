@@ -1,7 +1,17 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List, Dict, Any, Union
+from datetime import datetime
+import random
 from app.schemas.project import TDPProjectResponse
+from app.core.security import get_current_user, require_roles, UserContext, SYSTEM_PERSONAS
+from app.models.applicant import applicant_repo, ApplicantUser, SystemRole, StakeholderType
+from app.models.application import onboarding_app_repo, OnboardingApplicationRecord
+from app.schemas.onboarding import (
+    ApplicantResponse,
+    OnboardingApplicationCreate,
+    OnboardingApplicationResponse
+)
 
 app = FastAPI(
     title="VIKAS Platform - Technology Development API",
@@ -222,6 +232,221 @@ def root():
 @app.get("/api/health")
 def health_check():
     return {"status": "ok", "service": "VIKAS Technology Development API"}
+
+@app.get("/api/v1/auth/me")
+def get_my_profile(user: UserContext = Depends(get_current_user)):
+    """
+    Returns the authenticated user context and granular permission flags.
+    """
+    permissions = {
+        "can_screen": user.role in ["operations", "pd", "admin"],
+        "can_route": user.role in ["operations", "pd", "admin"],
+        "can_approve_pillar": user.role in ["pillar_lead", "pd", "admin"],
+        "can_approve_pd": user.role in ["pd", "admin"],
+        "can_esign": user.role in ["pd", "admin"],
+        "can_advance_stage": user.role in ["operations", "pillar_lead", "pd", "admin"],
+        "can_mentor_verify": user.role in ["pillar_lead", "pd", "admin", "execution"],
+        "can_manage_engagements": user.role in ["execution", "pillar_lead", "pd", "admin"],
+        "can_submit_application": True,
+        "is_applicant": user.role == "applicant",
+    }
+    return {
+        "user": user,
+        "permissions": permissions
+    }
+
+@app.get("/api/v1/auth/personas")
+def get_all_personas():
+    """
+    Returns available simulation personas for frontend role-switching.
+    """
+    return list(SYSTEM_PERSONAS.values())
+
+# =======================================================
+# APPLICANT USER RECORD & ONBOARDING APPLICATION ENDPOINTS
+# =======================================================
+
+@app.get("/api/v1/applicants/me", response_model=ApplicantResponse)
+def get_current_applicant_record(user: UserContext = Depends(get_current_user)):
+    """
+    Returns the persistent ApplicantUser entity for the active user.
+    """
+    stored = applicant_repo.get_by_id(user.id) or applicant_repo.get_by_email(user.email)
+    if stored:
+        return ApplicantResponse(
+            id=stored.id,
+            name=stored.name,
+            email=stored.email,
+            phone=stored.phone,
+            organization=stored.organization,
+            location=stored.location,
+            stakeholder_type=stored.stakeholder_type.value if hasattr(stored.stakeholder_type, "value") else str(stored.stakeholder_type),
+            role=stored.role.value if hasattr(stored.role, "value") else str(stored.role),
+            is_active=stored.is_active,
+            is_verified=stored.is_verified,
+            created_at=stored.created_at,
+            updated_at=stored.updated_at
+        )
+
+    st_val = user.stakeholder_type or "STARTUP"
+    return ApplicantResponse(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        phone=user.phone,
+        organization=user.organization,
+        location=user.location,
+        stakeholder_type=st_val,
+        role=user.role.upper(),
+        is_active=True,
+        is_verified=True,
+        created_at=datetime.now().isoformat(),
+        updated_at=datetime.now().isoformat()
+    )
+
+@app.get("/api/v1/applicants/{user_id}", response_model=ApplicantResponse)
+def get_applicant_by_user_id(user_id: str, user: UserContext = Depends(get_current_user)):
+    """
+    Retrieve applicant record by user_id with strict privacy boundaries.
+    """
+    if user.role == "applicant" and user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Applicants can only view their own user profile."
+        )
+    stored = applicant_repo.get_by_id(user_id)
+    if not stored:
+        raise HTTPException(status_code=404, detail=f"Applicant '{user_id}' not found.")
+    return ApplicantResponse(
+        id=stored.id,
+        name=stored.name,
+        email=stored.email,
+        phone=stored.phone,
+        organization=stored.organization,
+        location=stored.location,
+        stakeholder_type=stored.stakeholder_type.value if hasattr(stored.stakeholder_type, "value") else str(stored.stakeholder_type),
+        role=stored.role.value if hasattr(stored.role, "value") else str(stored.role),
+        is_active=stored.is_active,
+        is_verified=stored.is_verified,
+        created_at=stored.created_at,
+        updated_at=stored.updated_at
+    )
+
+@app.post("/api/v1/onboarding/applications", response_model=OnboardingApplicationResponse)
+def create_onboarding_application(
+    payload: OnboardingApplicationCreate,
+    user: UserContext = Depends(get_current_user)
+):
+    """
+    Create and store a VIKAS Onboarding Application.
+    Crucially assigns user_id = user.id, establishing direct ownership with the applicant.
+    """
+    current_year = datetime.now().year
+    random_suffix = random.randint(100, 999)
+    file_number = f"IITTNIF-{current_year}-{random_suffix}"
+    app_id = f"app_onboard_{current_year}_{random_suffix}"
+    submission_time = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
+    submission_date = datetime.now().strftime("%d/%m/%Y")
+
+    applicant_name = user.name if user.role == "applicant" else (payload.applicantName or payload.name or user.name)
+    email = user.email if user.role == "applicant" else (payload.email or user.email)
+    phone = payload.phone or user.phone or "9493562799"
+    organization = payload.organization or user.organization or "IITTNiF"
+    location = payload.location or user.location or "Tirupati"
+    stakeholder_type = payload.stakeholder_type or payload.stakeholderType or user.stakeholder_type or "STARTUP"
+
+    record = OnboardingApplicationRecord(
+        id=app_id,
+        file_number=file_number,
+        user_id=user.id,
+        applicant_name=applicant_name,
+        email=email,
+        phone=phone,
+        organization=organization,
+        location=location,
+        stakeholder_type=stakeholder_type,
+        domains=payload.domains,
+        intent_of_engagement=payload.intentOfEngagement or "Startup Ecosystem Onboarding",
+        dynamic_inputs=payload.dynamicInputs or {},
+        problem_statement=payload.problemStatement or "VIKAS Ecosystem Onboarding Application",
+        status="pending_screening",
+        approval_authority="pillar_lead",
+        assigned_vertical="6.2 Startups & Business Enablement" if stakeholder_type.upper() == "STARTUP" else "Ecosystem Enablement",
+        submission_date=submission_date,
+        last_updated=submission_time,
+        is_strategic=stakeholder_type.upper() in ["GOVERNMENT", "INDUSTRY"],
+        history=[
+            {
+                "date": submission_time,
+                "action": "File Created & Onboarded",
+                "user": f"{applicant_name} (Applicant)",
+                "details": f"Registered as {stakeholder_type} under {', '.join(payload.domains) if payload.domains else 'General'}. Awaiting initial operations screening."
+            }
+        ]
+    )
+
+    saved = onboarding_app_repo.save(record)
+    return saved.dict()
+
+@app.get("/api/v1/onboarding/applications", response_model=List[OnboardingApplicationResponse])
+def list_onboarding_applications(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    stakeholder_type: Optional[str] = Query(None, description="Filter by stakeholder type"),
+    search: Optional[str] = Query(None, description="Search by file number, name, or org"),
+    user: UserContext = Depends(get_current_user)
+):
+    """
+    Retrieve VIKAS onboarding applications with strict Record-Level Access Control:
+    - Applicants ONLY receive applications belonging to their user_id!
+    - Operations, Pillar Leads, PD, and Admin see applications according to workflow purview.
+    """
+    if user.role == "applicant":
+        # Strict Record-Level Filter for Applicants
+        records = onboarding_app_repo.get_by_user_id(user.id)
+        if not records and user.email:
+            records = [a for a in onboarding_app_repo.list_all() if a.email.lower() == user.email.lower()]
+    else:
+        records = onboarding_app_repo.list_all()
+
+    if status and status.lower() not in ["all", "all statuses"]:
+        records = [r for r in records if r.status.lower() == status.lower()]
+
+    if stakeholder_type and stakeholder_type.lower() not in ["all", "all types"]:
+        records = [r for r in records if r.stakeholder_type.lower() == stakeholder_type.lower()]
+
+    if search:
+        s = search.lower().strip()
+        records = [
+            r for r in records
+            if s in r.file_number.lower()
+            or s in r.applicant_name.lower()
+            or s in r.organization.lower()
+            or s in (r.problem_statement or "").lower()
+        ]
+
+    return [r.dict() for r in records]
+
+@app.get("/api/v1/onboarding/applications/{identifier}", response_model=OnboardingApplicationResponse)
+def get_onboarding_application_by_identifier(
+    identifier: str,
+    user: UserContext = Depends(get_current_user)
+):
+    """
+    Retrieve single onboarding application with applicant ownership check.
+    """
+    app_record = onboarding_app_repo.get_by_file_number(identifier) or onboarding_app_repo.get_by_id(identifier)
+    if not app_record:
+        raise HTTPException(status_code=404, detail=f"Onboarding Application '{identifier}' not found.")
+
+    if user.role == "applicant":
+        is_owner = (app_record.user_id == user.id) or (app_record.email.lower() == user.email.lower())
+        if not is_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Denied: Applicants are restricted to viewing only their own application records."
+            )
+
+    return app_record.dict()
 
 @app.get("/api/v1/vikas/technology-development/projects", response_model=List[TDPProjectResponse])
 def get_tdp_projects(
@@ -681,10 +906,10 @@ for app_item in TDP_APPLICATIONS_DATABASE:
 
 @app.post("/api/v1/vikas/technology-development/tdp/applications", response_model=TDPApplicationResponse)
 @app.post("/api/v1/vikas/technology-development/applications", response_model=TDPApplicationResponse)
-def submit_tdp_application(payload: TDPApplicationCreate):
+def submit_tdp_application(payload: TDPApplicationCreate, user: UserContext = Depends(get_current_user)):
     """
     Process and save full 7-step TDP proposal submission with auto-generated application number
-    and auto-populated 8-stage timeline.
+    and auto-populated 8-stage timeline. Associates submission with authenticated applicant.
     """
     random_num = random.randint(1000, 9999)
     current_year = datetime.now().year
@@ -704,6 +929,12 @@ def submit_tdp_application(payload: TDPApplicationCreate):
     saved_app["budgetApproved"] = "Pending Review"
     saved_app["leadReviewer"] = "Secretariat Screening Cell"
 
+    # Associate with authenticated applicant if payload didn't specify
+    if not saved_app.get("email") or saved_app.get("email") == "applicant@iitt.ac.in":
+        saved_app["email"] = user.email
+    if not saved_app.get("applicantName"):
+        saved_app["applicantName"] = user.name
+
     # Generate initial 8-stage timeline
     current_stage, timeline = generate_default_stage_timeline("Submitted", submitted_date, submission_time)
     saved_app["currentStage"] = current_stage
@@ -713,7 +944,7 @@ def submit_tdp_application(payload: TDPApplicationCreate):
         {
             "timestamp": submission_time,
             "action": "Proposal Submitted",
-            "actor": payload.applicantName,
+            "actor": saved_app["applicantName"],
             "details": f"Proposal submitted for {payload.technologyDomain} under call for proposals."
         }
     ]
@@ -727,9 +958,32 @@ def get_all_tdp_applications(
     status: Optional[str] = Query(None, description="Filter by status (e.g. Submitted, Technical Review, Approved)"),
     domain: Optional[str] = Query(None, description="Filter by Technology Domain"),
     applicant_email: Optional[str] = Query(None, description="Filter by Applicant Email"),
-    search: Optional[str] = Query(None, description="Search by application number, title, or applicant name")
+    search: Optional[str] = Query(None, description="Search by application number, title, or applicant name"),
+    user: UserContext = Depends(get_current_user)
 ):
+    """
+    Retrieve TDP applications with Record-Level Access Control:
+    - Applicants only see applications they own.
+    - Operations, Pillar Leads, PD, and Admin see applications according to workflow scope.
+    """
     results = TDP_APPLICATIONS_DATABASE
+
+    # RECORD-LEVEL ACCESS CONTROL:
+    if user.role == "applicant":
+        # Applicant can strictly access only their own records!
+        results = [
+            a for a in results
+            if (
+                a.get("email", "").lower() == user.email.lower()
+                or a.get("applicantName", "").lower() == user.name.lower()
+                or (applicant_email and a.get("email", "").lower() == applicant_email.lower())
+            )
+        ]
+    elif user.role == "pillar_lead" and user.assigned_vertical:
+        # Pillar leads focus on their vertical domain if not searching all
+        if domain is None and user.assigned_vertical == "TECH_DEV":
+            # For tech dev pillar lead, show tech dev projects
+            pass
 
     if status and status.lower() not in ["all", "all statuses"]:
         results = [a for a in results if a["status"].lower() == status.lower()]
@@ -737,7 +991,7 @@ def get_all_tdp_applications(
     if domain and domain.lower() not in ["all", "all domains"]:
         results = [a for a in results if a["technologyDomain"].lower() == domain.lower()]
 
-    if applicant_email:
+    if applicant_email and user.role != "applicant":
         results = [a for a in results if a.get("email", "").lower() == applicant_email.lower()]
 
     if search:
@@ -754,29 +1008,90 @@ def get_all_tdp_applications(
 
 @app.get("/api/v1/vikas/technology-development/applications/{application_identifier}", response_model=TDPApplicationResponse)
 @app.get("/api/v1/vikas/technology-development/tdp/applications/{application_identifier}", response_model=TDPApplicationResponse)
-def get_tdp_application_by_id(application_identifier: str):
+def get_tdp_application_by_id(
+    application_identifier: str,
+    user: UserContext = Depends(get_current_user)
+):
+    """
+    Retrieve single TDP application by ID with record-level privacy check.
+    """
     for app_item in TDP_APPLICATIONS_DATABASE:
         if (
             app_item["applicationNumber"].lower() == application_identifier.lower()
             or app_item.get("trackingToken", "").lower() == application_identifier.lower()
         ):
+            # RECORD-LEVEL ACCESS CHECK FOR APPLICANTS:
+            if user.role == "applicant":
+                is_owner = (
+                    app_item.get("email", "").lower() == user.email.lower()
+                    or app_item.get("applicantName", "").lower() == user.name.lower()
+                )
+                if not is_owner:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access Denied: Applicants are restricted to viewing only their own application records."
+                    )
             return app_item
     raise HTTPException(status_code=404, detail=f"TDP Application '{application_identifier}' not found.")
 
 @app.patch("/api/v1/vikas/technology-development/applications/{application_identifier}/status", response_model=TDPApplicationResponse)
-def update_tdp_application_status_by_admin(application_identifier: str, payload: TDPStatusUpdatePayload):
+def update_tdp_application_status_by_admin(
+    application_identifier: str, 
+    payload: TDPStatusUpdatePayload,
+    user: UserContext = Depends(require_roles(["operations", "pillar_lead", "pd", "admin"]))
+):
     """
-    Authorized Backend/Admin Action: Update status and timeline progression.
-    Constraint: Status cannot be updated directly by applicants.
+    Authorized Internal Workflow Action: Update status and timeline progression.
+    IMPORTANT BUSINESS RULE:
+    An applicant/external stakeholder must NEVER be able to perform internal workflow actions
+    such as screening, verification, routing, classification, approval, or e-signature.
     """
     for app_item in TDP_APPLICATIONS_DATABASE:
         if app_item["applicationNumber"].lower() == application_identifier.lower():
             valid_statuses = [
-                "Draft", "Submitted", "Under Screening", "Technical Review",
-                "Mentor Review", "Approved", "Rejected", "On Hold", "In Progress", "Completed"
+                "Draft", "Submitted", "Under Screening", "Screened", "Routing", "Technical Review",
+                "Mentor Review", "Approved", "Rejected", "On Hold", "In Progress", "Completed",
+                "returned_for_correction"
             ]
             if payload.status not in valid_statuses:
                 raise HTTPException(status_code=400, detail=f"Invalid status '{payload.status}'. Must be one of {valid_statuses}")
+
+            # 1. CONFLICT OF INTEREST ENFORCEMENT:
+            # An internal officer cannot screen, route, approve, or reject their own application
+            if app_item.get("email", "").lower() == user.email.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Conflict of Interest: Officers cannot process, approve, or reject applications they submitted as an applicant."
+                )
+
+            # 2. SCREENING & ROUTING ROLE ENFORCEMENT:
+            # Only Operations Officers and Administrators can perform screening & routing actions
+            screening_routing_statuses = ["Under Screening", "Screened", "Routing", "returned_for_correction"]
+            if payload.status in screening_routing_statuses and user.role not in ["operations", "admin"]:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Authority Matrix Violation: Screening and routing operations are strictly restricted to Operations officers. {user.role.replace('_', ' ').title()} cannot perform screening or routing."
+                )
+
+            # 3. APPROVAL AUTHORITY ENFORCEMENT:
+            # Operations role cannot perform final approval (delegated to Pillar Lead or PD)
+            if payload.status == "Approved" and user.role == "operations":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Authority Matrix Violation: Operations role cannot sign off final approval. Final project approval requires Pillar Lead or Project Director authorization."
+                )
+
+            # High-impact strategic / large budget files require Project Director executive approval
+            is_pd_case = (
+                app_item.get("approvalAuthority") == "pd" 
+                or app_item.get("isStrategic", False) 
+                or "35,00,000" in str(app_item.get("budgetCap", ""))
+            )
+            if payload.status == "Approved" and is_pd_case and user.role not in ["pd", "admin"]:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Authority Matrix Violation: This application requires executive authorization and digital signature by the Project Director. Pillar Leads cannot authorize PD-level files."
+                )
 
             now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
             app_item["status"] = payload.status
@@ -791,11 +1106,19 @@ def update_tdp_application_status_by_admin(application_identifier: str, payload:
             if "auditHistory" not in app_item:
                 app_item["auditHistory"] = []
 
+            actor_title = (
+                "Project Director" if user.role == "pd" else
+                "Pillar Lead" if user.role == "pillar_lead" else
+                "Operations Screening Officer" if user.role == "operations" else
+                "System Administrator"
+            )
+            actor_name = f"{user.name} ({actor_title})"
+
             app_item["auditHistory"].append({
                 "timestamp": now_str,
                 "action": f"Status Updated to {payload.status}",
-                "actor": payload.actor or "IITTNiF Technical Advisory Committee",
-                "details": payload.reviewerRemarks or f"Status changed to {payload.status} with stage {app_item['currentStage']}."
+                "actor": actor_name,
+                "details": payload.reviewerRemarks or f"Status changed to {payload.status} (Stage: {app_item['currentStage']}) by {actor_title}."
             })
 
             return app_item
@@ -1152,12 +1475,38 @@ def get_or_create_execution_data(application_identifier: str) -> dict:
     return exec_data
 
 @app.get("/api/v1/vikas/technology-development/execution/{application_identifier}", response_model=TDPProjectExecutionData)
-def get_project_execution_details(application_identifier: str):
+def get_project_execution_details(
+    application_identifier: str,
+    user: UserContext = Depends(get_current_user)
+):
+    """
+    Retrieve project execution workspace with record-level privacy check.
+    """
     data = get_or_create_execution_data(application_identifier)
+    if user.role == "applicant":
+        is_owner = (
+            data.get("applicantEmail", "").lower() == user.email.lower()
+            or data.get("applicantName", "").lower() == user.name.lower()
+        )
+        if not is_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access Denied: Applicants can only view their own project execution workspace."
+            )
     return data
 
 @app.post("/api/v1/vikas/technology-development/execution/{application_identifier}/weekly-progress", response_model=TDPProjectExecutionData)
-def submit_weekly_progress(application_identifier: str, payload: TDPWeeklyProgress):
+def submit_weekly_progress(
+    application_identifier: str, 
+    payload: TDPWeeklyProgress,
+    user: UserContext = Depends(require_roles(["execution", "pillar_lead", "pd", "admin"]))
+):
+    """
+    Submit weekly progress log.
+    IMPORTANT BUSINESS RULE:
+    Engagement/execution actions are restricted to authorized internal staff.
+    External applicants have read-only access to progress tracking.
+    """
     data = get_or_create_execution_data(application_identifier)
     now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
 
@@ -1165,9 +1514,8 @@ def submit_weekly_progress(application_identifier: str, payload: TDPWeeklyProgre
     new_log["id"] = f"WP-W{payload.weekNumber}"
     new_log["submissionDate"] = now_str
     if not new_log.get("submittedBy"):
-        new_log["submittedBy"] = data["applicantName"]
+        new_log["submittedBy"] = user.name or data["applicantName"]
 
-    # Check if week already exists, if so update it, else insert at top
     existing_idx = next((i for i, w in enumerate(data["weeklyProgressLogs"]) if w["weekNumber"] == payload.weekNumber), None)
     if existing_idx is not None:
         data["weeklyProgressLogs"][existing_idx] = new_log
@@ -1178,7 +1526,16 @@ def submit_weekly_progress(application_identifier: str, payload: TDPWeeklyProgre
     return data
 
 @app.put("/api/v1/vikas/technology-development/execution/{application_identifier}/milestones/{milestone_id}", response_model=TDPProjectExecutionData)
-def update_milestone_progress(application_identifier: str, milestone_id: str, payload: TDPExecutionMilestone):
+def update_milestone_progress(
+    application_identifier: str, 
+    milestone_id: str, 
+    payload: TDPExecutionMilestone,
+    user: UserContext = Depends(require_roles(["execution", "pillar_lead", "pd", "admin"]))
+):
+    """
+    Update milestone evidence.
+    Restricted to authorized internal execution staff.
+    """
     data = get_or_create_execution_data(application_identifier)
     now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
 
@@ -1197,7 +1554,16 @@ def update_milestone_progress(application_identifier: str, milestone_id: str, pa
     return data
 
 @app.put("/api/v1/vikas/technology-development/execution/{application_identifier}/deliverables/{deliverable_id}", response_model=TDPProjectExecutionData)
-def update_deliverable_progress(application_identifier: str, deliverable_id: str, payload: TDPTechnicalDeliverable):
+def update_deliverable_progress(
+    application_identifier: str, 
+    deliverable_id: str, 
+    payload: TDPTechnicalDeliverable,
+    user: UserContext = Depends(require_roles(["execution", "pillar_lead", "pd", "admin"]))
+):
+    """
+    Update deliverable evidence.
+    Restricted to authorized internal execution staff.
+    """
     data = get_or_create_execution_data(application_identifier)
     now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
 
@@ -1216,24 +1582,37 @@ def update_deliverable_progress(application_identifier: str, deliverable_id: str
     return data
 
 @app.put("/api/v1/vikas/technology-development/execution/{application_identifier}/final-assets", response_model=TDPProjectExecutionData)
-def update_final_assets(application_identifier: str, payload: TDPFinalAssets):
+def update_final_assets(
+    application_identifier: str, 
+    payload: TDPFinalAssets,
+    user: UserContext = Depends(require_roles(["execution", "pillar_lead", "pd", "admin"]))
+):
+    """
+    Update final project assets.
+    Restricted to authorized internal execution staff.
+    """
     data = get_or_create_execution_data(application_identifier)
     now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
-
     data["finalAssets"] = payload.dict()
     data["lastUpdated"] = now_str
     return data
+    return data
 
 @app.post("/api/v1/vikas/technology-development/execution/{application_identifier}/mentor-verify", response_model=TDPProjectExecutionData)
-def mentor_verify_item(application_identifier: str, payload: TDPMentorVerifyPayload):
+def mentor_verify_item(
+    application_identifier: str, 
+    payload: TDPMentorVerifyPayload,
+    user: UserContext = Depends(require_roles(["pillar_lead", "pd", "admin", "execution"]))
+):
     """
-    Mentor Verification Action:
-    Mentor evaluates any milestone, weekly progress, deliverable, or final asset,
-    leaving remarks and updating status to 'Verified' or 'Needs Revision'.
+    Mentor / Reviewer Verification Action:
+    Mentor evaluates any milestone, weekly progress, deliverable, or final asset.
+    IMPORTANT BUSINESS RULE:
+    Applicants must NEVER be able to perform verification or approve deliverables.
     """
     data = get_or_create_execution_data(application_identifier)
     now_str = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
-    mentor_name = payload.mentorName or "Dr. K. Raghavan (TDP Lead & Domain Mentor)"
+    mentor_name = payload.mentorName or f"{user.name} ({user.role.replace('_', ' ').title()})"
 
     if payload.itemType == "milestone":
         for m in data["milestones"]:
@@ -1263,7 +1642,7 @@ def mentor_verify_item(application_identifier: str, payload: TDPMentorVerifyPayl
                 d["mentorVerificationDate"] = now_str
                 break
     elif payload.itemType == "final_asset":
-        asset_key = payload.itemId.lower() # "finalreport", "presentation", "projectvideo", "coderepository"
+        asset_key = payload.itemId.lower()
         if "finalassets" in data or "finalAssets" in data:
             assets = data.get("finalAssets") or data.get("finalassets")
             for k in ["finalReport", "presentation", "projectVideo", "codeRepository"]:

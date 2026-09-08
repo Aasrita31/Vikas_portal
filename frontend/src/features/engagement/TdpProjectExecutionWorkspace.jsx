@@ -40,20 +40,27 @@ import {
   RotateCcw,
   UserCheck,
   Send,
-  Sliders
+  Sliders,
+  ShieldAlert
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const EXECUTION_STATUSES = ['Draft', 'Submitted', 'Verified', 'Needs Revision'];
 
 export default function TdpProjectExecutionWorkspace({ 
   applicationId = 'IITTNIF-TDP-2026-7193', 
-  onBack,
-  currentUser = { name: 'Prof. S. Ananth', email: 's.ananth@iitt.ac.in', role: 'Principal Investigator' }
+  onBack
 }) {
+  const { currentUser, currentRole, isApplicant, isExecution, isAdmin, canMentorVerify, authFetch } = useAuth();
+  const [accessDeniedError, setAccessDeniedError] = useState(false);
   const [execData, setExecData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('milestones'); // 'milestones' | 'weekly' | 'deliverables' | 'final_assets' | 'repo'
-  const [userRole, setUserRole] = useState('team'); // 'team' (Applicant/PI) | 'mentor' (Dr. K. Raghavan)
+  
+  // Strict RBAC: Engagement & execution actions are restricted to authorized internal staff
+  const isInternalStaff = isExecution || isPillarLead || isProjectDirector || isAdmin;
+  const isMentor = canMentorVerify && !isApplicant;
+  const canSubmitProgress = isInternalStaff && !isApplicant;
   
   // Weekly progress form modal state
   const [showWeeklyModal, setShowWeeklyModal] = useState(false);
@@ -101,8 +108,14 @@ export default function TdpProjectExecutionWorkspace({
   // Fetch execution data
   const fetchExecutionData = async () => {
     setLoading(true);
+    setAccessDeniedError(false);
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}`);
+      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}`);
+      if (res.status === 403) {
+        setAccessDeniedError(true);
+        setLoading(false);
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setExecData(data);
@@ -349,13 +362,17 @@ export default function TdpProjectExecutionWorkspace({
   // Submit Weekly Progress
   const handleWeeklySubmit = async (e) => {
     e.preventDefault();
+    if (!canSubmitProgress) {
+      alert('Access Denied: Engagement & execution actions are restricted to authorized internal staff.');
+      return;
+    }
     if (!weeklyFormData.tasksUndertaken.trim()) {
       alert('Please enter tasks undertaken for this week.');
       return;
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/weekly-progress`, {
+      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/weekly-progress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(weeklyFormData)
@@ -407,6 +424,10 @@ export default function TdpProjectExecutionWorkspace({
   // Milestone Update Evidence
   const handleMilestoneUpdate = async () => {
     if (!editingMilestone) return;
+    if (!canSubmitProgress) {
+      alert('Access Denied: Engagement & execution actions are restricted to authorized internal staff.');
+      return;
+    }
 
     try {
       const updatedPayload = {
@@ -417,7 +438,7 @@ export default function TdpProjectExecutionWorkspace({
         evidenceUrl: milestoneFormData.evidenceUrl || '#'
       };
 
-      const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/milestones/${editingMilestone.id}`, {
+      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/milestones/${editingMilestone.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedPayload)
@@ -444,6 +465,10 @@ export default function TdpProjectExecutionWorkspace({
   // Deliverable Update
   const handleDeliverableUpdate = async () => {
     if (!editingDeliverable) return;
+    if (!canSubmitProgress) {
+      alert('Access Denied: Engagement & execution actions are restricted to authorized internal staff.');
+      return;
+    }
 
     try {
       const updatedPayload = {
@@ -454,7 +479,7 @@ export default function TdpProjectExecutionWorkspace({
         evidenceUrl: deliverableFormData.evidenceUrl || '#'
       };
 
-      const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/deliverables/${editingDeliverable.id}`, {
+      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/deliverables/${editingDeliverable.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedPayload)
@@ -481,16 +506,21 @@ export default function TdpProjectExecutionWorkspace({
   // Mentor Verification Submit
   const handleMentorVerifySubmit = async () => {
     if (!reviewModalData) return;
+    if (isApplicant || !isMentor) {
+      alert('Access Denied: External applicants are strictly forbidden from performing mentor verifications.');
+      return;
+    }
 
     const payload = {
       itemType: reviewModalData.itemType,
       itemId: reviewModalData.itemId,
       status: mentorTargetStatus,
-      mentorReview: mentorFeedbackText || (mentorTargetStatus === 'Verified' ? 'Reviewed and verified by Domain Mentor.' : 'Revision requested with specific suggestions.')
+      mentorReview: mentorFeedbackText || (mentorTargetStatus === 'Verified' ? 'Reviewed and verified by Domain Mentor.' : 'Revision requested with specific suggestions.'),
+      mentorName: `${currentUser.name} (${currentUser.roleLabel || currentUser.role})`
     };
 
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/mentor-verify`, {
+      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/mentor-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -578,6 +608,29 @@ export default function TdpProjectExecutionWorkspace({
     );
   }
 
+  if (accessDeniedError) {
+    return (
+      <div className="techdev-detail-page tdp-exec-page animate-fade-in">
+        <div className="detail-top-nav">
+          <button className="btn-back-link" onClick={onBack}>
+            <ArrowLeft size={16} />
+            <span>Back to Applications Tracking</span>
+          </button>
+        </div>
+        <div className="card access-denied-card" style={{ textAlign: 'center', padding: '48px', maxWidth: '640px', margin: '40px auto' }}>
+          <ShieldAlert size={48} className="text-danger" style={{ margin: '0 auto 16px' }} />
+          <h3>Access Restricted: Confidential Project Workspace</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Under VIKAS role-based access rules, external stakeholders can only access their own active execution workspaces.
+          </p>
+          <button className="btn btn-primary" onClick={onBack}>
+            <ArrowLeft size={16} /> Return to Projects
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!execData) return null;
 
   return (
@@ -592,6 +645,21 @@ export default function TdpProjectExecutionWorkspace({
           VIKAS Platform / Technology Development / <strong className="text-emerald font-mono">Project Execution Workspace ({execData.applicationNumber})</strong>
         </span>
       </div>
+
+      {/* Read-Only Mode Banner for External Applicants */}
+      {isApplicant && (
+        <div className="card applicant-readonly-banner mb-16" style={{ marginBottom: '16px', padding: '14px 18px', background: 'rgba(6, 182, 212, 0.08)', border: '1px solid rgba(6, 182, 212, 0.3)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <ShieldCheck size={22} style={{ color: '#06b6d4', flexShrink: 0 }} />
+            <div>
+              <strong style={{ color: '#0891b2', fontSize: '13.5px' }}>Project Engagement & Execution (Read-Only Mode):</strong>
+              <p style={{ margin: '2px 0 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                As an external applicant, your project execution tracking is read-only. Milestone sign-offs, deliverable evaluations, and progress logs are administered by authorized IITTNiF project execution staff and domain mentors.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Execution Header Card */}
       <div className="card exec-header-card">
@@ -612,30 +680,35 @@ export default function TdpProjectExecutionWorkspace({
             </div>
           </div>
 
-          {/* Role Switcher (Project Team vs Mentor Mode) */}
+          {/* Authenticated Role Indicator: Strictly enforces zero self-verification */}
           <div className="role-switcher-card">
             <div className="role-switcher-header">
-              <Sliders size={14} className="text-muted" />
-              <span>Workspace Persona:</span>
+              {isMentor ? <UserCheck size={14} className="text-cyan" /> : <User size={14} className="text-emerald" />}
+              <span style={{ fontWeight: 700, color: isMentor ? 'var(--color-accent)' : 'var(--color-success)' }}>
+                {isApplicant ? 'External Applicant (Read-Only)' : isMentor ? 'Reviewer / Domain Mentor Mode' : 'Authorized Internal Staff Mode'}
+              </span>
             </div>
-            <div className="role-toggle-pill">
-              <button 
-                className={`btn-role-toggle ${userRole === 'team' ? 'active-team' : ''}`}
-                onClick={() => setUserRole('team')}
-              >
-                <User size={13} />
-                <span>Project Team</span>
-              </button>
-              <button 
-                className={`btn-role-toggle ${userRole === 'mentor' ? 'active-mentor' : ''}`}
-                onClick={() => setUserRole('mentor')}
-              >
-                <UserCheck size={13} />
-                <span>Domain Mentor</span>
-              </button>
+            <div className="role-auth-pill" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              backgroundColor: 'var(--bg-primary)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-color)',
+              fontSize: '12px',
+              fontWeight: 600
+            }}>
+              <span style={{ color: 'var(--text-primary)' }}>{currentUser.name}</span>
+              <span style={{ color: 'var(--text-muted)' }}>•</span>
+              <span style={{ color: 'var(--color-accent)' }}>{currentUser.roleLabel || currentUser.role.toUpperCase()}</span>
             </div>
             <span className="role-mode-hint">
-              {userRole === 'team' ? 'Upload deliverables & progress logs' : 'Verify submissions & leave feedback'}
+              {isApplicant
+                ? 'External Stakeholder: Read-only monitoring of active milestone verifications and outcome achievements.'
+                : isMentor 
+                ? 'Authorized Reviewer: Verify project milestones, review deliverables & submit evaluations.'
+                : 'Authorized Internal Staff: Manage project milestones, progress logs & deliverable packaging.'}
             </span>
           </div>
         </div>
@@ -720,7 +793,7 @@ export default function TdpProjectExecutionWorkspace({
                 </p>
               </div>
 
-              {userRole === 'team' && (
+              {canSubmitProgress && (
                 <button 
                   className="btn btn-sm btn-outline"
                   onClick={() => alert('New milestone can be appended upon formal approval from TAC.')}
@@ -781,7 +854,7 @@ export default function TdpProjectExecutionWorkspace({
                         )}
                       </td>
                       <td className="text-right">
-                        {userRole === 'team' ? (
+                        {canSubmitProgress && (
                           <button 
                             className="btn btn-sm btn-outline"
                             onClick={() => {
@@ -797,9 +870,10 @@ export default function TdpProjectExecutionWorkspace({
                             <Upload size={13} />
                             <span>Upload Evidence</span>
                           </button>
-                        ) : (
+                        )}
+                        {isMentor && (
                           <button 
-                            className="btn btn-sm btn-mentor-review"
+                            className="btn btn-sm btn-mentor-review ml-10"
                             onClick={() => {
                               setReviewModalData({
                                 itemType: 'milestone',
@@ -843,7 +917,7 @@ export default function TdpProjectExecutionWorkspace({
                 </p>
               </div>
 
-              {userRole === 'team' && (
+              {canSubmitProgress && (
                 <button 
                   className="btn btn-primary-cta"
                   onClick={() => setShowWeeklyModal(true)}
@@ -873,7 +947,7 @@ export default function TdpProjectExecutionWorkspace({
                       </div>
                       <div className="weekly-status-action">
                         {getStatusBadge(log.status)}
-                        {userRole === 'mentor' && (
+                        {isMentor && (
                           <button 
                             className="btn btn-sm btn-mentor-review ml-10"
                             onClick={() => {
@@ -1041,7 +1115,7 @@ export default function TdpProjectExecutionWorkspace({
 
                   {/* Action */}
                   <div className="deliv-card-action mt-16">
-                    {userRole === 'team' ? (
+                    {canSubmitProgress && (
                       <button 
                         className="btn btn-sm btn-outline w-full"
                         onClick={() => {
@@ -1057,9 +1131,10 @@ export default function TdpProjectExecutionWorkspace({
                         <Upload size={13} />
                         <span>Upload Deliverable Artifact ({d.deliverableCode})</span>
                       </button>
-                    ) : (
+                    )}
+                    {isMentor && (
                       <button 
-                        className="btn btn-sm btn-mentor-review w-full"
+                        className="btn btn-sm btn-mentor-review w-full mt-8"
                         onClick={() => {
                           setReviewModalData({
                             itemType: 'deliverable',
@@ -1140,7 +1215,7 @@ export default function TdpProjectExecutionWorkspace({
                 </div>
 
                 <div className="asset-action mt-14">
-                  {userRole === 'team' ? (
+                  {canSubmitProgress && (
                     <button 
                       className="btn btn-sm btn-outline w-full"
                       onClick={() => alert('Uploading Final Project Report dossier...')}
@@ -1148,9 +1223,10 @@ export default function TdpProjectExecutionWorkspace({
                       <Upload size={13} />
                       <span>Upload Final Report (PDF)</span>
                     </button>
-                  ) : (
+                  )}
+                  {isMentor && (
                     <button 
-                      className="btn btn-sm btn-mentor-review w-full"
+                      className="btn btn-sm btn-mentor-review w-full mt-8"
                       onClick={() => {
                         setReviewModalData({
                           itemType: 'final_asset',
@@ -1207,7 +1283,7 @@ export default function TdpProjectExecutionWorkspace({
                 </div>
 
                 <div className="asset-action mt-14">
-                  {userRole === 'team' ? (
+                  {canSubmitProgress && (
                     <button 
                       className="btn btn-sm btn-outline w-full"
                       onClick={() => alert('Uploading Presentation deck (PPTX/PDF)...')}
@@ -1215,9 +1291,10 @@ export default function TdpProjectExecutionWorkspace({
                       <Upload size={13} />
                       <span>Upload Slide Deck</span>
                     </button>
-                  ) : (
+                  )}
+                  {isMentor && (
                     <button 
-                      className="btn btn-sm btn-mentor-review w-full"
+                      className="btn btn-sm btn-mentor-review w-full mt-8"
                       onClick={() => {
                         setReviewModalData({
                           itemType: 'final_asset',
@@ -1281,7 +1358,7 @@ export default function TdpProjectExecutionWorkspace({
                 </div>
 
                 <div className="asset-action mt-14">
-                  {userRole === 'team' ? (
+                  {canSubmitProgress && (
                     <button 
                       className="btn btn-sm btn-outline w-full"
                       onClick={() => alert('Linking video URL...')}
@@ -1289,9 +1366,10 @@ export default function TdpProjectExecutionWorkspace({
                       <Video size={13} />
                       <span>Link Demo Video</span>
                     </button>
-                  ) : (
+                  )}
+                  {isMentor && (
                     <button 
-                      className="btn btn-sm btn-mentor-review w-full"
+                      className="btn btn-sm btn-mentor-review w-full mt-8"
                       onClick={() => {
                         setReviewModalData({
                           itemType: 'final_asset',

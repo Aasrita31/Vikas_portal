@@ -1,64 +1,73 @@
 import React, { useState } from 'react';
-import { ShieldAlert, Award, FileText, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { ShieldAlert, Award, FileText, CheckCircle, XCircle, ExternalLink, Lock, AlertTriangle } from 'lucide-react';
+import { useAuth, ROLES } from '../../context/AuthContext';
 
 export default function ApprovalPanel({ currentRole, applications, onApproveApplication, onRejectApplication }) {
+  const { currentUser, canApproveApplication, isProjectDirector, isPillarLead, isApplicant } = useAuth();
   const [selectedApp, setSelectedApp] = useState(null);
   const [signatureName, setSignatureName] = useState('');
   const [comment, setComment] = useState('');
 
-  // Access validation
-  if (currentRole !== 'pd' && currentRole !== 'pillar_lead') {
+  // Access validation: Only Project Director, Pillar Leads, and Admin can access the Approval Matrix
+  const isAuthorized = currentRole === 'pd' || currentRole === 'pillar_lead' || currentRole === 'admin';
+  if (!isAuthorized || isApplicant) {
     return (
       <div className="card access-denied-card animate-fade-in">
         <ShieldAlert size={48} className="text-danger" />
-        <h3>Access Restricted</h3>
-        <p>The Governance Approval Matrix is restricted to authorizing officers (Pillar Leads or the Project Director).</p>
+        <h3>Access Restricted: Governance Approval Matrix</h3>
+        <p>
+          The Governance Approval Matrix and E-Signature Console are restricted to authorizing officers (Pillar Leads or the Project Director).
+        </p>
+        <div className="business-rule-banner">
+          <strong>Mandatory Business Rule:</strong> An applicant or external stakeholder must NEVER be able to perform internal workflow actions such as screening, verification, routing, classification, approval, or e-signature.
+        </div>
         <div className="hint-box">
-          <strong>Tip to evaluate:</strong> Switch your persona to <strong>Pillar Lead</strong> or <strong>Project Director (PD)</strong> in the top header menu to access authorizations.
+          <strong>Evaluation Note:</strong> Switch your persona to <strong>Pillar Lead</strong> or <strong>Project Director (PD)</strong> in the top header menu to evaluate digital approvals and e-signatures.
         </div>
         
         <style>{`
           .access-denied-card {
             text-align: center;
-            padding: 48px;
-            max-width: 600px;
+            padding: 48px 32px;
+            max-width: 640px;
             margin: 40px auto;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 16px;
           }
-          .hint-box {
-            background-color: rgba(226, 184, 87, 0.05);
-            border: 1px solid rgba(226, 184, 87, 0.2);
-            padding: 12px;
+          .business-rule-banner {
+            background-color: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            padding: 12px 16px;
             border-radius: var(--radius-md);
-            font-size: 13px;
+            font-size: 12.5px;
+            color: var(--color-danger);
+            line-height: 1.4;
+          }
+          .hint-box {
+            background-color: rgba(var(--color-accent-rgb), 0.08);
+            border: 1px solid rgba(var(--color-accent-rgb), 0.2);
+            padding: 12px 16px;
+            border-radius: var(--radius-md);
+            font-size: 12.5px;
             color: var(--text-secondary);
-            margin-top: 12px;
+            margin-top: 4px;
           }
         `}</style>
       </div>
     );
   }
 
-  // Filter pending approvals based on roles
+  // Filter pending approvals based on roles and authority level
   const pendingApprovals = applications.filter(app => {
     if (app.status !== 'pending_approval') return false;
-    
-    // Project Director can see and approve everything
-    if (currentRole === 'pd') return true;
-    
-    // Pillar Leads see cases matching their level
-    if (currentRole === 'pillar_lead') {
-      return app.approvalAuthority === 'pillar_lead';
-    }
-    
-    return false;
+    // Both PD and Pillar Leads see the active approval matrix for institutional transparency
+    return true;
   });
 
   const getAuthorityDetails = (app) => {
-    if (app.approvalAuthority === 'pd') {
+    if (app.approvalAuthority === 'pd' || app.isStrategic) {
       return {
         label: 'Project Director Strategic Approval Mandatory',
         badge: 'badge-danger',
@@ -66,15 +75,24 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
       };
     } else {
       return {
-        label: 'Pillar Lead Executive Approval Sufficient',
+        label: `Pillar Lead (${app.assignedVertical || 'Assigned Vertical'}) Sign-off`,
         badge: 'badge-warning',
-        rule: 'Governance Framework Clause 4.2: Program participation, fellowships, general skills upskilling, and standard labs network files are delegated to respective Pillar Leads.'
+        rule: `Governance Framework Clause 4.2: Program participation, fellowships, general skills upskilling, and standard labs network files are delegated to the respective Pillar Lead for ${app.assignedVertical || 'this vertical'}.`
       };
     }
   };
 
   const handleApprove = (e) => {
     e.preventDefault();
+    if (!selectedApp) return;
+
+    // Strict Authority Matrix Verification
+    const authCheck = canApproveApplication(selectedApp);
+    if (!authCheck.authorized) {
+      alert(`Access Denied: ${authCheck.reason}`);
+      return;
+    }
+
     if (!signatureName) {
       alert('Digital signature is required for audit logs.');
       return;
@@ -85,7 +103,7 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
       {
         date: new Date().toLocaleString('en-GB'),
         action: 'Digitally Approved & Signed',
-        user: `${currentRole === 'pd' ? 'Project Director' : 'Pillar Lead'} (${signatureName})`,
+        user: `${currentUser.roleLabel || currentRole.toUpperCase()} (${signatureName})`,
         details: `Approved vertical enrollment in: ${selectedApp.assignedVertical}. E-Signature logged. Comments: ${comment || 'Approved without further remarks.'}`
       }
     ];
@@ -104,6 +122,14 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
   };
 
   const handleReject = () => {
+    if (!selectedApp) return;
+
+    const authCheck = canApproveApplication(selectedApp);
+    if (!authCheck.authorized) {
+      alert(`Access Denied: ${authCheck.reason}`);
+      return;
+    }
+
     if (!comment) {
       alert('Remarks / rejection reasons must be documented for the audit trail.');
       return;
@@ -113,20 +139,20 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
       ...(selectedApp.history || []),
       {
         date: new Date().toLocaleString('en-GB'),
-        action: 'Application Rejected & Escalated Back',
-        user: `${currentRole === 'pd' ? 'Project Director' : 'Pillar Lead'}`,
-        details: `Rejected. Returned to screening stage. Reason: ${comment}`
+        action: 'Application Evaluated — Declined',
+        user: `${currentUser.roleLabel || currentRole.toUpperCase()}`,
+        details: `Application declined under Authority Matrix. Reason: ${comment}`
       }
     ];
 
     onRejectApplication(selectedApp.fileNumber, {
       status: 'rejected',
+      rejectionDate: new Date().toLocaleDateString('en-GB'),
       history: updatedHistory,
       screeningNotes: comment
     });
 
     setSelectedApp(null);
-    setSignatureName('');
     setComment('');
   };
 
@@ -159,6 +185,9 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
                 <tbody>
                   {pendingApprovals.map((app) => {
                     const auth = getAuthorityDetails(app);
+                    const authStatus = canApproveApplication(app);
+                    const canAuthThisApp = authStatus.authorized;
+
                     return (
                       <tr key={app.fileNumber} className={selectedApp?.fileNumber === app.fileNumber ? 'selected-row' : ''}>
                         <td className="font-mono text-accent">{app.fileNumber}</td>
@@ -171,10 +200,18 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
                         </td>
                         <td>
                           <button 
-                            className="btn btn-primary btn-sm"
+                            className={`btn ${canAuthThisApp ? 'btn-primary' : 'btn-outline'} btn-sm`}
                             onClick={() => setSelectedApp(app)}
+                            title={!canAuthThisApp ? authStatus.reason : 'Review and execute authorization'}
                           >
-                            Review & Sign
+                            {canAuthThisApp ? (
+                              <span>{app.approvalAuthority === 'pd' || app.isStrategic ? 'Review & E-Sign' : 'Review & Sign'}</span>
+                            ) : (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <Lock size={12} />
+                                <span>{currentRole === 'pd' ? 'View (Delegated)' : 'View (Restricted)'}</span>
+                              </span>
+                            )}
                           </button>
                         </td>
                       </tr>
@@ -242,6 +279,17 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
               </div>
             </div>
 
+            {/* Authority Matrix Compliance Notice */}
+            {!canApproveApplication(selectedApp).authorized && (
+              <div className="alert-box alert-warning mt-14 mb-16" style={{ padding: '12px 16px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-md)', color: '#b45309', fontSize: '12.5px', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                <Lock size={18} className="text-warning flex-shrink-0" style={{ marginTop: '2px' }} />
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '2px' }}>Authorization Restricted Under Governance Matrix:</strong>
+                  <span>{canApproveApplication(selectedApp).reason}</span>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleApprove} className="approval-sign-form">
               <div className="form-group">
                 <label className="form-label">Review/Approval Comments</label>
@@ -250,6 +298,8 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
                   rows="3"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
+                  disabled={!canApproveApplication(selectedApp).authorized}
+                  placeholder={!canApproveApplication(selectedApp).authorized ? 'Read-only mode (Restricted by authority matrix)' : 'Enter review remarks...'}
                 ></textarea>
               </div>
 
@@ -259,10 +309,11 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
                   <input 
                     type="text" 
                     className="form-control font-signature"
-                    placeholder="Enter Name"
+                    placeholder={!canApproveApplication(selectedApp).authorized ? 'Signature locked' : 'Enter Name to digitally sign'}
                     value={signatureName}
                     onChange={(e) => setSignatureName(e.target.value)}
-                    required
+                    disabled={!canApproveApplication(selectedApp).authorized}
+                    required={canApproveApplication(selectedApp).authorized}
                   />
                   <span className="signature-disclaimer">
                     By typing your name above, you attach a digital authorization stamp to this audit record.
@@ -283,13 +334,30 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
               )}
 
               <div className="panel-actions">
-                <button type="submit" className="btn btn-success flex-1">
-                  <CheckCircle size={16} />
-                  Authorize & E-Sign
+                <button 
+                  type="submit" 
+                  className="btn btn-success flex-1"
+                  disabled={!canApproveApplication(selectedApp).authorized}
+                  style={{
+                    opacity: !canApproveApplication(selectedApp).authorized ? 0.45 : 1,
+                    cursor: !canApproveApplication(selectedApp).authorized ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {!canApproveApplication(selectedApp).authorized ? <Lock size={16} /> : <CheckCircle size={16} />}
+                  <span>{selectedApp.approvalAuthority === 'pd' || selectedApp.isStrategic ? 'Authorize & E-Sign' : 'Authorize & Sign'}</span>
                 </button>
-                <button type="button" className="btn btn-danger" onClick={handleReject}>
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  onClick={handleReject}
+                  disabled={!canApproveApplication(selectedApp).authorized}
+                  style={{
+                    opacity: !canApproveApplication(selectedApp).authorized ? 0.45 : 1,
+                    cursor: !canApproveApplication(selectedApp).authorized ? 'not-allowed' : 'pointer'
+                  }}
+                >
                   <XCircle size={16} />
-                  Send Back
+                  <span>Decline File</span>
                 </button>
               </div>
             </form>
