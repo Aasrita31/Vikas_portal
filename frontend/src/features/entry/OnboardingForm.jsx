@@ -30,7 +30,7 @@ import {
   Clock
 } from 'lucide-react';
 
-export default function OnboardingForm({ onSubmitApplication }) {
+export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -44,15 +44,17 @@ export default function OnboardingForm({ onSubmitApplication }) {
     phone: '',
     location: '',
 
-    // Section 2: Stakeholder Type (Select one)
-    stakeholderType: 'Startup',
+    // Section 2: Stakeholder Type (Select one - Default unselected)
+    stakeholderType: '',
+    otherStakeholderType: '',
 
-    // Section 3: Domain Selection (Multiple choice)
-    domains: ['GIS / Remote Sensing'],
+    // Section 3: Domain Selection (Multiple choice - initially empty)
+    domains: [],
     otherDomain: '',
 
     // Section 4: Intent of Engagement (Single choice, initially unselected)
     intentOfEngagement: '',
+    otherIntent: '',
 
     // Section 5: Detailed Inputs (Dynamic based on type)
     // Startup
@@ -83,6 +85,11 @@ export default function OnboardingForm({ onSubmitApplication }) {
     industryDepartment: '',
     industryEngagementMode: 'Collaborative R&D / Tech Transfer',
 
+    // Other Stakeholder Type Details
+    otherEntityCategory: '',
+    otherFocusArea: '',
+    otherEngagementDetails: '',
+
     // Section 6: Problem Statement / Interest
     problemStatement: '',
 
@@ -97,6 +104,27 @@ export default function OnboardingForm({ onSubmitApplication }) {
   });
 
   const [submittedData, setSubmittedData] = useState(null);
+
+  // Track whether user has entered any unsaved details
+  React.useEffect(() => {
+    const isDirty = Boolean(
+      !submittedData && (
+        formData.name.trim() ||
+        formData.organization.trim() ||
+        formData.email.trim() ||
+        formData.phone.trim() ||
+        formData.location.trim() ||
+        formData.stakeholderType ||
+        formData.domains.length > 0 ||
+        formData.intentOfEngagement ||
+        formData.problemStatement.trim() ||
+        formData.documentName
+      )
+    );
+    if (onDirtyChange) {
+      onDirtyChange(isDirty);
+    }
+  }, [formData, submittedData, onDirtyChange]);
 
   // Available Stakeholder Types
   const stakeholderTypes = [
@@ -155,6 +183,14 @@ export default function OnboardingForm({ onSubmitApplication }) {
       icon: Award,
       badge: 'Advisory',
       color: '#ca8a04'
+    },
+    { 
+      id: 'Other', 
+      title: 'Other', 
+      subtitle: 'NGO, Community, Consortium or other entity', 
+      icon: Compass,
+      badge: 'Custom',
+      color: '#8b5cf6'
     }
   ];
 
@@ -176,7 +212,8 @@ export default function OnboardingForm({ onSubmitApplication }) {
     'Collaboration',
     'Technology Development',
     'Business Opportunity',
-    'Mentorship / Expert Contribution'
+    'Mentorship / Expert Contribution',
+    'Other'
   ];
 
   // Startup Stages
@@ -196,7 +233,11 @@ export default function OnboardingForm({ onSubmitApplication }) {
       const newDomains = exists 
         ? prev.domains.filter(d => d !== domain)
         : [...prev.domains, domain];
-      return { ...prev, domains: newDomains };
+      return { 
+        ...prev, 
+        domains: newDomains,
+        otherDomain: exists && domain === 'Others' ? '' : prev.otherDomain
+      };
     });
     if (formErrors.domains) {
       setFormErrors(prev => ({ ...prev, domains: null }));
@@ -207,10 +248,14 @@ export default function OnboardingForm({ onSubmitApplication }) {
   const toggleIntent = (intent) => {
     setFormData(prev => ({
       ...prev,
-      intentOfEngagement: prev.intentOfEngagement === intent ? '' : intent
+      intentOfEngagement: prev.intentOfEngagement === intent ? '' : intent,
+      otherIntent: prev.intentOfEngagement === intent ? '' : prev.otherIntent
     }));
     if (formErrors.intentOfEngagement) {
       setFormErrors(prev => ({ ...prev, intentOfEngagement: null }));
+    }
+    if (formErrors.otherIntent) {
+      setFormErrors(prev => ({ ...prev, otherIntent: null }));
     }
   };
 
@@ -248,6 +293,7 @@ export default function OnboardingForm({ onSubmitApplication }) {
       case 'Industry': verticalCode = 'INDUSTRY'; break;
       case 'Government': verticalCode = 'GOVT'; break;
       case 'Expert': verticalCode = 'EXPERT'; break;
+      case 'Other': verticalCode = 'OTHER'; break;
       default: verticalCode = 'PORTAL';
     }
     const serial = Math.floor(Math.random() * 900) + 100;
@@ -322,31 +368,56 @@ export default function OnboardingForm({ onSubmitApplication }) {
   // Validate Form
   const validateForm = () => {
     const errors = {};
-    if (!formData.name.trim()) errors.name = 'Applicant name is required';
+    if (!formData.name.trim()) {
+      errors.name = 'Applicant name is required';
+    } else if (!/^[a-zA-Z\s.'-]+$/.test(formData.name.trim())) {
+      errors.name = 'Name should only contain letters and spaces (no special characters)';
+    }
+
     if (!formData.organization.trim()) errors.organization = 'Organization / Institution is required';
     if (!formData.email.trim()) {
       errors.email = 'Email address is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       errors.email = 'Please provide a valid email address';
     }
-    if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-    if (!formData.location.trim()) errors.location = 'Location (City, State) is required';
-
-    if (formData.domains.length === 0) {
-      errors.domains = 'Please select at least one technology domain';
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (!/^\d{10}$/.test(formData.phone.trim())) {
+      errors.phone = 'Phone number must be exactly 10 digits';
     }
-    if (formData.domains.includes('Others') && !formData.otherDomain.trim()) {
+    if (!formData.location.trim()) {
+      errors.location = 'Location (City, State) is required';
+    } else if (!/^[a-zA-Z0-9\s,.-]+$/.test(formData.location.trim())) {
+      errors.location = 'Location should not contain special characters';
+    }
+
+    // Section 2: Stakeholder Type
+    if (!formData.stakeholderType) {
+      errors.stakeholderType = 'Please select a stakeholder type in Section 2';
+    } else if (formData.stakeholderType === 'Other' && !formData.otherStakeholderType.trim()) {
+      errors.otherStakeholderType = 'Please specify your other stakeholder type';
+    }
+
+    // Section 3: Domain Selection
+    if (formData.domains.length === 0) {
+      errors.domains = 'Please select at least one technology domain in Section 3';
+    } else if (formData.domains.includes('Others') && !formData.otherDomain.trim()) {
       errors.otherDomain = 'Please specify your other domain';
     }
 
+    // Section 4: Intent of Engagement
     if (!formData.intentOfEngagement || (Array.isArray(formData.intentOfEngagement) && formData.intentOfEngagement.length === 0)) {
-      errors.intentOfEngagement = 'Please select your intent of engagement';
+      errors.intentOfEngagement = 'Please select your intent of engagement in Section 4';
+    } else if (formData.intentOfEngagement === 'Other' && !formData.otherIntent.trim()) {
+      errors.otherIntent = 'Please specify your other intent of engagement';
     }
 
+    // Section 6: Problem Statement / Interest
     if (!formData.problemStatement.trim()) {
-      errors.problemStatement = 'Please provide a brief problem statement or description of interest';
+      errors.problemStatement = 'Please provide a brief problem statement or description of interest in Section 6';
     }
 
+    // Section 7: Consent
     if (!formData.agreeToTerms) {
       errors.agreeToTerms = 'You must agree to the terms to proceed';
     }
@@ -410,6 +481,13 @@ export default function OnboardingForm({ onSubmitApplication }) {
         curriculum: formData.schoolCurriculum,
         interest: formData.schoolInterest
       };
+    } else if (formData.stakeholderType === 'Other') {
+      dynamicSummary = {
+        category: `Other: ${formData.otherStakeholderType || 'Custom'}`,
+        entityCategory: formData.otherEntityCategory,
+        focusArea: formData.otherFocusArea,
+        engagementDetails: formData.otherEngagementDetails
+      };
     } else {
       dynamicSummary = {
         category: formData.stakeholderType,
@@ -427,9 +505,11 @@ export default function OnboardingForm({ onSubmitApplication }) {
       phone: formData.phone,
       location: formData.location,
       stakeholderType: formData.stakeholderType,
+      otherStakeholderType: formData.otherStakeholderType,
       domains: formData.domains,
       otherDomain: formData.otherDomain,
       intentOfEngagement: formData.intentOfEngagement,
+      otherIntent: formData.otherIntent,
       dynamicInputs: dynamicSummary,
       problemStatement: formData.problemStatement,
       consent: {
@@ -453,7 +533,7 @@ export default function OnboardingForm({ onSubmitApplication }) {
           date: new Date().toLocaleString('en-GB'),
           action: 'File Created & Onboarded',
           user: 'VIKAS Portal (Auto)',
-          details: `Registered as ${formData.stakeholderType} under ${formData.domains.join(', ')}. Awaiting initial screening.`
+          details: `Registered as ${formData.stakeholderType === 'Other' ? `Other (${formData.otherStakeholderType})` : formData.stakeholderType} under ${formData.domains.join(', ')}. Awaiting initial screening.`
         }
       ]
     };
@@ -479,10 +559,12 @@ export default function OnboardingForm({ onSubmitApplication }) {
       email: '',
       phone: '',
       location: '',
-      stakeholderType: 'Startup',
-      domains: ['GIS / Remote Sensing'],
+      stakeholderType: '',
+      otherStakeholderType: '',
+      domains: [],
       otherDomain: '',
       intentOfEngagement: '',
+      otherIntent: '',
       startupStage: 'Prototype',
       startupDomain: '',
       startupTeamSize: '1 - 5',
@@ -499,6 +581,9 @@ export default function OnboardingForm({ onSubmitApplication }) {
       schoolInterest: 'VidyaGIS & Spatial Intelligence Lab',
       industryDepartment: '',
       industryEngagementMode: 'Collaborative R&D / Tech Transfer',
+      otherEntityCategory: '',
+      otherFocusArea: '',
+      otherEngagementDetails: '',
       problemStatement: '',
       agreeToTerms: false,
       acknowledgeNonIncubation: false,
@@ -569,7 +654,11 @@ export default function OnboardingForm({ onSubmitApplication }) {
               <div className="receipt-block-content">
                 <div className="summary-row">
                   <span className="lbl">Category:</span>
-                  <span className="badge badge-amber font-bold">{submittedData.stakeholderType}</span>
+                  <span className="badge badge-amber font-bold">
+                    {submittedData.stakeholderType === 'Other' && submittedData.otherStakeholderType
+                      ? `Other: ${submittedData.otherStakeholderType}`
+                      : submittedData.stakeholderType}
+                  </span>
                 </div>
                 <div className="summary-row">
                   <span className="lbl">Status:</span>
@@ -603,7 +692,9 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 <div className="summary-row mt-8">
                   <span className="lbl">Intent:</span>
                   <div className="val-chips">
-                    {Array.isArray(submittedData.intentOfEngagement) ? (
+                    {submittedData.intentOfEngagement === 'Other' && submittedData.otherIntent ? (
+                      <span className="receipt-chip-cyan font-semibold">Other: {submittedData.otherIntent}</span>
+                    ) : Array.isArray(submittedData.intentOfEngagement) ? (
                       submittedData.intentOfEngagement.map((intent, i) => (
                         <span key={i} className="receipt-chip-cyan">{intent}</span>
                       ))
@@ -619,7 +710,7 @@ export default function OnboardingForm({ onSubmitApplication }) {
             <div className="receipt-summary-block">
               <div className="receipt-block-header">
                 <Layers size={15} className="header-icon-amber" />
-                <span>Section 5: Detailed Inputs ({submittedData.stakeholderType})</span>
+                <span>Section 5: Detailed Inputs ({submittedData.stakeholderType === 'Other' && submittedData.otherStakeholderType ? submittedData.otherStakeholderType : submittedData.stakeholderType})</span>
               </div>
               <div className="receipt-block-content">
                 {submittedData.dynamicInputs?.stage && (
@@ -720,10 +811,12 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 </label>
                 <input 
                   type="text" 
+                  placeholder="Enter full name"
                   className={`form-control ${formErrors.name ? 'input-error' : ''}`}
                   value={formData.name}
                   onChange={(e) => {
-                    setFormData({...formData, name: e.target.value});
+                    const sanitized = e.target.value.replace(/[^a-zA-Z\s.'-]/g, '');
+                    setFormData({...formData, name: sanitized});
                     if (formErrors.name) setFormErrors({...formErrors, name: null});
                   }}
                   required
@@ -776,10 +869,13 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 </label>
                 <input 
                   type="tel" 
+                  maxLength={10}
+                  placeholder="10-digit mobile number"
                   className={`form-control ${formErrors.phone ? 'input-error' : ''}`}
                   value={formData.phone}
                   onChange={(e) => {
-                    setFormData({...formData, phone: e.target.value});
+                    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({...formData, phone: digitsOnly});
                     if (formErrors.phone) setFormErrors({...formErrors, phone: null});
                   }}
                   required
@@ -794,10 +890,12 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 </label>
                 <input 
                   type="text" 
+                  placeholder="City, State"
                   className={`form-control ${formErrors.location ? 'input-error' : ''}`}
                   value={formData.location}
                   onChange={(e) => {
-                    setFormData({...formData, location: e.target.value});
+                    const sanitized = e.target.value.replace(/[^a-zA-Z0-9\s,.-]/g, '');
+                    setFormData({...formData, location: sanitized});
                     if (formErrors.location) setFormErrors({...formErrors, location: null});
                   }}
                   required
@@ -814,10 +912,17 @@ export default function OnboardingForm({ onSubmitApplication }) {
             <div className="section-card-header">
               <div className="section-number-badge">2</div>
               <div className="section-header-text">
-                <h3>Section 2: Stakeholder Type</h3>
+                <h3>Section 2: Stakeholder Type <span className="text-danger">*</span></h3>
                 <p>Select one primary stakeholder category that represents your engagement</p>
               </div>
             </div>
+
+            {formErrors.stakeholderType && (
+              <div className="alert-error-banner mb-16">
+                <AlertCircle size={15} />
+                <span>{formErrors.stakeholderType}</span>
+              </div>
+            )}
 
             <div className="stakeholder-selector-grid">
               {stakeholderTypes.map((type) => {
@@ -827,7 +932,14 @@ export default function OnboardingForm({ onSubmitApplication }) {
                   <div 
                     key={type.id}
                     className={`stakeholder-type-pill-card ${isSelected ? 'selected' : ''}`}
-                    onClick={() => setFormData({...formData, stakeholderType: type.id})}
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev, 
+                        stakeholderType: type.id,
+                        otherStakeholderType: type.id === 'Other' ? prev.otherStakeholderType : ''
+                      }));
+                      if (formErrors.stakeholderType) setFormErrors(prev => ({ ...prev, stakeholderType: null }));
+                    }}
                   >
                     <div className="card-top-row">
                       <div className="stakeholder-icon-box" style={{ color: type.color, backgroundColor: `${type.color}14`, borderColor: `${type.color}30` }}>
@@ -854,6 +966,26 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 );
               })}
             </div>
+
+            {/* Conditionally reveal 'Other' Stakeholder specification */}
+            {formData.stakeholderType === 'Other' && (
+              <div className="others-input-container animate-fade-in mt-16" id="field-otherStakeholderType">
+                <label className="form-label">
+                  Please Specify Other Stakeholder Type <span className="text-danger">*</span>
+                </label>
+                <input 
+                  type="text"
+                  className={`form-control ${formErrors.otherStakeholderType ? 'input-error' : ''}`}
+                  placeholder="e.g. Non-profit Organization, Research Foundation, Independent Innovator..."
+                  value={formData.otherStakeholderType}
+                  onChange={(e) => {
+                    setFormData({...formData, otherStakeholderType: e.target.value});
+                    if (formErrors.otherStakeholderType) setFormErrors({...formErrors, otherStakeholderType: null});
+                  }}
+                />
+                {formErrors.otherStakeholderType && <span className="field-error-msg">{formErrors.otherStakeholderType}</span>}
+              </div>
+            )}
           </div>
 
           {/* ========================================================
@@ -863,7 +995,7 @@ export default function OnboardingForm({ onSubmitApplication }) {
             <div className="section-card-header">
               <div className="section-number-badge">3</div>
               <div className="section-header-text">
-                <h3>Section 3: Domain Selection</h3>
+                <h3>Section 3: Domain Selection <span className="text-danger">*</span></h3>
                 <p>Multiple choice — Select all core technology domains aligned with your proposal</p>
               </div>
             </div>
@@ -921,7 +1053,7 @@ export default function OnboardingForm({ onSubmitApplication }) {
             <div className="section-card-header">
               <div className="section-number-badge">4</div>
               <div className="section-header-text">
-                <h3>Section 4: Intent of Engagement</h3>
+                <h3>Section 4: Intent of Engagement <span className="text-danger">*</span></h3>
                 <p>Select your intended mode and purpose of engagement with IITTNiF (Single choice)</p>
               </div>
             </div>
@@ -951,6 +1083,26 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 );
               })}
             </div>
+
+            {/* Conditionally reveal 'Other' Intent specification */}
+            {formData.intentOfEngagement === 'Other' && (
+              <div className="others-input-container animate-fade-in mt-16" id="field-otherIntent">
+                <label className="form-label">
+                  Please Specify Other Intent <span className="text-danger">*</span>
+                </label>
+                <input 
+                  type="text"
+                  className={`form-control ${formErrors.otherIntent ? 'input-error' : ''}`}
+                  placeholder="Please specify your intended mode or purpose of engagement..."
+                  value={formData.otherIntent}
+                  onChange={(e) => {
+                    setFormData({...formData, otherIntent: e.target.value});
+                    if (formErrors.otherIntent) setFormErrors({...formErrors, otherIntent: null});
+                  }}
+                />
+                {formErrors.otherIntent && <span className="field-error-msg">{formErrors.otherIntent}</span>}
+              </div>
+            )}
           </div>
 
           {/* ========================================================
@@ -961,12 +1113,28 @@ export default function OnboardingForm({ onSubmitApplication }) {
               <div className="section-number-badge">5</div>
               <div className="section-header-text">
                 <div className="dynamic-title-row">
-                  <h3>Section 5: Detailed Inputs</h3>
-                  <span className="badge badge-amber">Dynamic: {formData.stakeholderType}</span>
+                  <h3>Section 5: Detailed Inputs <span className="text-danger">*</span></h3>
+                  <span className="badge badge-amber">
+                    {formData.stakeholderType ? `Dynamic: ${formData.stakeholderType === 'Other' && formData.otherStakeholderType ? formData.otherStakeholderType : formData.stakeholderType}` : 'Awaiting Selection'}
+                  </span>
                 </div>
-                <p>Specific operational parameters customized for {formData.stakeholderType}</p>
+                <p>
+                  {formData.stakeholderType 
+                    ? `Specific operational parameters customized for ${formData.stakeholderType}`
+                    : 'Please select a stakeholder type in Section 2 above to view specialized inputs'}
+                </p>
               </div>
             </div>
+
+            {/* IF NO STAKEHOLDER TYPE SELECTED YET */}
+            {!formData.stakeholderType && (
+              <div className="empty-dynamic-prompt animate-fade-in">
+                <Compass size={28} className="text-amber animate-pulse" />
+                <p className="empty-dynamic-text">
+                  Please select a <strong>Stakeholder Type</strong> in Section 2 above to configure tailored operational parameters.
+                </p>
+              </div>
+            )}
 
             {/* DYNAMIC: IF STARTUP */}
             {formData.stakeholderType === 'Startup' && (
@@ -1242,6 +1410,50 @@ export default function OnboardingForm({ onSubmitApplication }) {
                 </div>
               </div>
             )}
+
+            {/* DYNAMIC: IF OTHER */}
+            {formData.stakeholderType === 'Other' && (
+              <div className="dynamic-content-box other-box animate-fade-in">
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">
+                      Organization / Entity Category
+                    </label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. Non-profit, Individual, Consortium"
+                      value={formData.otherEntityCategory}
+                      onChange={(e) => setFormData({...formData, otherEntityCategory: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">
+                      Key Operational Focus
+                    </label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. Community Tech, Open Science, Social Impact"
+                      value={formData.otherFocusArea}
+                      onChange={(e) => setFormData({...formData, otherFocusArea: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="form-group mt-16">
+                  <label className="form-label">
+                    Proposed Engagement Highlights
+                  </label>
+                  <textarea 
+                    className="form-control"
+                    rows="3"
+                    placeholder="Outline your planned contribution or how you wish to collaborate..."
+                    value={formData.otherEngagementDetails}
+                    onChange={(e) => setFormData({...formData, otherEngagementDetails: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ========================================================
@@ -1251,7 +1463,7 @@ export default function OnboardingForm({ onSubmitApplication }) {
             <div className="section-card-header">
               <div className="section-number-badge">6</div>
               <div className="section-header-text">
-                <h3>Section 6: Problem Statement / Interest</h3>
+                <h3>Section 6: Problem Statement / Interest <span className="text-danger">*</span></h3>
                 <p>Open text — Articulate the challenge, technological problem, or specific interest you wish to pursue</p>
               </div>
             </div>
@@ -1938,6 +2150,29 @@ export default function OnboardingForm({ onSubmitApplication }) {
           border: 1px solid #e2e8f0;
           padding: 22px;
           border-radius: 12px;
+        }
+
+        .empty-dynamic-prompt {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 24px 28px;
+          background-color: #fffbeb;
+          border: 1.5px dashed #fcd34d;
+          border-radius: 12px;
+          box-shadow: 0 1px 3px rgba(217, 119, 6, 0.05);
+        }
+
+        .empty-dynamic-text {
+          font-size: 14.5px;
+          color: #92400e;
+          margin: 0;
+          line-height: 1.55;
+        }
+
+        .other-box {
+          background: #fbfbfe;
+          border-color: #e0e7ff;
         }
 
         .stage-pills-row, .willingness-pills-row {

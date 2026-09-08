@@ -8,12 +8,31 @@ import ApprovalPanel from './features/approval/ApprovalPanel';
 import EngagementsList from './features/engagement/EngagementsList';
 import AuditLogs from './features/audit/AuditLogs';
 import VikasFlow from './features/flow/VikasFlow';
+import UnsavedChangesModal from './components/UnsavedChangesModal';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('entry'); // Default to Step 1: Entry & Data Capture
   const [featureSubTab, setFeatureSubTab] = useState('onboard'); // Sub navigation within features: onboard, screening, approval, audit
   const [currentRole, setCurrentRole] = useState('pd'); // Initialize to PD for full preview access
   const [overviewKey, setOverviewKey] = useState(0);
+
+  // Unsaved Changes & Navigation Guard States
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
+  const [preventDialogs, setPreventDialogs] = useState(false);
+
+  // Browser-level reload/close interceptor when form has unsaved inputs
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges && !preventDialogs) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, preventDialogs]);
 
   // System Notifications State (Loaded from localStorage or empty)
   const [notifications, setNotifications] = useState(() => {
@@ -64,12 +83,54 @@ export default function App() {
     }
   };
 
-  const handleTabChange = (tabId) => {
+  const executeTabNavigation = (tabId) => {
     if (tabId === 'overview' || tabId === 'engagement') {
       window.history.pushState({}, '', '/');
       setOverviewKey(prev => prev + 1);
     }
     setActiveTab(tabId);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleTabChange = (tabId) => {
+    if (tabId === activeTab) return;
+    if (hasUnsavedChanges && !preventDialogs) {
+      setPendingNavigation({ type: 'tab', target: tabId });
+      setShowLeaveModal(true);
+    } else {
+      executeTabNavigation(tabId);
+    }
+  };
+
+  const handleFeatureSubTabChange = (tabId) => {
+    if (tabId === featureSubTab) return;
+    if (hasUnsavedChanges && !preventDialogs) {
+      setPendingNavigation({ type: 'subtab', target: tabId });
+      setShowLeaveModal(true);
+    } else {
+      setFeatureSubTab(tabId);
+      setHasUnsavedChanges(false);
+    }
+  };
+
+  const handleConfirmLeave = () => {
+    setShowLeaveModal(false);
+    setHasUnsavedChanges(false);
+    if (pendingNavigation) {
+      if (pendingNavigation.type === 'tab') {
+        executeTabNavigation(pendingNavigation.target);
+      } else if (pendingNavigation.type === 'subtab') {
+        setFeatureSubTab(pendingNavigation.target);
+      } else if (pendingNavigation.type === 'callback' && typeof pendingNavigation.target === 'function') {
+        pendingNavigation.target();
+      }
+      setPendingNavigation(null);
+    }
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveModal(false);
+    setPendingNavigation(null);
   };
 
   // Applications State: Only stores and displays real registrations from user submissions
@@ -257,7 +318,12 @@ export default function App() {
           />
         );
       case 'entry':
-        return <OnboardingForm onSubmitApplication={handleAddNewApplication} />;
+        return (
+          <OnboardingForm 
+            onSubmitApplication={handleAddNewApplication} 
+            onDirtyChange={(isDirty) => setHasUnsavedChanges(isDirty)}
+          />
+        );
       case 'screening':
         return (
           <ScreeningQueue 
@@ -298,7 +364,12 @@ export default function App() {
     const renderFeatureComponent = () => {
       switch (featureSubTab) {
         case 'onboard':
-          return <OnboardingForm onSubmitApplication={handleAddNewApplication} />;
+          return (
+            <OnboardingForm 
+              onSubmitApplication={handleAddNewApplication} 
+              onDirtyChange={(isDirty) => setHasUnsavedChanges(isDirty)}
+            />
+          );
         case 'screening':
           return (
             <ScreeningQueue 
@@ -319,7 +390,12 @@ export default function App() {
         case 'audit':
           return <AuditLogs applications={applications} />;
         default:
-          return <OnboardingForm onSubmitApplication={handleAddNewApplication} />;
+          return (
+            <OnboardingForm 
+              onSubmitApplication={handleAddNewApplication} 
+              onDirtyChange={(isDirty) => setHasUnsavedChanges(isDirty)}
+            />
+          );
       }
     };
 
@@ -331,7 +407,7 @@ export default function App() {
             {subTabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setFeatureSubTab(tab.id)}
+                onClick={() => handleFeatureSubTabChange(tab.id)}
                 className={`subnav-btn ${featureSubTab === tab.id ? 'active' : ''}`}
               >
                 {tab.label}
@@ -457,6 +533,16 @@ export default function App() {
         <div className="content-body">
           {renderActiveMainTab()}
         </div>
+
+        {/* Unsaved Changes Navigation Confirmation Modal */}
+        <UnsavedChangesModal 
+          isOpen={showLeaveModal}
+          title="Leave site?"
+          message="Changes you made may not be saved."
+          onConfirm={handleConfirmLeave}
+          onCancel={handleCancelLeave}
+          onPreventDialogsChange={(prevent) => setPreventDialogs(prevent)}
+        />
 
         <style>{`
           .floating-toast-alert {

@@ -25,6 +25,7 @@ import {
   RotateCcw,
   CheckCircle2
 } from 'lucide-react';
+import UnsavedChangesModal from '../../components/UnsavedChangesModal';
 
 export const SAMPLE_DEMO_DATA = {
   // Step 1: Applicant Details
@@ -200,6 +201,25 @@ export default function TdpProposalApplicationFlow({
   const [isAuthenticated, setIsAuthenticated] = useState(currentUser?.authenticated || true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [copiedAppNo, setCopiedAppNo] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  const handleBackClick = () => {
+    const isDirty = Boolean(
+      !submittedReceipt && (
+        formData.applicantName?.trim() ||
+        formData.organization?.trim() ||
+        formData.email?.trim() ||
+        formData.mobile?.trim() ||
+        formData.projectTitle?.trim() ||
+        formData.problemStatement?.trim()
+      )
+    );
+    if (isDirty) {
+      setShowExitConfirm(true);
+    } else if (onBack) {
+      onBack();
+    }
+  };
 
   const handleResetForm = () => {
     localStorage.removeItem('VIKAS_TDP_PROPOSAL_DRAFT');
@@ -233,12 +253,20 @@ export default function TdpProposalApplicationFlow({
     const errors = {};
 
     if (currentStep === 1) {
-      if (!formData.applicantName?.trim()) errors.applicantName = 'Applicant name is required.';
+      if (!formData.applicantName?.trim()) {
+        errors.applicantName = 'Applicant name is required.';
+      } else if (!/^[a-zA-Z\s.'-]+$/.test(formData.applicantName.trim())) {
+        errors.applicantName = 'Applicant name should not contain special characters.';
+      }
       if (!formData.organization?.trim()) errors.organization = 'Organization / Institution is required.';
       if (!formData.department?.trim()) errors.department = 'Department is required.';
       if (!formData.designation?.trim()) errors.designation = 'Designation is required.';
       if (!formData.email?.trim() || !formData.email.includes('@')) errors.email = 'Valid institutional email is required.';
-      if (!formData.mobile?.trim()) errors.mobile = 'Mobile number is required.';
+      if (!formData.mobile?.trim()) {
+        errors.mobile = 'Mobile number is required.';
+      } else if (!/^\d{10}$/.test(formData.mobile.replace(/\D/g, ''))) {
+        errors.mobile = 'Mobile number must be exactly 10 digits.';
+      }
     } else if (currentStep === 2) {
       if (!formData.projectTitle?.trim()) errors.projectTitle = 'Project title is required.';
       if (!formData.technologyDomain?.trim()) errors.technologyDomain = 'Technology domain is required.';
@@ -260,7 +288,11 @@ export default function TdpProposalApplicationFlow({
       }
     } else if (currentStep === 6) {
       if (!formData.declarationAccepted) errors.declarationAccepted = 'You must accept the institutional declaration to proceed.';
-      if (!formData.authorizedSigner?.trim()) errors.authorizedSigner = 'Authorized signatory name is required.';
+      if (!formData.authorizedSigner?.trim()) {
+        errors.authorizedSigner = 'Authorized signatory name is required.';
+      } else if (!/^[a-zA-Z\s.'-]+$/.test(formData.authorizedSigner.trim())) {
+        errors.authorizedSigner = 'Authorized signatory name should not contain special characters.';
+      }
     }
 
     setValidationErrors(errors);
@@ -571,7 +603,7 @@ export default function TdpProposalApplicationFlow({
         <>
           {/* Top Navigation Bar with Back Button */}
           <div className="detail-top-nav">
-            <button className="btn-back-link" onClick={onBack}>
+            <button className="btn-back-link" onClick={handleBackClick}>
               <ArrowLeft size={16} />
               <span>Back to Technology Development</span>
             </button>
@@ -671,7 +703,10 @@ export default function TdpProposalApplicationFlow({
                   className={`form-control-input ${validationErrors.applicantName ? 'input-error' : ''}`}
                   placeholder="Enter Name"
                   value={formData.applicantName}
-                  onChange={(e) => updateField('applicantName', e.target.value)}
+                  onChange={(e) => {
+                    const sanitized = e.target.value.replace(/[^a-zA-Z\s.'-]/g, '');
+                    updateField('applicantName', sanitized);
+                  }}
                 />
                 {validationErrors.applicantName && <span className="field-error-text">{validationErrors.applicantName}</span>}
               </div>
@@ -724,9 +759,14 @@ export default function TdpProposalApplicationFlow({
                 <label className="form-label required">Mobile Number</label>
                 <input 
                   type="tel" 
+                  maxLength={10}
+                  placeholder="Enter 10-digit mobile number"
                   className={`form-control-input ${validationErrors.mobile ? 'input-error' : ''}`}
                   value={formData.mobile}
-                  onChange={(e) => updateField('mobile', e.target.value)}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    updateField('mobile', digits);
+                  }}
                 />
                 {validationErrors.mobile && <span className="field-error-text">{validationErrors.mobile}</span>}
               </div>
@@ -1297,7 +1337,10 @@ export default function TdpProposalApplicationFlow({
                 className={`form-control-input ${validationErrors.authorizedSigner ? 'input-error' : ''}`}
                 placeholder="Enter Name"
                 value={formData.authorizedSigner}
-                onChange={(e) => updateField('authorizedSigner', e.target.value)}
+                onChange={(e) => {
+                  const sanitized = e.target.value.replace(/[^a-zA-Z\s.'-]/g, '');
+                  updateField('authorizedSigner', sanitized);
+                }}
               />
               {validationErrors.authorizedSigner && (
                 <span className="field-error-text">{validationErrors.authorizedSigner}</span>
@@ -1494,6 +1537,18 @@ export default function TdpProposalApplicationFlow({
           </div>
         </div>
       )}
+
+      {/* Unsaved Changes Confirmation Modal */}
+      <UnsavedChangesModal 
+        isOpen={showExitConfirm}
+        title="Leave site?"
+        message="Changes you made may not be saved."
+        onConfirm={() => {
+          setShowExitConfirm(false);
+          if (onBack) onBack();
+        }}
+        onCancel={() => setShowExitConfirm(false)}
+      />
 
       {/* Scoped CSS */}
       <style>{`
