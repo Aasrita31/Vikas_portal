@@ -2,6 +2,67 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 
+def map_stakeholder_to_verticals(
+    stakeholder_type: str,
+    domains: Optional[List[str]] = None,
+    intent: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Automated Institutional Vertical Routing Engine:
+    Determines appropriate VIKAS vertical(s) based on stakeholder type, technology domain, and engagement intent.
+    The applicant never performs internal routing manually.
+    """
+    st = (stakeholder_type or "").upper().replace(" ", "_").replace("/", "_")
+    dom_str = " ".join(domains or []).lower()
+    intent_str = (intent or "").lower()
+
+    assigned: List[str] = []
+    primary: str = "6.2 Startups & Business Enablement"
+
+    if "STARTUP" in st:
+        primary = "6.2 Startups & Business Enablement"
+        assigned.append("6.2 Startups & Business Enablement")
+        if any(k in dom_str for k in ["pnt", "navic", "gnss", "cps", "drone", "robotics"]) or "prototype" in intent_str:
+            assigned.append("6.1 Technology Development")
+
+    elif "STUDENT" in st or "RESEARCHER" in st:
+        primary = "6.3 Human Resource Development"
+        assigned.append("6.3 Human Resource Development")
+        if any(k in dom_str for k in ["pnt", "navic", "sensor", "ai", "hardware"]) or "tdp" in intent_str or "grant" in intent_str:
+            assigned.append("6.1 Technology Development")
+
+    elif "SCHOOL" in st:
+        primary = "6.6 Schools & Academic Outreach (VidyaGIS)"
+        assigned.append("6.6 Schools & Academic Outreach (VidyaGIS)")
+
+    elif "INSTITUTION" in st:
+        primary = "6.7 Institutions & Labs Network (SPIN Lab)"
+        assigned.append("6.7 Institutions & Labs Network (SPIN Lab)")
+
+    elif "INDUSTRY" in st:
+        primary = "6.8 Industry & Government Interface"
+        assigned.append("6.8 Industry & Government Interface")
+        if "r&d" in intent_str or "tech transfer" in intent_str or "prototype" in intent_str:
+            assigned.append("6.1 Technology Development")
+
+    elif "GOVERNMENT" in st:
+        primary = "6.8 Industry & Government Interface"
+        assigned.append("6.8 Industry & Government Interface")
+
+    elif "EXPERT" in st:
+        primary = "6.9 Experts & Advisory Network"
+        assigned.append("6.9 Experts & Advisory Network")
+
+    else:
+        primary = "6.2 Startups & Business Enablement"
+        assigned.append("6.2 Startups & Business Enablement")
+
+    return {
+        "primary_vertical": primary,
+        "assigned_verticals": assigned,
+        "assigned_vertical": primary
+    }
+
 class OnboardingApplicationRecord(BaseModel):
     """
     Canonical record for a VIKAS Ecosystem Onboarding Application.
@@ -23,6 +84,7 @@ class OnboardingApplicationRecord(BaseModel):
     status: str = Field("pending_screening", description="Lifecycle status: pending_screening, under_screening, screened, routing, pending_approval, approved, rejected")
     approval_authority: Optional[str] = Field("pillar_lead", description="Approval tier: pillar_lead, pd")
     assigned_vertical: Optional[str] = Field("6.2 Startups & Business Enablement", description="Assigned institutional vertical")
+    assigned_verticals: List[str] = Field(default_factory=lambda: ["6.2 Startups & Business Enablement"], description="Assigned institutional vertical(s)")
     submission_date: str = Field(default_factory=lambda: datetime.now().strftime("%d/%m/%Y"))
     last_updated: str = Field(default_factory=lambda: datetime.now().strftime("%d/%m/%Y, %H:%M:%S"))
     is_strategic: bool = Field(False, description="Flag for high-value strategic files")

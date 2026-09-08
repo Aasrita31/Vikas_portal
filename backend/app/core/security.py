@@ -143,6 +143,25 @@ def get_current_user(
             detail=f"Invalid or unrecognized role: {role}. Must be one of {valid_roles}"
         )
 
+    # 0. Token-based Session check
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ")[1].strip()
+        stored_user = applicant_repo.get_by_token(token)
+        if stored_user:
+            st_val = stored_user.stakeholder_type.value if hasattr(stored_user.stakeholder_type, "value") else str(stored_user.stakeholder_type)
+            role_val = stored_user.role.value.lower() if hasattr(stored_user.role, "value") else str(stored_user.role).lower()
+            return UserContext(
+                id=stored_user.id,
+                name=stored_user.name,
+                email=stored_user.email,
+                phone=stored_user.phone,
+                role=role_val,
+                stakeholder_type=st_val,
+                applicant_type="Startup" if st_val == "STARTUP" else st_val.title(),
+                organization=stored_user.organization or "IITTNiF",
+                location=stored_user.location or "Tirupati"
+            )
+
     # 1. Primary check: Query persistent backend Applicant Repository
     stored_applicant = None
     if x_user_id:
@@ -150,14 +169,15 @@ def get_current_user(
     if not stored_applicant and x_user_email:
         stored_applicant = applicant_repo.get_by_email(x_user_email)
 
-    if stored_applicant and role == "applicant":
+    if stored_applicant:
         st_val = stored_applicant.stakeholder_type.value if hasattr(stored_applicant.stakeholder_type, "value") else str(stored_applicant.stakeholder_type)
+        role_val = stored_applicant.role.value.lower() if hasattr(stored_applicant.role, "value") else str(stored_applicant.role).lower()
         return UserContext(
             id=stored_applicant.id,
             name=stored_applicant.name,
             email=stored_applicant.email,
             phone=stored_applicant.phone,
-            role="applicant",
+            role=role_val,
             stakeholder_type=st_val,
             applicant_type="Startup" if st_val == "STARTUP" else st_val.title(),
             organization=stored_applicant.organization or "IITTNiF",

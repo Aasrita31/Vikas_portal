@@ -846,20 +846,36 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
                       {/* Structured Details Matrix */}
                       <div className="dossier-meta-grid mt-14">
                         <div className="meta-box">
+                          <span className="meta-kicker">Organization / Institution:</span>
+                          <strong className="meta-strong">{app.organization || currentUser.organization || 'Not Specified'}</strong>
+                        </div>
+
+                        <div className="meta-box">
                           <span className="meta-kicker">Stakeholder Category:</span>
                           <strong className="meta-strong">{app.stakeholderType || currentUser.applicantType || 'Startup'}</strong>
                         </div>
 
                         <div className="meta-box">
-                          <span className="meta-kicker">Assigned VIKAS Vertical:</span>
-                          <strong className={`meta-strong ${app.assignedVertical ? 'text-accent font-semibold' : 'text-muted'}`}>
-                            {app.assignedVertical ? `${app.assignedVertical}` : 'Pending Operations Routing'}
+                          <span className="meta-kicker">Assigned VIKAS Vertical(s):</span>
+                          <strong className={`meta-strong ${(app.assignedVerticals?.length || app.assignedVertical) ? 'text-accent font-semibold' : 'text-muted'}`}>
+                            {Array.isArray(app.assignedVerticals) && app.assignedVerticals.length > 0 
+                              ? app.assignedVerticals.join(', ') 
+                              : (app.assignedVertical || 'Pending Operations Routing')}
                           </strong>
                         </div>
 
                         <div className="meta-box">
-                          <span className="meta-kicker">NM-ICPS Focus Domains:</span>
+                          <span className="meta-kicker">Registered Domains / Focus:</span>
                           <strong className="meta-strong">{app.nmIcpsAlign || (app.domains ? app.domains.join(', ') : 'Cyber-Physical Systems')}</strong>
+                        </div>
+
+                        <div className="meta-box">
+                          <span className="meta-kicker">Intent of Engagement:</span>
+                          <strong className="meta-strong">
+                            {Array.isArray(app.intentOfEngagement) 
+                              ? app.intentOfEngagement.join(', ') 
+                              : (app.intentOfEngagement || 'Technology Collaboration / Ecosystem Partnership')}
+                          </strong>
                         </div>
 
                         <div className="meta-box">

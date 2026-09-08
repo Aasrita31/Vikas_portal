@@ -3,14 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 import random
+import secrets
 from app.schemas.project import TDPProjectResponse
 from app.core.security import get_current_user, require_roles, UserContext, SYSTEM_PERSONAS
 from app.models.applicant import applicant_repo, ApplicantUser, SystemRole, StakeholderType
-from app.models.application import onboarding_app_repo, OnboardingApplicationRecord
+from app.models.application import onboarding_app_repo, OnboardingApplicationRecord, map_stakeholder_to_verticals
 from app.schemas.onboarding import (
     ApplicantResponse,
     OnboardingApplicationCreate,
-    OnboardingApplicationResponse
+    OnboardingApplicationResponse,
+    UserRegisterRequest,
+    LoginRequest,
+    AuthResponse
 )
 
 app = FastAPI(
@@ -236,23 +240,54 @@ def health_check():
 @app.get("/api/v1/auth/me")
 def get_my_profile(user: UserContext = Depends(get_current_user)):
     """
-    Returns the authenticated user context and granular permission flags.
+    Returns the authenticated user context, permissions, and scoped application records.
     """
+    stored = applicant_repo.get_by_id(user.id) or applicant_repo.get_by_email(user.email)
+    st_val = stored.stakeholder_type.value if stored and hasattr(stored.stakeholder_type, "value") else (user.stakeholder_type or "STARTUP")
+    role_val = stored.role.value.lower() if stored and hasattr(stored.role, "value") else user.role.lower()
+
+    if role_val == "applicant":
+        user_apps = onboarding_app_repo.get_by_user_id(user.id)
+        if not user_apps and user.email:
+            user_apps = [a for a in onboarding_app_repo.list_all() if a.email.lower() == user.email.lower()]
+    else:
+        user_apps = onboarding_app_repo.list_all()
+
+    app_resps = [OnboardingApplicationResponse(**a.dict()).dict() for a in user_apps]
+    primary_app = app_resps[0] if app_resps else None
+    token = stored.session_token if (stored and stored.session_token) else f"vikas_{secrets.token_urlsafe(32)}"
+
     permissions = {
-        "can_screen": user.role in ["operations", "pd", "admin"],
-        "can_route": user.role in ["operations", "pd", "admin"],
-        "can_approve_pillar": user.role in ["pillar_lead", "pd", "admin"],
-        "can_approve_pd": user.role in ["pd", "admin"],
-        "can_esign": user.role in ["pd", "admin"],
-        "can_advance_stage": user.role in ["operations", "pillar_lead", "pd", "admin"],
-        "can_mentor_verify": user.role in ["pillar_lead", "pd", "admin", "execution"],
-        "can_manage_engagements": user.role in ["execution", "pillar_lead", "pd", "admin"],
+        "can_screen": role_val in ["operations", "admin"],
+        "can_route": role_val in ["operations", "admin"],
+        "can_approve_pillar": role_val in ["pillar_lead", "admin"],
+        "can_approve_pd": role_val in ["pd", "project_director", "admin"],
+        "can_esign": role_val in ["pd", "project_director", "admin"],
+        "can_advance_stage": role_val in ["operations", "pillar_lead", "pd", "project_director", "admin"],
+        "can_mentor_verify": role_val in ["pillar_lead", "pd", "project_director", "admin", "execution"],
+        "can_manage_engagements": role_val in ["execution", "pillar_lead", "pd", "project_director", "admin"],
         "can_submit_application": True,
-        "is_applicant": user.role == "applicant",
+        "is_applicant": role_val == "applicant",
     }
+
     return {
-        "user": user,
-        "permissions": permissions
+        "token": token,
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone,
+            "organization": user.organization,
+            "location": user.location,
+            "role": role_val,
+            "stakeholder_type": st_val,
+            "stakeholderType": st_val,
+            "applicant_type": "Startup" if st_val == "STARTUP" else st_val.title(),
+            "applicantType": "Startup" if st_val == "STARTUP" else st_val.title()
+        },
+        "permissions": permissions,
+        "application": primary_app,
+        "applications": app_resps
     }
 
 @app.get("/api/v1/auth/personas")
@@ -261,6 +296,176 @@ def get_all_personas():
     Returns available simulation personas for frontend role-switching.
     """
     return list(SYSTEM_PERSONAS.values())
+
+# =======================================================
+# =======================================================
+# AUTHENTICATION & ACCOUNT CREATION ENDPOINTS
+# =======================================================
+
+@app.post("/api/v1/auth/register", response_model=AuthResponse)
+def register_applicant(payload: UserRegisterRequest):
+    """
+    Real registration endpoint for VIKAS applicants:
+    1. Validates unique email
+    2. Hashes password securely via PBKDF2-HMAC-SHA256 (no plaintext stored)
+    3. Creates ApplicantUser record with role = SystemRole.APPLICANT and chosen stakeholder_type
+    4. Automatically routes to appropriate VIKAS vertical(s) using rule engine
+    5. Creates the VIKAS onboarding application record linked to the user
+    6. Returns auth token, profile, and initial application record
+    """
+    email_clean = payload.email.strip().lower()
+    existing = applicant_repo.get_by_email(email_clean)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"An account with email '{payload.email}' already exists. Please sign in instead."
+        )
+
+    # Resolve Stakeholder Type
+    st_raw = (payload.stakeholder_type or "STARTUP").upper().replace(" ", "_").replace("/", "_")
+    try:
+        st_enum = StakeholderType[st_raw]
+    except KeyError:
+        st_enum = StakeholderType.STARTUP
+
+    # 1. Create User with salted PBKDF2 hash
+    try:
+        new_user = applicant_repo.create_user(
+            name=payload.name,
+            email=email_clean,
+            password=payload.password,
+            phone=payload.phone,
+            organization=payload.organization,
+            location=payload.location,
+            stakeholder_type=st_enum,
+            role=SystemRole.APPLICANT
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    # Authenticate to issue session token
+    authenticated_user = applicant_repo.authenticate(email_clean, payload.password)
+    token = authenticated_user.session_token if authenticated_user else f"vikas_{secrets.token_urlsafe(32)}"
+
+    # 2. Automated Vertical Mapping (System handles internal routing)
+    mapping = map_stakeholder_to_verticals(
+        stakeholder_type=payload.stakeholder_type or "STARTUP",
+        domains=payload.domains,
+        intent=payload.intent_of_engagement
+    )
+
+    # 3. Create linked Onboarding Application record
+    current_year = datetime.now().year
+    random_suffix = random.randint(100, 999)
+    file_number = f"IITTNIF-{current_year}-{random_suffix}"
+    app_id = f"app_onboard_{current_year}_{random_suffix}"
+    submission_time = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
+    submission_date = datetime.now().strftime("%d/%m/%Y")
+
+    is_strat = st_enum in [StakeholderType.GOVERNMENT, StakeholderType.INDUSTRY]
+    app_record = OnboardingApplicationRecord(
+        id=app_id,
+        file_number=file_number,
+        user_id=new_user.id,
+        applicant_name=new_user.name,
+        email=new_user.email,
+        phone=new_user.phone,
+        organization=new_user.organization or "Applicant Organization",
+        location=new_user.location or "India",
+        stakeholder_type=payload.stakeholder_type or "STARTUP",
+        domains=payload.domains or [],
+        intent_of_engagement=payload.intent_of_engagement or "Ecosystem Participation",
+        dynamic_inputs=payload.dynamic_inputs or {},
+        problem_statement=payload.problem_statement or "VIKAS Ecosystem Registration & Participation",
+        status="pending_screening",
+        approval_authority="pd" if is_strat else "pillar_lead",
+        assigned_vertical=mapping["primary_vertical"],
+        assigned_verticals=mapping["assigned_verticals"],
+        submission_date=submission_date,
+        last_updated=submission_time,
+        is_strategic=is_strat,
+        history=[
+            {
+                "date": submission_time,
+                "action": "Account Created & Application Submitted",
+                "user": f"{new_user.name} (Applicant)",
+                "details": f"Registered as {payload.stakeholder_type}. Auto-mapped to vertical: {mapping['primary_vertical']}. Awaiting initial operations screening."
+            }
+        ]
+    )
+
+    saved_app = onboarding_app_repo.save(app_record)
+
+    user_resp = ApplicantResponse(
+        id=new_user.id,
+        name=new_user.name,
+        email=new_user.email,
+        phone=new_user.phone,
+        organization=new_user.organization,
+        location=new_user.location,
+        stakeholder_type=new_user.stakeholder_type.value,
+        role=new_user.role.value,
+        is_active=new_user.is_active,
+        is_verified=new_user.is_verified,
+        created_at=new_user.created_at,
+        updated_at=new_user.updated_at
+    )
+
+    app_resp = OnboardingApplicationResponse(**saved_app.dict())
+
+    return AuthResponse(
+        token=token,
+        user=user_resp,
+        application=app_resp,
+        applications=[app_resp]
+    )
+
+@app.post("/api/v1/auth/login", response_model=AuthResponse)
+def login_user(payload: LoginRequest):
+    """
+    Authenticate user via email and hashed password.
+    Returns user profile, active session token, and user's applications.
+    """
+    email_clean = payload.email.strip().lower()
+    user = applicant_repo.authenticate(email_clean, payload.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password. Please verify your credentials."
+        )
+
+    user_resp = ApplicantResponse(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        phone=user.phone,
+        organization=user.organization,
+        location=user.location,
+        stakeholder_type=user.stakeholder_type.value if hasattr(user.stakeholder_type, "value") else str(user.stakeholder_type),
+        role=user.role.value if hasattr(user.role, "value") else str(user.role),
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        created_at=user.created_at,
+        updated_at=user.updated_at
+    )
+
+    # Retrieve user's application records (Record-level isolation)
+    if user.role == SystemRole.APPLICANT:
+        user_apps = onboarding_app_repo.get_by_user_id(user.id)
+        if not user_apps and user.email:
+            user_apps = [a for a in onboarding_app_repo.list_all() if a.email.lower() == user.email.lower()]
+    else:
+        user_apps = onboarding_app_repo.list_all()
+
+    app_resps = [OnboardingApplicationResponse(**a.dict()) for a in user_apps]
+    primary_app = app_resps[0] if app_resps else None
+
+    return AuthResponse(
+        token=user.session_token or f"vikas_{secrets.token_urlsafe(32)}",
+        user=user_resp,
+        application=primary_app,
+        applications=app_resps
+    )
 
 # =======================================================
 # APPLICANT USER RECORD & ONBOARDING APPLICATION ENDPOINTS
@@ -340,6 +545,7 @@ def create_onboarding_application(
     """
     Create and store a VIKAS Onboarding Application.
     Crucially assigns user_id = user.id, establishing direct ownership with the applicant.
+    System performs automatic vertical mapping based on stakeholder type and technology domain.
     """
     current_year = datetime.now().year
     random_suffix = random.randint(100, 999)
@@ -355,6 +561,13 @@ def create_onboarding_application(
     location = payload.location or user.location or "Tirupati"
     stakeholder_type = payload.stakeholder_type or payload.stakeholderType or user.stakeholder_type or "STARTUP"
 
+    # Automated Vertical Routing
+    mapping = map_stakeholder_to_verticals(
+        stakeholder_type=stakeholder_type,
+        domains=payload.domains,
+        intent=payload.intentOfEngagement or payload.intent_of_engagement
+    )
+
     record = OnboardingApplicationRecord(
         id=app_id,
         file_number=file_number,
@@ -366,12 +579,13 @@ def create_onboarding_application(
         location=location,
         stakeholder_type=stakeholder_type,
         domains=payload.domains,
-        intent_of_engagement=payload.intentOfEngagement or "Startup Ecosystem Onboarding",
-        dynamic_inputs=payload.dynamicInputs or {},
-        problem_statement=payload.problemStatement or "VIKAS Ecosystem Onboarding Application",
+        intent_of_engagement=payload.intentOfEngagement or payload.intent_of_engagement or "Startup Ecosystem Onboarding",
+        dynamic_inputs=payload.dynamicInputs or payload.dynamic_inputs or {},
+        problem_statement=payload.problemStatement or payload.problem_statement or "VIKAS Ecosystem Onboarding Application",
         status="pending_screening",
         approval_authority="pillar_lead",
-        assigned_vertical="6.2 Startups & Business Enablement" if stakeholder_type.upper() == "STARTUP" else "Ecosystem Enablement",
+        assigned_vertical=mapping["primary_vertical"],
+        assigned_verticals=mapping["assigned_verticals"],
         submission_date=submission_date,
         last_updated=submission_time,
         is_strategic=stakeholder_type.upper() in ["GOVERNMENT", "INDUSTRY"],
@@ -380,7 +594,7 @@ def create_onboarding_application(
                 "date": submission_time,
                 "action": "File Created & Onboarded",
                 "user": f"{applicant_name} (Applicant)",
-                "details": f"Registered as {stakeholder_type} under {', '.join(payload.domains) if payload.domains else 'General'}. Awaiting initial operations screening."
+                "details": f"Registered as {stakeholder_type} under {', '.join(payload.domains) if payload.domains else 'General'}. Auto-mapped to vertical: {mapping['primary_vertical']}. Awaiting initial operations screening."
             }
         ]
     )

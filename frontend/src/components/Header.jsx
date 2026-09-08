@@ -12,7 +12,11 @@ import {
   School,
   Building2,
   Lock,
-  Layers
+  Layers,
+  LogIn,
+  LogOut,
+  UserPlus,
+  LayoutDashboard
 } from 'lucide-react';
 import { useAuth, ROLES } from '../context/AuthContext';
 
@@ -26,54 +30,64 @@ export default function Header({
   onClearNotifications,
   onNotificationClick
 }) {
-  const { currentUser, currentRole, systemPersonas, switchPersona, isApplicant } = useAuth();
+  const { currentUser, currentRole, isAuthenticated, logout, isApplicant } = useAuth();
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
-  const [personaModalOpen, setPersonaModalOpen] = useState(false);
-  const personaRef = useRef(null);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const profileRef = useRef(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (personaRef.current && !personaRef.current.contains(event.target)) {
-        setPersonaModalOpen(false);
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setProfileModalOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ROLE-BASED NAVIGATION LINKS (A: Role-based navigation)
-  // An applicant/external stakeholder must NEVER be able to view or access Screening or Approval
+  // ROLE-BASED NAVIGATION LINKS
+  // External applicants must NEVER see internal screening or approval queues
   const getRoleBasedNavs = () => {
+    if (!isAuthenticated) {
+      return [
+        { id: 'overview', label: '1. VIKAS Verticals' },
+        { id: 'flow', label: '2. System Flow' },
+        { id: 'login', label: '3. Sign In' },
+        { id: 'entry', label: '4. Register' }
+      ];
+    }
+
     switch (currentRole) {
       case ROLES.APPLICANT:
         return [
-          { id: 'entry', label: '1. Submit Application' },
-          { id: 'tracking', label: '2. My Applications & Status' },
+          { id: 'tracking', label: '1. My Dashboard & Status' },
+          { id: 'entry', label: '2. Submit Application' },
           { id: 'overview', label: '3. VIKAS Verticals' },
           { id: 'flow', label: '4. System Flow' }
         ];
 
       case ROLES.OPERATIONS:
         return [
-          { id: 'entry', label: '1. Intake & Registry' },
-          { id: 'screening', label: '2. Screening Queue', count: pendingScreeningCount },
+          { id: 'screening', label: '1. Screening Queue', count: pendingScreeningCount },
+          { id: 'entry', label: '2. Registry Intake' },
           { id: 'overview', label: '3. VIKAS Verticals' },
           { id: 'tracking', label: '4. Monitoring & Tracking' }
         ];
 
       case ROLES.PILLAR_LEAD:
         return [
-          { id: 'overview', label: '1. Overview' },
-          { id: 'approval', label: '2. Approval Matrix', count: pendingApprovalCount },
+          { id: 'approval', label: '1. Approval Matrix', count: pendingApprovalCount },
+          { id: 'overview', label: '2. Overview' },
           { id: 'tracking', label: '3. Vertical Monitoring' },
           { id: 'flow', label: '4. Process Flow' }
         ];
 
+      case ROLES.PROJECT_DIRECTOR:
       case ROLES.PD:
         return [
-          { id: 'overview', label: '1. Overview' },
-          { id: 'approval', label: '2. Approval Matrix', count: pendingApprovalCount },
+          { id: 'approval', label: '1. Approval Matrix', count: pendingApprovalCount },
+          { id: 'overview', label: '2. Overview' },
           { id: 'tracking', label: '3. System Monitoring' },
           { id: 'flow', label: '4. Process Flow' }
         ];
@@ -97,8 +111,8 @@ export default function Header({
 
       default:
         return [
-          { id: 'entry', label: '1. Submit Application' },
-          { id: 'tracking', label: '2. Tracking & Outcomes' },
+          { id: 'tracking', label: '1. My Dashboard' },
+          { id: 'entry', label: '2. Submit Application' },
           { id: 'overview', label: '3. Verticals' },
           { id: 'flow', label: '4. System Flow' }
         ];
@@ -107,259 +121,114 @@ export default function Header({
 
   const mainNavs = getRoleBasedNavs();
   const scopedNotifications = isApplicant
-    ? notifications.filter(n => !n.recipientEmail || (currentUser.email && n.recipientEmail.toLowerCase() === currentUser.email.toLowerCase()))
+    ? notifications.filter(n => !n.recipientEmail || (currentUser?.email && n.recipientEmail.toLowerCase() === currentUser.email.toLowerCase()))
     : notifications;
   const unreadCount = scopedNotifications.filter(n => !n.read).length;
 
   return (
     <header className="navbar-header-grid">
-      {/* Column 1: Left Controls & Persona Switcher */}
+      {/* Column 1: Left Controls & User Account Menu */}
       <div className="navbar-controls-left">
-        {/* Interactive User Persona & Role Switcher */}
-        <div className="persona-switcher-wrapper" ref={personaRef}>
-          <button 
-            className="persona-btn-pill"
-            onClick={() => setPersonaModalOpen(!personaModalOpen)}
-            title="Switch User Role / Persona"
-          >
-            <span className="persona-avatar-icon">
-              {currentUser.avatarBadge || '👤'}
-            </span>
-            <div className="persona-meta-text">
-              <span className="persona-user-name">{currentUser.name}</span>
-              <span className="persona-role-badge">
-                {currentUser.roleLabel || currentUser.role.toUpperCase()}
-              </span>
-            </div>
-            <ChevronDown size={14} className="persona-caret" />
-          </button>
+        {isAuthenticated && currentUser ? (
+          /* Authenticated User Profile Dropdown */
+          <div className="user-profile-wrapper" ref={profileRef}>
+            <button 
+              className="user-profile-btn-pill"
+              onClick={() => setProfileModalOpen(!profileModalOpen)}
+              title="Account Menu"
+            >
+              <div className="user-avatar-circle">
+                {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div className="user-meta-text">
+                <span className="user-name-text">{currentUser.name}</span>
+                <span className="user-badge-text">
+                  {currentUser.role?.toUpperCase()}
+                  {currentUser.stakeholderType ? ` • ${currentUser.stakeholderType}` : ''}
+                </span>
+              </div>
+              <ChevronDown size={14} className="user-caret" />
+            </button>
 
-          {/* Persona Selection Dropdown Modal */}
-          {personaModalOpen && (
-            <div className="persona-dropdown-modal animate-slide-down">
-              <div className="persona-modal-header">
-                <div>
-                  <h4 className="persona-modal-title">Switch Active Role & Persona</h4>
-                  <p className="persona-modal-subtitle">
-                    Select a simulated stakeholder or internal officer to evaluate RBAC workflow permissions.
-                  </p>
+            {/* User Profile Popover Modal */}
+            {profileModalOpen && (
+              <div className="user-profile-popover animate-slide-down">
+                <div className="profile-popover-header">
+                  <div className="popover-avatar-lg">
+                    {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div className="popover-name-block">
+                    <h4 className="popover-full-name">{currentUser.name}</h4>
+                    <span className="popover-email font-mono">{currentUser.email}</span>
+                  </div>
+                </div>
+
+                <div className="profile-popover-details">
+                  <div className="popover-row">
+                    <span className="popover-lbl">Organization:</span>
+                    <span className="popover-val">{currentUser.organization || 'Not Specified'}</span>
+                  </div>
+                  {currentUser.location && (
+                    <div className="popover-row">
+                      <span className="popover-lbl">Location:</span>
+                      <span className="popover-val">{currentUser.location}</span>
+                    </div>
+                  )}
+                  {currentUser.stakeholderType && (
+                    <div className="popover-row">
+                      <span className="popover-lbl">Stakeholder Track:</span>
+                      <span className="badge badge-amber font-bold">{currentUser.stakeholderType}</span>
+                    </div>
+                  )}
+                  <div className="popover-row">
+                    <span className="popover-lbl">System Role:</span>
+                    <span className="badge badge-blue font-bold">{currentUser.role?.toUpperCase()}</span>
+                  </div>
+                </div>
+
+                <div className="profile-popover-actions">
+                  {isApplicant && (
+                    <button 
+                      className="btn-popover-dash"
+                      onClick={() => {
+                        setActiveTab('tracking');
+                        setProfileModalOpen(false);
+                      }}
+                    >
+                      <LayoutDashboard size={14} /> My Dashboard
+                    </button>
+                  )}
+                  <button 
+                    className="btn-popover-signout"
+                    onClick={() => {
+                      logout();
+                      setProfileModalOpen(false);
+                      setActiveTab('login');
+                    }}
+                  >
+                    <LogOut size={14} /> Sign Out
+                  </button>
                 </div>
               </div>
-
-              <div className="persona-groups-scroll">
-                {/* 1. External Applicants */}
-                <div className="persona-group-section">
-                  <div className="group-heading-row">
-                    <span className="group-badge-icon">🌐</span>
-                    <span className="group-title">1. APPLICANT / EXTERNAL STAKEHOLDERS</span>
-                  </div>
-                  <div className="group-subtext">
-                    Strictly read-only for internal workflows. Can only view/manage own application and progress.
-                  </div>
-                  <div className="personas-list">
-                    {systemPersonas.filter(p => p.role === ROLES.APPLICANT).map((persona) => {
-                      const isSelected = persona.id === currentUser.id;
-                      return (
-                        <div 
-                          key={persona.id} 
-                          className={`persona-item-card ${isSelected ? 'active' : ''}`}
-                          onClick={() => {
-                            switchPersona(persona.id);
-                            setPersonaModalOpen(false);
-                            setActiveTab('entry');
-                          }}
-                        >
-                          <div className="persona-item-left">
-                            <span className="persona-item-emoji">{persona.avatarBadge}</span>
-                            <div className="persona-item-info">
-                              <div className="persona-item-title-row">
-                                <span className="persona-item-name">{persona.name}</span>
-                                <span className="persona-item-type-badge">{persona.applicantType}</span>
-                              </div>
-                              <span className="persona-item-org">{persona.organization}</span>
-                              <p className="persona-item-desc">{persona.description}</p>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={16} className="text-success check-icon" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Operations & Screening */}
-                <div className="persona-group-section mt-12">
-                  <div className="group-heading-row">
-                    <span className="group-badge-icon">🔍</span>
-                    <span className="group-title">2. OPERATIONS / SCREENING CELL</span>
-                  </div>
-                  <div className="personas-list">
-                    {systemPersonas.filter(p => p.role === ROLES.OPERATIONS).map((persona) => {
-                      const isSelected = persona.id === currentUser.id;
-                      return (
-                        <div 
-                          key={persona.id} 
-                          className={`persona-item-card ${isSelected ? 'active' : ''}`}
-                          onClick={() => {
-                            switchPersona(persona.id);
-                            setPersonaModalOpen(false);
-                            setActiveTab('screening');
-                          }}
-                        >
-                          <div className="persona-item-left">
-                            <span className="persona-item-emoji">{persona.avatarBadge}</span>
-                            <div className="persona-item-info">
-                              <span className="persona-item-name">{persona.name}</span>
-                              <span className="persona-item-org">{persona.organization}</span>
-                              <p className="persona-item-desc">{persona.description}</p>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={16} className="text-success check-icon" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 3. Pillar Leads */}
-                <div className="persona-group-section mt-12">
-                  <div className="group-heading-row">
-                    <span className="group-badge-icon">⚡</span>
-                    <span className="group-title">3. PILLAR LEADS (VERTICAL GOVERNANCE)</span>
-                  </div>
-                  <div className="personas-list">
-                    {systemPersonas.filter(p => p.role === ROLES.PILLAR_LEAD).map((persona) => {
-                      const isSelected = persona.id === currentUser.id;
-                      return (
-                        <div 
-                          key={persona.id} 
-                          className={`persona-item-card ${isSelected ? 'active' : ''}`}
-                          onClick={() => {
-                            switchPersona(persona.id);
-                            setPersonaModalOpen(false);
-                            setActiveTab('approval');
-                          }}
-                        >
-                          <div className="persona-item-left">
-                            <span className="persona-item-emoji">{persona.avatarBadge}</span>
-                            <div className="persona-item-info">
-                              <span className="persona-item-name">{persona.name}</span>
-                              <span className="persona-item-org">{persona.roleLabel}</span>
-                              <p className="persona-item-desc">{persona.description}</p>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={16} className="text-success check-icon" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 4. Project Director */}
-                <div className="persona-group-section mt-12">
-                  <div className="group-heading-row">
-                    <span className="group-badge-icon">⭐</span>
-                    <span className="group-title">4. PROJECT DIRECTOR (APEX AUTHORITY)</span>
-                  </div>
-                  <div className="personas-list">
-                    {systemPersonas.filter(p => p.role === ROLES.PROJECT_DIRECTOR).map((persona) => {
-                      const isSelected = persona.id === currentUser.id;
-                      return (
-                        <div 
-                          key={persona.id} 
-                          className={`persona-item-card ${isSelected ? 'active' : ''}`}
-                          onClick={() => {
-                            switchPersona(persona.id);
-                            setPersonaModalOpen(false);
-                            setActiveTab('approval');
-                          }}
-                        >
-                          <div className="persona-item-left">
-                            <span className="persona-item-emoji">{persona.avatarBadge}</span>
-                            <div className="persona-item-info">
-                              <span className="persona-item-name">{persona.name}</span>
-                              <span className="persona-item-org">{persona.organization}</span>
-                              <p className="persona-item-desc">{persona.description}</p>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={16} className="text-success check-icon" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 5. Execution & Program Team */}
-                <div className="persona-group-section mt-12">
-                  <div className="group-heading-row">
-                    <span className="group-badge-icon">📊</span>
-                    <span className="group-title">5. EXECUTION / PROGRAM TEAM</span>
-                  </div>
-                  <div className="personas-list">
-                    {systemPersonas.filter(p => p.role === ROLES.EXECUTION).map((persona) => {
-                      const isSelected = persona.id === currentUser.id;
-                      return (
-                        <div 
-                          key={persona.id} 
-                          className={`persona-item-card ${isSelected ? 'active' : ''}`}
-                          onClick={() => {
-                            switchPersona(persona.id);
-                            setPersonaModalOpen(false);
-                            setActiveTab('overview');
-                          }}
-                        >
-                          <div className="persona-item-left">
-                            <span className="persona-item-emoji">{persona.avatarBadge}</span>
-                            <div className="persona-item-info">
-                              <span className="persona-item-name">{persona.name}</span>
-                              <span className="persona-item-org">{persona.organization}</span>
-                              <p className="persona-item-desc">{persona.description}</p>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={16} className="text-success check-icon" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 6. Admin */}
-                <div className="persona-group-section mt-12">
-                  <div className="group-heading-row">
-                    <span className="group-badge-icon">⚙️</span>
-                    <span className="group-title">6. ADMIN</span>
-                  </div>
-                  <div className="personas-list">
-                    {systemPersonas.filter(p => p.role === ROLES.ADMIN).map((persona) => {
-                      const isSelected = persona.id === currentUser.id;
-                      return (
-                        <div 
-                          key={persona.id} 
-                          className={`persona-item-card ${isSelected ? 'active' : ''}`}
-                          onClick={() => {
-                            switchPersona(persona.id);
-                            setPersonaModalOpen(false);
-                            setActiveTab('audit');
-                          }}
-                        >
-                          <div className="persona-item-left">
-                            <span className="persona-item-emoji">{persona.avatarBadge}</span>
-                            <div className="persona-item-info">
-                              <span className="persona-item-name">{persona.name}</span>
-                              <span className="persona-item-org">{persona.organization}</span>
-                              <p className="persona-item-desc">{persona.description}</p>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={16} className="text-success check-icon" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          /* Unauthenticated Guest Actions */
+          <div className="header-auth-buttons">
+            <button 
+              className="btn-header-signin"
+              onClick={() => setActiveTab('login')}
+            >
+              <LogIn size={14} /> Sign In
+            </button>
+            <button 
+              className="btn-header-signup"
+              onClick={() => setActiveTab('entry')}
+            >
+              <UserPlus size={14} /> Register
+            </button>
+          </div>
+        )}
 
         {/* Notifications Button & Dropdown */}
         <div className="notif-selector-container" style={{ position: 'relative' }}>
@@ -368,7 +237,7 @@ export default function Header({
             title="View Notifications"
             onClick={() => {
               setNotifDropdownOpen(!notifDropdownOpen);
-              setPersonaModalOpen(false);
+              setProfileModalOpen(false);
             }}
           >
             <Bell size={17} />
@@ -402,7 +271,7 @@ export default function Header({
                 {notifications.length === 0 ? (
                   <div className="notif-empty-state">
                     <Bell size={24} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
-                    <span>No new notifications for your role</span>
+                    <span>No new notifications</span>
                   </div>
                 ) : (
                   notifications.map((notif) => (
@@ -488,16 +357,16 @@ export default function Header({
           flex-shrink: 0;
         }
 
-        /* Persona Switcher Pill */
-        .persona-switcher-wrapper {
+        /* Profile Pill */
+        .user-profile-wrapper {
           position: relative;
         }
 
-        .persona-btn-pill {
+        .user-profile-btn-pill {
           display: flex;
           align-items: center;
           gap: 10px;
-          padding: 6px 12px;
+          padding: 5px 12px 5px 6px;
           background-color: var(--bg-primary);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-full);
@@ -506,208 +375,232 @@ export default function Header({
           box-shadow: var(--shadow-sm);
         }
 
-        .persona-btn-pill:hover {
+        .user-profile-btn-pill:hover {
           border-color: var(--color-accent);
           background-color: rgba(var(--color-accent-rgb), 0.05);
           transform: translateY(-1px);
         }
 
-        .persona-avatar-icon {
-          font-size: 18px;
-          line-height: 1;
+        .user-avatar-circle {
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, var(--color-accent), #38bdf8);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 800;
+          box-shadow: 0 2px 6px rgba(var(--color-accent-rgb), 0.3);
         }
 
-        .persona-meta-text {
+        .user-meta-text {
           display: flex;
           flex-direction: column;
           align-items: flex-start;
           line-height: 1.2;
         }
 
-        .persona-user-name {
+        .user-name-text {
           font-size: 12.5px;
           font-weight: 700;
           color: var(--text-primary);
         }
 
-        .persona-role-badge {
+        .user-badge-text {
           font-size: 10px;
           font-weight: 600;
           color: var(--color-accent);
-          text-transform: uppercase;
           letter-spacing: 0.3px;
         }
 
-        .persona-caret {
+        .user-caret {
           color: var(--text-muted);
           transition: transform var(--transition-fast);
         }
 
-        /* Persona Dropdown Modal */
-        .persona-dropdown-modal {
+        /* User Profile Popover Modal */
+        .user-profile-popover {
           position: absolute;
           top: calc(100% + 10px);
           left: 0;
-          width: 440px;
-          max-height: 520px;
+          width: 320px;
           background-color: var(--bg-surface);
           border: 1px solid var(--border-color);
-          border-radius: var(--radius-lg);
-          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+          border-radius: var(--radius-md);
+          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
           z-index: 250;
           overflow: hidden;
           display: flex;
           flex-direction: column;
         }
 
-        .persona-modal-header {
-          padding: 14px 18px;
+        .profile-popover-header {
+          padding: 16px;
           background-color: var(--bg-primary);
           border-bottom: 1px solid var(--border-color);
+          display: flex;
+          align-items: center;
+          gap: 12px;
         }
 
-        .persona-modal-title {
+        .popover-avatar-lg {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, var(--color-accent), #38bdf8);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          font-weight: 800;
+          flex-shrink: 0;
+        }
+
+        .popover-name-block {
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .popover-full-name {
           font-size: 13.5px;
           font-weight: 800;
           color: var(--text-primary);
           margin: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .persona-modal-subtitle {
+        .popover-email {
           font-size: 11px;
           color: var(--text-secondary);
-          margin: 3px 0 0 0;
-          line-height: 1.35;
+          margin-top: 2px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .persona-groups-scroll {
-          padding: 12px;
-          overflow-y: auto;
-          max-height: 440px;
+        .profile-popover-details {
+          padding: 14px 16px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px;
+          border-bottom: 1px solid var(--border-color);
         }
 
-        .persona-group-section {
-          background-color: var(--bg-primary);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-md);
-          padding: 10px;
-        }
-
-        .group-heading-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 3px;
-        }
-
-        .group-badge-icon {
-          font-size: 13px;
-        }
-
-        .group-title {
-          font-size: 11px;
-          font-weight: 800;
-          color: var(--color-accent);
-          letter-spacing: 0.4px;
-        }
-
-        .group-subtext {
-          font-size: 10px;
-          color: var(--text-muted);
-          margin-bottom: 8px;
-          line-height: 1.3;
-        }
-
-        .personas-list {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .persona-item-card {
+        .popover-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 8px 10px;
-          background-color: var(--bg-surface);
+          font-size: 11.5px;
+        }
+
+        .popover-lbl {
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        .popover-val {
+          color: var(--text-primary);
+          font-weight: 600;
+        }
+
+        .profile-popover-actions {
+          padding: 10px 14px;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          background-color: var(--bg-primary);
+        }
+
+        .btn-popover-dash {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: var(--radius-sm);
+          background-color: rgba(var(--color-accent-rgb), 0.1);
+          border: 1px solid rgba(var(--color-accent-rgb), 0.25);
+          color: var(--color-accent);
+          font-size: 11.5px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .btn-popover-dash:hover {
+          background-color: var(--color-accent);
+          color: #ffffff;
+        }
+
+        .btn-popover-signout {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: var(--radius-sm);
+          background-color: #fef2f2;
+          border: 1px solid #fecaca;
+          color: #b91c1c;
+          font-size: 11.5px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .btn-popover-signout:hover {
+          background-color: #b91c1c;
+          color: #ffffff;
+        }
+
+        /* Unauthenticated Auth Buttons */
+        .header-auth-buttons {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .btn-header-signin {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 14px;
+          background-color: var(--bg-primary);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-sm);
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--text-primary);
           cursor: pointer;
           transition: all var(--transition-fast);
         }
 
-        .persona-item-card:hover {
+        .btn-header-signin:hover {
           border-color: var(--color-accent);
-          transform: translateX(2px);
+          color: var(--color-accent);
         }
 
-        .persona-item-card.active {
-          border-color: var(--color-accent);
-          background-color: rgba(var(--color-accent-rgb), 0.08);
-        }
-
-        .persona-item-left {
-          display: flex;
-          align-items: flex-start;
-          gap: 9px;
-          flex: 1;
-        }
-
-        .persona-item-emoji {
-          font-size: 16px;
-          margin-top: 2px;
-        }
-
-        .persona-item-info {
-          display: flex;
-          flex-direction: column;
-          gap: 1px;
-        }
-
-        .persona-item-title-row {
+        .btn-header-signup {
           display: flex;
           align-items: center;
           gap: 6px;
-        }
-
-        .persona-item-name {
+          padding: 7px 14px;
+          background-color: var(--color-accent);
+          border: 1px solid var(--color-accent);
+          border-radius: var(--radius-sm);
           font-size: 12px;
           font-weight: 700;
-          color: var(--text-primary);
+          color: #ffffff;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          box-shadow: 0 2px 6px rgba(var(--color-accent-rgb), 0.25);
         }
 
-        .persona-item-type-badge {
-          font-size: 9px;
-          font-weight: 700;
-          background-color: rgba(var(--color-accent-rgb), 0.12);
-          color: var(--color-accent);
-          padding: 1px 6px;
-          border-radius: var(--radius-full);
-        }
-
-        .persona-item-org {
-          font-size: 10.5px;
-          color: var(--text-secondary);
-          font-weight: 500;
-        }
-
-        .persona-item-desc {
-          font-size: 9.5px;
-          color: var(--text-muted);
-          margin: 2px 0 0 0;
-          line-height: 1.3;
-        }
-
-        .check-icon {
-          flex-shrink: 0;
-          margin-left: 8px;
-        }
-
-        .mt-12 {
-          margin-top: 12px;
+        .btn-header-signup:hover {
+          background-color: var(--color-accent-hover, #0284c7);
         }
 
         /* Notifications Dropdown */

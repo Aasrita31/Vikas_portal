@@ -73,6 +73,8 @@ class OnboardingApplicationResponse(BaseModel):
     approvalAuthority: Optional[str] = "pillar_lead"
     assigned_vertical: Optional[str] = None
     assignedVertical: Optional[str] = None
+    assigned_verticals: List[str] = Field(default_factory=list)
+    assignedVerticals: List[str] = Field(default_factory=list)
     submission_date: str
     submissionDate: str
     last_updated: str
@@ -100,6 +102,7 @@ class OnboardingApplicationResponse(BaseModel):
         ps = data.get("problem_statement") or data.get("problemStatement")
         aa = data.get("approval_authority") or data.get("approvalAuthority") or "pillar_lead"
         av = data.get("assigned_vertical") or data.get("assignedVertical")
+        avs = data.get("assigned_verticals") or data.get("assignedVerticals") or ([av] if av else [])
         sd = data.get("submission_date") or data.get("submissionDate", "")
         lu = data.get("last_updated") or data.get("lastUpdated", "")
         strat = data.get("is_strategic") if "is_strategic" in data else data.get("isStrategic", False)
@@ -122,6 +125,8 @@ class OnboardingApplicationResponse(BaseModel):
         data["approvalAuthority"] = aa
         data["assigned_vertical"] = av
         data["assignedVertical"] = av
+        data["assigned_verticals"] = avs
+        data["assignedVerticals"] = avs
         data["submission_date"] = sd
         data["submissionDate"] = sd
         data["last_updated"] = lu
@@ -130,3 +135,44 @@ class OnboardingApplicationResponse(BaseModel):
         data["isStrategic"] = strat
 
         return data
+
+class UserRegisterRequest(BaseModel):
+    name: str
+    organization: str
+    email: str
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    password: str
+    stakeholder_type: Optional[str] = "STARTUP"
+    stakeholderType: Optional[str] = None
+    domains: List[str] = []
+    intent_of_engagement: Optional[str] = None
+    intentOfEngagement: Optional[str] = None
+    problem_statement: Optional[str] = None
+    problemStatement: Optional[str] = None
+    dynamic_inputs: Optional[Dict[str, Any]] = None
+    dynamicInputs: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            if "stakeholderType" in values and "stakeholder_type" not in values:
+                values["stakeholder_type"] = values["stakeholderType"]
+            if "intentOfEngagement" in values and "intent_of_engagement" not in values:
+                values["intent_of_engagement"] = values["intentOfEngagement"]
+            if "problemStatement" in values and "problem_statement" not in values:
+                values["problem_statement"] = values["problemStatement"]
+            if "dynamicInputs" in values and "dynamic_inputs" not in values:
+                values["dynamic_inputs"] = values["dynamicInputs"]
+        return values
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class AuthResponse(BaseModel):
+    token: str
+    user: ApplicantResponse
+    application: Optional[OnboardingApplicationResponse] = None
+    applications: List[OnboardingApplicationResponse] = []

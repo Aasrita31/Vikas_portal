@@ -27,17 +27,27 @@ import {
   AlertCircle,
   HelpCircle,
   FileCheck,
-  Clock
+  Clock,
+  Lock,
+  EyeOff,
+  KeyRound,
+  ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
-  const { currentUser, isApplicant, authFetch } = useAuth();
+export default function OnboardingForm({ 
+  onSubmitApplication, 
+  onDirtyChange, 
+  onNavigateToLogin,
+  onNavigateToDashboard 
+}) {
+  const { register, authFetch, loading: authLoading } = useAuth();
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
-  // 7-Section Form State
+  // 7-Section Form State (Starts completely blank - no prefilled mock personas)
   const [formData, setFormData] = useState({
     // Section 1: Basic Details
     name: '',
@@ -45,6 +55,8 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
     email: '',
     phone: '',
     location: '',
+    password: '',
+    confirmPassword: '',
 
     // Section 2: Stakeholder Type (Select one - Default unselected)
     stakeholderType: '',
@@ -107,6 +119,42 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
 
   const [submittedData, setSubmittedData] = useState(null);
 
+  // Dynamic Vertical Auto-Mapping Rule Engine preview
+  const getMappedVerticals = () => {
+    if (!formData.stakeholderType) return null;
+    const st = formData.stakeholderType.toUpperCase();
+    const doms = formData.domains.join(' ').toLowerCase();
+    const intent = (formData.intentOfEngagement || '').toLowerCase();
+    
+    let primary = '6.2 Startups & Business Enablement';
+    let additional = [];
+    if (st.includes('STARTUP')) {
+      primary = '6.2 Startups & Business Enablement';
+      if (doms.includes('pnt') || doms.includes('navic') || doms.includes('sensor') || intent.includes('prototype') || doms.includes('cps') || doms.includes('drone')) {
+        additional.push('6.1 Technology Development');
+      }
+    } else if (st.includes('STUDENT') || st.includes('RESEARCHER')) {
+      primary = '6.3 Human Resource Development';
+      if (doms.includes('pnt') || doms.includes('navic') || doms.includes('ai') || intent.includes('research') || intent.includes('grant')) {
+        additional.push('6.1 Technology Development');
+      }
+    } else if (st.includes('SCHOOL')) {
+      primary = '6.6 Schools & Academic Outreach (VidyaGIS)';
+    } else if (st.includes('INSTITUTION')) {
+      primary = '6.7 Institutions & Labs Network (SPIN Lab)';
+    } else if (st.includes('INDUSTRY')) {
+      primary = '6.8 Industry & Government Interface';
+      if (intent.includes('r&d') || intent.includes('tech transfer') || intent.includes('prototype')) {
+        additional.push('6.1 Technology Development');
+      }
+    } else if (st.includes('GOVERNMENT')) {
+      primary = '6.8 Industry & Government Interface';
+    } else if (st.includes('EXPERT')) {
+      primary = '6.9 Experts & Advisory Network';
+    }
+    return { primary, additional };
+  };
+
   // Track whether user has entered any unsaved details
   React.useEffect(() => {
     const isDirty = Boolean(
@@ -116,6 +164,7 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
         formData.email.trim() ||
         formData.phone.trim() ||
         formData.location.trim() ||
+        formData.password ||
         formData.stakeholderType ||
         formData.domains.length > 0 ||
         formData.intentOfEngagement ||
@@ -127,25 +176,6 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
       onDirtyChange(isDirty);
     }
   }, [formData, submittedData, onDirtyChange]);
-
-  // Auto-populate verified applicant data from active user record (e.g. Aasrita Reddy)
-  React.useEffect(() => {
-    if (isApplicant && currentUser) {
-      setFormData(prev => ({
-        ...prev,
-        name: prev.name || currentUser.name || '',
-        organization: prev.organization || currentUser.organization || '',
-        email: prev.email || currentUser.email || '',
-        phone: prev.phone || currentUser.phone || '',
-        location: prev.location || currentUser.location || '',
-        stakeholderType: prev.stakeholderType || (
-          currentUser.stakeholderType === 'STARTUP' ? 'Startup' :
-          currentUser.stakeholderType === 'STUDENT_RESEARCHER' ? 'Student / Researcher' :
-          currentUser.applicantType || 'Startup'
-        )
-      }));
-    }
-  }, [currentUser, isApplicant]);
 
   // Available Stakeholder Types
   const stakeholderTypes = [
@@ -246,6 +276,18 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
   // Institution Types & Interests
   const institutionTypes = ['College', 'University'];
   const institutionInterests = ['SPIN Lab', 'Training', 'Collaboration'];
+
+  // Handle Stakeholder Type Selection
+  const handleSelectStakeholder = (stakeholderId) => {
+    setFormData(prev => ({
+      ...prev,
+      stakeholderType: prev.stakeholderType === stakeholderId ? '' : stakeholderId,
+      otherStakeholderType: stakeholderId === 'Other' ? prev.otherStakeholderType : ''
+    }));
+    if (formErrors.stakeholderType) {
+      setFormErrors(prev => ({ ...prev, stakeholderType: null }));
+    }
+  };
 
   // Handle Domain Selection (Multiple Choice)
   const toggleDomain = (domain) => {
@@ -438,6 +480,19 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
       errors.problemStatement = 'Please provide a brief problem statement or description of interest in Section 6';
     }
 
+    // Section 1: Password Validation for account creation
+    if (!formData.password) {
+      errors.password = 'Password is required to create your account';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long';
+    }
+
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Confirm your account password';
+    } else if (formData.confirmPassword !== formData.password) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
     // Section 7: Consent
     if (!formData.agreeToTerms) {
       errors.agreeToTerms = 'You must agree to the terms to proceed';
@@ -451,7 +506,7 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
       const firstErrorKey = Object.keys(formErrors)[0];
@@ -517,64 +572,68 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
       };
     }
 
-    // Consolidated application payload
-    const submissionPayload = {
-      // Direct 7-section data
-      name: formData.name,
-      organization: formData.organization,
-      email: formData.email,
-      phone: formData.phone,
-      location: formData.location,
-      stakeholderType: formData.stakeholderType,
-      otherStakeholderType: formData.otherStakeholderType,
-      domains: formData.domains,
-      otherDomain: formData.otherDomain,
-      intentOfEngagement: formData.intentOfEngagement,
-      otherIntent: formData.otherIntent,
-      dynamicInputs: dynamicSummary,
-      problemStatement: formData.problemStatement,
-      consent: {
-        agreeToTerms: formData.agreeToTerms,
-        acknowledgeNonIncubation: formData.acknowledgeNonIncubation
-      },
+    const mapped = getMappedVerticals();
 
-      // Backwards-compatible mappings for ScreeningQueue and App state
-      userId: currentUser?.id || 'usr_app_aasrita_reddy',
-      user_id: currentUser?.id || 'usr_app_aasrita_reddy',
-      contactPerson: formData.name,
-      nmIcpsAlign: formData.domains.join(', '),
-      description: formData.problemStatement,
-      documentName: finalDocName,
-      documentSize: finalDocSize,
-      documentUrl: formData.documentUrl,
-      fileNumber,
-      status: 'pending_screening',
-      submissionDate: new Date().toLocaleDateString('en-GB'),
-      isStrategic: formData.stakeholderType === 'Government' || formData.stakeholderType === 'Industry',
-      history: [
-        {
-          date: new Date().toLocaleString('en-GB'),
-          action: 'File Created & Onboarded',
-          user: `${formData.name} (Applicant)`,
-          details: `Registered as ${formData.stakeholderType === 'Other' ? `Other (${formData.otherStakeholderType})` : formData.stakeholderType} under ${formData.domains.join(', ')}. Awaiting initial screening.`
-        }
-      ]
-    };
-
-    // Attempt backend persistence to store real application entity linked with user_id
+    // Call real backend registration
     try {
-      authFetch('http://localhost:5000/api/v1/onboarding/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submissionPayload)
-      }).catch(err => console.debug('Backend sync notice:', err));
-    } catch (e) {}
+      const regResult = await register({
+        name: formData.name.trim(),
+        organization: formData.organization.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        location: formData.location.trim(),
+        password: formData.password,
+        stakeholderType: formData.stakeholderType,
+        domains: formData.domains,
+        intentOfEngagement: formData.intentOfEngagement,
+        problemStatement: formData.problemStatement,
+        dynamicInputs: dynamicSummary
+      });
 
-    if (onSubmitApplication) {
-      onSubmitApplication(submissionPayload);
+      const registeredApp = regResult.application || {
+        name: formData.name,
+        applicantName: formData.name,
+        contactPerson: formData.name,
+        organization: formData.organization,
+        email: formData.email,
+        phone: formData.phone,
+        location: formData.location,
+        stakeholderType: formData.stakeholderType,
+        domains: formData.domains,
+        intentOfEngagement: formData.intentOfEngagement,
+        dynamicInputs: dynamicSummary,
+        problemStatement: formData.problemStatement,
+        userId: regResult.user?.id || 'usr_app_registered',
+        user_id: regResult.user?.id || 'usr_app_registered',
+        documentName: finalDocName,
+        documentSize: finalDocSize,
+        documentUrl: formData.documentUrl,
+        fileNumber,
+        status: 'pending_screening',
+        assignedVertical: mapped?.primary || '6.2 Startups & Business Enablement',
+        assignedVerticals: [mapped?.primary || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
+        submissionDate: new Date().toLocaleDateString('en-GB'),
+        isStrategic: formData.stakeholderType === 'Government' || formData.stakeholderType === 'Industry',
+        history: [
+          {
+            date: new Date().toLocaleString('en-GB'),
+            action: 'Account Created & File Submitted',
+            user: `${formData.name} (Applicant)`,
+            details: `Registered as ${formData.stakeholderType}. Auto-mapped to vertical: ${mapped?.primary}. Awaiting initial operations screening.`
+          }
+        ]
+      };
+
+      if (onSubmitApplication) {
+        onSubmitApplication(registeredApp);
+      }
+
+      setSubmittedData(registeredApp);
+    } catch (err) {
+      setFormErrors({ api: err.message || 'Registration failed. Please check inputs.' });
+      const apiErrEl = document.getElementById('field-name');
+      if (apiErrEl) apiErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
-    setSubmittedData(submissionPayload);
   };
 
   const resetForm = () => {
@@ -817,11 +876,35 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
         <form onSubmit={handleSubmit} className="onboarding-main-form" noValidate>
           {/* Header Banner - Sleek, Bright & Harmonious */}
           <div className="card form-masthead">
-            <h1 className="masthead-title">VIKAS Portal Stakeholder Onboarding</h1>
+            <h1 className="masthead-title">VIKAS Portal Stakeholder Registration</h1>
             <p className="masthead-desc">
-              National single-window registration for startups, researchers, institutions, industry, schools, and domain experts.
+              National single-window registration and onboarding for startups, researchers, institutions, industry, schools, and domain experts.
             </p>
           </div>
+
+          {/* Top Authentication Switch Banner */}
+          <div className="form-auth-switch-banner">
+            <div className="banner-text-wrap">
+              <span className="banner-title-text">Already registered on VIKAS?</span>
+              <span className="banner-sub-text">Sign in to view your application dossier, tracking timeline, and assigned verticals.</span>
+            </div>
+            {onNavigateToLogin && (
+              <button 
+                type="button" 
+                className="btn-switch-to-login"
+                onClick={onNavigateToLogin}
+              >
+                Sign In to My Dashboard <ArrowRight size={14} />
+              </button>
+            )}
+          </div>
+
+          {formErrors.api && (
+            <div className="alert-error-banner mb-16 animate-shake" id="form-top-error">
+              <AlertCircle size={16} />
+              <span>{formErrors.api}</span>
+            </div>
+          )}
 
           {/* ========================================================
               SECTION 1: BASIC DETAILS
@@ -830,8 +913,8 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
             <div className="section-card-header">
               <div className="section-number-badge">1</div>
               <div className="section-header-text">
-                <h3>Section 1: Basic Details</h3>
-                <p>Provide your primary point of contact and organizational identity</p>
+                <h3>Section 1: Basic Details <span className="text-danger">*</span></h3>
+                <p>Provide your primary point of contact, organization, and create secure account credentials</p>
               </div>
             </div>
 
@@ -863,6 +946,7 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
                 </label>
                 <input 
                   type="text" 
+                  placeholder="Company, University or Institution name"
                   className={`form-control ${formErrors.organization ? 'input-error' : ''}`}
                   value={formData.organization}
                   onChange={(e) => {
@@ -879,10 +963,11 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
               <div className="form-group" id="field-email">
                 <label className="form-label">
                   <Mail size={15} className="label-icon" />
-                  Email <span className="text-danger">*</span>
+                  Email Address <span className="text-danger">*</span>
                 </label>
                 <input 
                   type="email" 
+                  placeholder="Official / contact email"
                   className={`form-control ${formErrors.email ? 'input-error' : ''}`}
                   value={formData.email}
                   onChange={(e) => {
@@ -897,7 +982,7 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
               <div className="form-group" id="field-phone">
                 <label className="form-label">
                   <Phone size={15} className="label-icon" />
-                  Phone <span className="text-danger">*</span>
+                  Phone Number <span className="text-danger">*</span>
                 </label>
                 <input 
                   type="tel" 
@@ -935,6 +1020,57 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
                 {formErrors.location && <span className="field-error-msg">{formErrors.location}</span>}
               </div>
             </div>
+
+            {/* Account Password Inputs */}
+            <div className="form-grid-2 mt-16">
+              <div className="form-group" id="field-password">
+                <label className="form-label">
+                  <Lock size={15} className="label-icon" />
+                  Create Password <span className="text-danger">*</span>
+                </label>
+                <div className="input-with-toggle">
+                  <input 
+                    type={showPassword ? 'text' : 'password'} 
+                    placeholder="Create secure password (min 6 chars)"
+                    className={`form-control ${formErrors.password ? 'input-error' : ''}`}
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({...formData, password: e.target.value});
+                      if (formErrors.password) setFormErrors({...formErrors, password: null});
+                    }}
+                    required
+                  />
+                  <button 
+                    type="button" 
+                    className="password-toggle-btn-field"
+                    onClick={() => setShowPassword(!showPassword)}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                {formErrors.password && <span className="field-error-msg">{formErrors.password}</span>}
+              </div>
+
+              <div className="form-group" id="field-confirmPassword">
+                <label className="form-label">
+                  <KeyRound size={15} className="label-icon" />
+                  Confirm Password <span className="text-danger">*</span>
+                </label>
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  placeholder="Re-enter password to confirm"
+                  className={`form-control ${formErrors.confirmPassword ? 'input-error' : ''}`}
+                  value={formData.confirmPassword}
+                  onChange={(e) => {
+                    setFormData({...formData, confirmPassword: e.target.value});
+                    if (formErrors.confirmPassword) setFormErrors({...formErrors, confirmPassword: null});
+                  }}
+                  required
+                />
+                {formErrors.confirmPassword && <span className="field-error-msg">{formErrors.confirmPassword}</span>}
+              </div>
+            </div>
           </div>
 
           {/* ========================================================
@@ -961,54 +1097,51 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
                 const IconComponent = type.icon;
                 const isSelected = formData.stakeholderType === type.id;
                 return (
-                  <div 
+                  <div
                     key={type.id}
                     className={`stakeholder-type-pill-card ${isSelected ? 'selected' : ''}`}
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev, 
-                        stakeholderType: type.id,
-                        otherStakeholderType: type.id === 'Other' ? prev.otherStakeholderType : ''
-                      }));
-                      if (formErrors.stakeholderType) setFormErrors(prev => ({ ...prev, stakeholderType: null }));
+                    onClick={() => handleSelectStakeholder(type.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleSelectStakeholder(type.id);
+                      }
                     }}
                   >
                     <div className="card-top-row">
-                      <div className="stakeholder-icon-box" style={{ color: type.color, backgroundColor: `${type.color}14`, borderColor: `${type.color}30` }}>
+                      <div className="stakeholder-icon-box" style={{ backgroundColor: `${type.color}15`, color: type.color }}>
                         <IconComponent size={20} />
                       </div>
-                      <span className="stakeholder-badge">{type.badge}</span>
+                      <span className="stakeholder-badge font-mono" style={{ color: type.color, borderColor: `${type.color}40`, backgroundColor: `${type.color}10` }}>
+                        {type.badge}
+                      </span>
                     </div>
-
                     <div className="stakeholder-info">
                       <h4 className="stakeholder-title">{type.title}</h4>
                       <p className="stakeholder-sub">{type.subtitle}</p>
                     </div>
-
                     <div className="stakeholder-radio-indicator">
-                      {isSelected ? (
-                        <div className="radio-dot active">
-                          <Check size={12} className="text-white" />
-                        </div>
-                      ) : (
-                        <div className="radio-dot" />
-                      )}
+                      <div className={`radio-dot ${isSelected ? 'active' : ''}`}>
+                        {isSelected && <Check size={12} color="#ffffff" strokeWidth={3} />}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* Conditionally reveal 'Other' Stakeholder specification */}
+            {/* Conditional Other Stakeholder Input */}
             {formData.stakeholderType === 'Other' && (
-              <div className="others-input-container animate-fade-in mt-16" id="field-otherStakeholderType">
+              <div className="form-group mt-16 animate-fade-in" id="field-otherStakeholderType">
                 <label className="form-label">
-                  Please Specify Other Stakeholder Type <span className="text-danger">*</span>
+                  Specify Stakeholder Entity Type <span className="text-danger">*</span>
                 </label>
                 <input 
-                  type="text"
+                  type="text" 
+                  placeholder="e.g. Non-profit research consortium, community collective, etc."
                   className={`form-control ${formErrors.otherStakeholderType ? 'input-error' : ''}`}
-                  placeholder="e.g. Non-profit Organization, Research Foundation, Independent Innovator..."
                   value={formData.otherStakeholderType}
                   onChange={(e) => {
                     setFormData({...formData, otherStakeholderType: e.target.value});
@@ -1016,6 +1149,39 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
                   }}
                 />
                 {formErrors.otherStakeholderType && <span className="field-error-msg">{formErrors.otherStakeholderType}</span>}
+              </div>
+            )}
+
+            {/* Real-Time Institutional Vertical Auto-Routing Decision Preview */}
+            {formData.stakeholderType && (
+              <div className="vertical-auto-routing-card animate-fade-in mt-16">
+                <div className="routing-card-top">
+                  <div className="routing-title-row">
+                    <ShieldCheck size={18} className="text-emerald" />
+                    <span className="routing-heading">Institutional Vertical Auto-Routing Decision</span>
+                  </div>
+                  <span className="badge badge-emerald font-bold">System-Determined</span>
+                </div>
+                <p className="routing-desc">
+                  Based on your selected stakeholder track (<strong>{formData.stakeholderType}</strong>)
+                  {formData.domains.length > 0 && <span> and focus areas ({formData.domains.join(', ')})</span>}, 
+                  VIKAS will automatically assign your dossier to the following institutional vertical(s):
+                </p>
+                <div className="mapped-verticals-tags">
+                  <div className="primary-vertical-pill">
+                    <span className="pill-tag">Primary Vertical:</span>
+                    <span className="pill-val">{getMappedVerticals()?.primary}</span>
+                  </div>
+                  {getMappedVerticals()?.additional?.map(v => (
+                    <div key={v} className="additional-vertical-pill">
+                      <span className="pill-tag">Joint Track:</span>
+                      <span className="pill-val">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <span className="routing-guarantee-note">
+                  ✓ System-governed routing: No manual administrative classification required from applicant.
+                </span>
               </div>
             )}
           </div>
@@ -1944,110 +2110,124 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
         /* SECTION 2: Stakeholder Selector Grid */
         .stakeholder-selector-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          gap: 16px;
         }
 
-        .stakeholder-type-pill-card {
+        .stakeholder-type-pill-card,
+        .stakeholder-select-card {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 16px 18px;
+          padding: 18px 20px;
           background-color: #ffffff;
-          border: 1.5px solid #e2e8f0;
+          border: 2px solid #cbd5e1;
           border-radius: 12px;
           cursor: pointer;
-          transition: all var(--transition-fast);
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
           position: relative;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+          user-select: none;
         }
 
-        .stakeholder-type-pill-card:hover {
-          border-color: #d97706;
-          background-color: #fffdfa;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px -2px rgba(217, 119, 6, 0.1);
+        .stakeholder-type-pill-card:hover,
+        .stakeholder-select-card:hover {
+          border-color: var(--color-accent, #0284c7);
+          background-color: #f8fafc;
+          transform: translateY(-3px);
+          box-shadow: 0 10px 24px -4px rgba(2, 132, 199, 0.16);
         }
 
-        .stakeholder-type-pill-card.selected {
-          border-color: #d97706;
-          background: #fffbeb;
-          box-shadow: 0 0 0 1px #d97706, 0 4px 14px rgba(217, 119, 6, 0.15);
+        .stakeholder-type-pill-card.selected,
+        .stakeholder-select-card.selected {
+          border-color: var(--color-accent, #0284c7) !important;
+          background-color: #f0f9ff !important;
+          box-shadow: 0 0 0 2px var(--color-accent, #0284c7), 0 10px 28px -4px rgba(2, 132, 199, 0.22) !important;
         }
 
         .card-top-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 12px;
+          margin-bottom: 14px;
         }
 
-        .stakeholder-icon-box {
-          width: 38px;
-          height: 38px;
+        .stakeholder-icon-box,
+        .icon-wrapper {
+          width: 40px;
+          height: 40px;
           border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid transparent;
         }
 
-        .stakeholder-badge {
-          font-size: 10px;
+        .stakeholder-badge,
+        .type-badge {
+          font-size: 10.5px;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 0.5px;
-          color: #475569;
-          background: #f1f5f9;
-          border: 1px solid #e2e8f0;
-          padding: 2px 8px;
-          border-radius: 4px;
+          padding: 3px 9px;
+          border-radius: 6px;
+          border: 1px solid currentColor;
         }
 
-        .stakeholder-type-pill-card.selected .stakeholder-badge {
-          background: #fef3c7;
-          border-color: #fde68a;
-          color: #92400e;
+        .stakeholder-type-pill-card.selected .stakeholder-badge,
+        .stakeholder-select-card.selected .type-badge {
+          font-weight: 800;
         }
 
-        .stakeholder-info {
+        .stakeholder-info,
+        .card-text-body {
           flex: 1;
-          margin-bottom: 12px;
+          margin-bottom: 14px;
         }
 
-        .stakeholder-title {
-          font-size: 15px;
+        .stakeholder-title,
+        .type-title {
+          font-size: 15.5px;
           font-weight: 700;
           color: #0f172a;
-          margin-bottom: 4px;
+          margin: 0 0 5px 0;
         }
 
-        .stakeholder-sub {
+        .stakeholder-type-pill-card.selected .stakeholder-title,
+        .stakeholder-select-card.selected .type-title {
+          color: #0369a1;
+        }
+
+        .stakeholder-sub,
+        .type-subtitle {
           font-size: 12px;
           color: #64748b;
-          line-height: 1.4;
+          line-height: 1.45;
+          margin: 0;
         }
 
-        .stakeholder-radio-indicator {
+        .stakeholder-radio-indicator,
+        .select-indicator {
           display: flex;
           justify-content: flex-end;
+          align-items: center;
         }
 
         .radio-dot {
-          width: 20px;
-          height: 20px;
+          width: 22px;
+          height: 22px;
           border-radius: 50%;
-          border: 2px solid #cbd5e1;
+          border: 2px solid #94a3b8;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all var(--transition-fast);
+          transition: all 0.2s ease;
           background: #ffffff;
         }
 
         .radio-dot.active {
-          border-color: #d97706;
-          background-color: #d97706;
+          border-color: var(--color-accent, #0284c7) !important;
+          background-color: var(--color-accent, #0284c7) !important;
+          box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
         }
 
         /* SECTION 3: Domain Selection Grid */
@@ -2645,6 +2825,167 @@ export default function OnboardingForm({ onSubmitApplication, onDirtyChange }) {
         .receipt-actions {
           display: flex;
           gap: 12px;
+        }
+
+        /* Authentication Switch Banner */
+        .form-auth-switch-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 18px;
+          background-color: rgba(var(--color-accent-rgb), 0.06);
+          border: 1px solid rgba(var(--color-accent-rgb), 0.2);
+          border-radius: var(--radius-md);
+          margin-bottom: 20px;
+          gap: 16px;
+        }
+
+        .banner-text-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .banner-title-text {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .banner-sub-text {
+          font-size: 11.5px;
+          color: var(--text-secondary);
+        }
+
+        .btn-switch-to-login {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background-color: var(--bg-surface);
+          border: 1px solid var(--color-accent);
+          color: var(--color-accent);
+          font-size: 12px;
+          font-weight: 700;
+          padding: 7px 14px;
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all var(--transition-fast);
+        }
+
+        .btn-switch-to-login:hover {
+          background-color: var(--color-accent);
+          color: #ffffff;
+        }
+
+        /* Password Input Wrapper */
+        .input-with-toggle {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .password-toggle-btn-field {
+          position: absolute;
+          right: 10px;
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px;
+        }
+
+        .password-toggle-btn-field:hover {
+          color: var(--text-primary);
+        }
+
+        /* Vertical Auto-Routing Decision Box */
+        .vertical-auto-routing-card {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(56, 189, 248, 0.06) 100%);
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          border-radius: var(--radius-md);
+          padding: 16px 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .routing-card-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .routing-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .routing-heading {
+          font-size: 13.5px;
+          font-weight: 800;
+          color: var(--text-primary);
+        }
+
+        .routing-desc {
+          font-size: 12px;
+          color: var(--text-secondary);
+          margin: 0;
+          line-height: 1.45;
+        }
+
+        .mapped-verticals-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .primary-vertical-pill, .additional-vertical-pill {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 12px;
+          border-radius: var(--radius-full);
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .primary-vertical-pill {
+          background-color: #ecfdf5;
+          color: #065f46;
+          border: 1px solid #a7f3d0;
+        }
+
+        .primary-vertical-pill .pill-tag {
+          font-size: 10px;
+          text-transform: uppercase;
+          color: #047857;
+          font-weight: 800;
+        }
+
+        .additional-vertical-pill {
+          background-color: #e0f2fe;
+          color: #0369a1;
+          border: 1px solid #bae6fd;
+        }
+
+        .additional-vertical-pill .pill-tag {
+          font-size: 10px;
+          text-transform: uppercase;
+          color: #0284c7;
+          font-weight: 800;
+        }
+
+        .routing-guarantee-note {
+          font-size: 11px;
+          color: #059669;
+          font-weight: 600;
+          margin-top: 2px;
         }
       `}</style>
     </div>

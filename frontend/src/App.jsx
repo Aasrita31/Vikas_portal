@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Dashboard from './features/monitoring/Dashboard';
 import OnboardingForm from './features/entry/OnboardingForm';
 import ApplicantMyApplications from './features/entry/ApplicantMyApplications';
+import LoginPage from './features/auth/LoginPage';
 import ScreeningQueue from './features/screening/ScreeningQueue';
 import ApprovalPanel from './features/approval/ApprovalPanel';
 import EngagementsList from './features/engagement/EngagementsList';
@@ -235,8 +236,11 @@ const INITIAL_SEED_APPLICATIONS = [
 ];
 
 function AppContent() {
-  const { currentRole, currentUser, isApplicant, canScreen, canRoute, canApprove, canApproveApplication } = useAuth();
-  const [activeTab, setActiveTab] = useState(isApplicant ? 'entry' : 'overview');
+  const { currentRole, currentUser, isAuthenticated, isApplicant, canScreen, canRoute, canApprove, canApproveApplication } = useAuth();
+  const [activeTab, setActiveTab] = useState(() => {
+    if (isApplicant) return 'tracking';
+    return 'overview';
+  });
   const [featureSubTab, setFeatureSubTab] = useState('onboard');
   const [overviewKey, setOverviewKey] = useState(0);
 
@@ -246,12 +250,33 @@ function AppContent() {
   const [pendingNavigation, setPendingNavigation] = useState(null);
   const [preventDialogs, setPreventDialogs] = useState(false);
 
-  // Role Guard: If activeTab becomes forbidden when persona changes, redirect safely to applicant entry
+  // Role Guard: If activeTab becomes forbidden when persona changes, redirect safely to applicant dashboard
   useEffect(() => {
     if (isApplicant && (activeTab === 'screening' || activeTab === 'approval')) {
-      setActiveTab('entry');
+      setActiveTab('tracking');
     }
   }, [currentRole, isApplicant, activeTab]);
+
+  // Sync state and route upon successful login
+  const handleUserLoggedIn = (user, loggedInApplications) => {
+    if (loggedInApplications && Array.isArray(loggedInApplications) && loggedInApplications.length > 0) {
+      setApplications(prev => {
+        const existingFileNos = new Set(prev.map(a => a.fileNumber));
+        const newItems = loggedInApplications.filter(a => !existingFileNos.has(a.fileNumber));
+        return newItems.length > 0 ? [...newItems, ...prev] : prev;
+      });
+    }
+    const role = (user?.role || '').toLowerCase();
+    if (role === 'applicant') {
+      setActiveTab('tracking');
+    } else if (role === 'operations') {
+      setActiveTab('screening');
+    } else if (role === 'pillar_lead' || role === 'project_director' || role === 'pd') {
+      setActiveTab('approval');
+    } else {
+      setActiveTab('overview');
+    }
+  };
 
   // Browser-level reload/close interceptor when form has unsaved inputs
   useEffect(() => {
@@ -438,14 +463,16 @@ function AppContent() {
   const handleAddNewApplication = (newApp) => {
     const stampedApp = {
       ...newApp,
-      userId: newApp.userId || currentUser?.id || 'usr_app_aasrita_reddy',
-      email: newApp.email || currentUser?.email || 'aasritareddy.c@gmail.com',
-      applicantName: newApp.name || newApp.applicantName || newApp.contactPerson || currentUser?.name || 'Aasrita Reddy',
-      contactPerson: newApp.contactPerson || newApp.applicantName || newApp.name || currentUser?.name || 'Aasrita Reddy',
-      organization: newApp.organization || currentUser?.organization || 'IITTNiF',
-      phone: newApp.phone || currentUser?.phone || '9493562799',
-      location: newApp.location || currentUser?.location || 'Tirupati',
-      stakeholderType: newApp.stakeholderType || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup'
+      userId: newApp.userId || newApp.user_id || currentUser?.id || `usr_app_${Date.now()}`,
+      email: newApp.email || currentUser?.email || '',
+      applicantName: newApp.applicantName || newApp.name || newApp.contactPerson || currentUser?.name || 'Registered Applicant',
+      contactPerson: newApp.contactPerson || newApp.applicantName || newApp.name || currentUser?.name || 'Registered Applicant',
+      organization: newApp.organization || currentUser?.organization || 'Registered Entity',
+      phone: newApp.phone || currentUser?.phone || '',
+      location: newApp.location || currentUser?.location || '',
+      stakeholderType: newApp.stakeholderType || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup',
+      assignedVertical: newApp.assignedVertical || (newApp.assignedVerticals ? newApp.assignedVerticals[0] : '6.2 Startups & Business Enablement'),
+      assignedVerticals: newApp.assignedVerticals || (newApp.assignedVertical ? [newApp.assignedVertical] : ['6.2 Startups & Business Enablement'])
     };
 
     setApplications(prev => [stampedApp, ...prev]);
@@ -733,11 +760,19 @@ function AppContent() {
             onAddApplication={handleAddNewApplication}
           />
         );
+      case 'login':
+        return (
+          <LoginPage 
+            onNavigateToRegister={() => handleTabChange('entry')}
+            onLoginSuccess={(user, userApps) => handleUserLoggedIn(user, userApps)}
+          />
+        );
       case 'entry':
         return (
           <OnboardingForm 
             onSubmitApplication={handleAddNewApplication} 
             onDirtyChange={(isDirty) => setHasUnsavedChanges(isDirty)}
+            onNavigateToLogin={() => handleTabChange('login')}
           />
         );
       case 'screening':
@@ -784,6 +819,14 @@ function AppContent() {
       case 'engagement':
         return <EngagementsList key={`engagement-${overviewKey}`} applications={applications} onNavigateToTab={(tab) => handleTabChange(tab)} />;
       case 'tracking':
+        if (!isAuthenticated) {
+          return (
+            <LoginPage 
+              onNavigateToRegister={() => handleTabChange('entry')}
+              onLoginSuccess={(user, userApps) => handleUserLoggedIn(user, userApps)}
+            />
+          );
+        }
         if (isApplicant) {
           return (
             <ApplicantMyApplications 

@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
-// The 6 Roles supported by VIKAS
+// The 6 Roles supported by VIKAS Platform
 export const ROLES = {
   APPLICANT: 'applicant',
   OPERATIONS: 'operations',
@@ -10,204 +10,192 @@ export const ROLES = {
   ADMIN: 'admin'
 };
 
-// Comprehensive pre-configured personas covering all 6 roles and external stakeholder types
-export const SYSTEM_PERSONAS = [
-  // 1. APPLICANT / EXTERNAL USERS
+// Staff demo credentials for login page quick-access (kept for evaluation, but NOT shown in normal user header)
+export const EVALUATION_STAFF_ACCOUNTS = [
   {
-    id: 'usr_app_aasrita_reddy',
-    aliasId: 'applicant_aasrita',
-    name: 'Aasrita Reddy',
-    email: 'aasritareddy.c@gmail.com',
-    phone: '9493562799',
-    organization: 'IITTNiF',
-    location: 'Tirupati',
-    stakeholderType: 'STARTUP',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (Startup)',
-    applicantType: 'Startup',
-    avatarBadge: '🚀',
-    description: 'Verified test applicant for VIKAS onboarding flow (STARTUP stakeholder).'
-  },
-  {
-    id: 'applicant_startup',
-    name: 'Rohan Varma',
-    email: 'rohan.varma@skylinetech.io',
-    phone: '+91 98765 43210',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (Startup)',
-    stakeholderType: 'STARTUP',
-    applicantType: 'Startup',
-    organization: 'SkyLine Drone Technologies Pvt Ltd',
-    location: 'Hyderabad',
-    avatarBadge: '🚀',
-    description: 'Deep-Tech drone hardware startup with functional TRL 3 prototype.'
-  },
-  {
-    id: 'applicant_researcher',
-    name: 'Prof. S. Ananth',
-    email: 's.ananth@iitt.ac.in',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (Researcher / Faculty)',
-    applicantType: 'Student / Researcher',
-    organization: 'Department of Electrical Engineering, IIT Tirupati',
-    avatarBadge: '🎓',
-    description: 'Faculty PI proposing Dual-Frequency NavIC receiver TDP prototype.'
-  },
-  {
-    id: 'applicant_school',
-    name: 'Meera Sundaram',
-    email: 'principal@vidyamandir.edu.in',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (School)',
-    applicantType: 'School',
-    organization: 'Vidya Mandir Senior Secondary School',
-    avatarBadge: '🏫',
-    description: 'School principal seeking VidyaGIS and spatial lab outreach.'
-  },
-  {
-    id: 'applicant_institution',
-    name: 'Dr. B. N. Reddy',
-    email: 'bn.reddy@svu.edu.in',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (Institution / Lab)',
-    applicantType: 'Institution',
-    organization: 'Sri Venkateswara University College of Engineering',
-    avatarBadge: '🏛️',
-    description: 'University research center seeking joint SPIN Lab accreditation.'
-  },
-  {
-    id: 'applicant_industry',
-    name: 'Rajesh Mehta',
-    email: 'r.mehta@bharatdyn.com',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (Industry Partner)',
-    applicantType: 'Industry',
-    organization: 'Bharat Dynamics & Geospatial Systems',
-    avatarBadge: '💼',
-    description: 'Industry partner seeking commercial R&D and defense tech transfer.'
-  },
-  {
-    id: 'applicant_govt',
-    name: 'Suresh Babu',
-    email: 'suresh.babu@ap.gov.in',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (Government Agency)',
-    applicantType: 'Government',
-    organization: 'AP State Disaster Management Agency',
-    avatarBadge: '🛡️',
-    description: 'Government agency requesting real-time spatial analytics pilot.'
-  },
-  {
-    id: 'applicant_expert',
-    name: 'Dr. M. G. Rao',
-    email: 'mg.rao@advisory.res.in',
-    role: ROLES.APPLICANT,
-    roleLabel: 'Applicant (Domain Expert)',
-    applicantType: 'Expert',
-    organization: 'Senior Metrology & GNSS Advisory Forum',
-    avatarBadge: '🎖️',
-    description: 'Senior scientist applying for advisory network and technical panels.'
-  },
-
-  // 2. OPERATIONS / SCREENING ROLE
-  {
-    id: 'operations',
-    name: 'Vikram Malhotra',
-    email: 'ops.screening@iittnif.in',
     role: ROLES.OPERATIONS,
-    roleLabel: 'Operations / Screening Anchor',
-    organization: 'IITTNiF Operations & Screening Cell',
-    avatarBadge: '🔍',
+    roleLabel: 'Operations / Screening Officer',
+    email: 'ops@iittnif.in',
+    password: 'admin123',
+    badge: '🔍',
     description: 'Screens incoming registrations, verifies documents, remarks and routes to verticals.'
   },
-
-  // 3. PILLAR LEAD ROLE
   {
-    id: 'pillar_lead_tech',
-    name: 'Dr. K. Raghavan',
-    email: 'k.raghavan@iittnif.in',
-    role: ROLES.PILLAR_LEAD,
-    roleLabel: 'Pillar Lead (Tech Development 6.1)',
-    assignedVertical: 'TECH_DEV',
-    organization: 'IITTNiF Technology Development Pillar',
-    avatarBadge: '⚡',
-    description: 'Evaluates TDP proposals, verifies milestones, deliverables and approves delegated cases.'
-  },
-  {
-    id: 'pillar_lead_startup',
-    name: 'Dr. P. Venkat',
-    email: 'p.venkat@iittnif.in',
     role: ROLES.PILLAR_LEAD,
     roleLabel: 'Pillar Lead (Startups 6.2)',
-    assignedVertical: 'STARTUP',
-    organization: 'IITTNiF Startups & Business Enablement',
-    avatarBadge: '🌱',
-    description: 'Oversees startup onboarding, project allocations, and incubation-free commercial pilots.'
+    email: 'pillar_startup@iittnif.in',
+    password: 'admin123',
+    badge: '🌱',
+    description: 'Evaluates startup applications, approves delegated files, and initiates onboarding.'
   },
-
-  // 4. PROJECT DIRECTOR ROLE
   {
-    id: 'pd',
-    name: 'Dr. C. P. Sharma',
-    email: 'director@iittnif.in',
+    role: ROLES.PILLAR_LEAD,
+    roleLabel: 'Pillar Lead (Tech Dev 6.1)',
+    email: 'pillar_tech@iittnif.in',
+    password: 'admin123',
+    badge: '⚡',
+    description: 'Evaluates technology development proposals, verifies milestones and TRL.'
+  },
+  {
     role: ROLES.PROJECT_DIRECTOR,
-    roleLabel: 'Project Director (PD)',
-    organization: 'Directorate, IIT Tirupati Navavishkar I-Hub Foundation',
-    avatarBadge: '⭐',
-    description: 'Apex authority: Approves strategic, high-value cases, e-signatures, and governance rules.'
+    roleLabel: 'Project Director (Apex Authority)',
+    email: 'director@iittnif.in',
+    password: 'admin123',
+    badge: '⭐',
+    description: 'Apex authority: Approves strategic files, e-signs onboarding letters, and governance.'
   },
-
-  // 5. EXECUTION / PROGRAM TEAM ROLE
   {
-    id: 'execution',
-    name: 'Anita Reddy',
-    email: 'execution@iittnif.in',
     role: ROLES.EXECUTION,
-    roleLabel: 'Execution / Program Team',
-    organization: 'IITTNiF Program Execution & Allocation Cell',
-    avatarBadge: '📊',
-    description: 'Manages approved projects, monitors progress, records milestones and project outcomes.'
+    roleLabel: 'Program Execution Cell',
+    email: 'execution@iittnif.in',
+    password: 'admin123',
+    badge: '📊',
+    description: 'Monitors ongoing projects, records engagement progress and track outcomes.'
   },
-
-  // 6. ADMIN ROLE
   {
-    id: 'admin',
-    name: 'System Administrator',
-    email: 'admin@iittnif.in',
     role: ROLES.ADMIN,
     roleLabel: 'System Administrator',
-    organization: 'IITTNiF Central Administration',
-    avatarBadge: '⚙️',
-    description: 'Manages users, permissions, configuration, audit trail and compliance verification.'
+    email: 'admin@iittnif.in',
+    password: 'admin123',
+    badge: '⚙️',
+    description: 'Manages platform configuration, user registry, and compliance audit trail.'
   }
 ];
 
 const AuthContext = createContext(null);
 
+const SESSION_STORAGE_KEY = 'VIKAS_AUTH_SESSION';
+
 export function AuthProvider({ children }) {
-  const [selectedPersonaId, setSelectedPersonaId] = useState(() => {
+  // Session State: { user, token }
+  const [session, setSession] = useState(() => {
     try {
-      const saved = localStorage.getItem('VIKAS_AUTH_PERSONA');
-      if (saved && SYSTEM_PERSONAS.some(p => p.id === saved)) {
-        return saved;
+      const saved = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.token && parsed?.user) {
+          return parsed;
+        }
       }
-    } catch (e) {}
-    return 'pd'; // Default to PD initially for comprehensive initial view, switchable anytime
+    } catch (e) {
+      console.warn('Failed to parse saved auth session:', e);
+    }
+    return null;
   });
 
-  const currentUser = SYSTEM_PERSONAS.find(p => p.id === selectedPersonaId) || SYSTEM_PERSONAS[0];
-  const currentRole = currentUser.role;
+  const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
 
+  const currentUser = session?.user || null;
+  const token = session?.token || null;
+  const isAuthenticated = Boolean(currentUser && token);
+
+  // Normalize role
+  const rawRole = currentUser?.role?.toLowerCase() || ROLES.APPLICANT;
+  const currentRole = rawRole === 'pd' ? ROLES.PROJECT_DIRECTOR : rawRole;
+
+  // Persist session to localStorage
   useEffect(() => {
-    localStorage.setItem('VIKAS_AUTH_PERSONA', selectedPersonaId);
-  }, [selectedPersonaId]);
+    try {
+      if (session) {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      } else {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    } catch (e) {
+      console.warn('Failed to persist auth session:', e);
+    }
+  }, [session]);
 
-  const switchPersona = (personaId) => {
-    const found = SYSTEM_PERSONAS.find(p => p.id === personaId || p.aliasId === personaId);
-    if (found) {
-      setSelectedPersonaId(found.id);
+  // Real Login Method
+  const login = async (email, password) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Authentication failed. Please check your credentials.');
+      }
+
+      const newSession = {
+        token: data.token,
+        user: {
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          phone: data.user.phone,
+          organization: data.user.organization,
+          location: data.user.location,
+          role: data.user.role.toLowerCase(),
+          stakeholderType: data.user.stakeholder_type || data.user.stakeholderType || 'STARTUP',
+          applicantType: data.user.applicant_type || data.user.applicantType || 'Startup',
+          assignedVertical: data.application?.assignedVertical || data.application?.assigned_vertical || null
+        }
+      };
+
+      setSession(newSession);
+      return { success: true, user: newSession.user, application: data.application, applications: data.applications };
+    } catch (err) {
+      setAuthError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
     }
   };
+
+  // Real Registration Method
+  const register = async (registrationData) => {
+    setLoading(true);
+    setAuthError(null);
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registrationData)
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Registration failed. Please check your inputs.');
+      }
+
+      const newSession = {
+        token: data.token,
+        user: {
+          id: data.user.id,
+          name: data.user.name,
+          email: data.user.email,
+          phone: data.user.phone,
+          organization: data.user.organization,
+          location: data.user.location,
+          role: data.user.role.toLowerCase(),
+          stakeholderType: data.user.stakeholder_type || data.user.stakeholderType || 'STARTUP',
+          applicantType: data.user.applicant_type || data.user.applicantType || 'Startup',
+          assignedVertical: data.application?.assignedVertical || data.application?.assigned_vertical || null
+        }
+      };
+
+      setSession(newSession);
+      return { success: true, user: newSession.user, application: data.application, applications: data.applications };
+    } catch (err) {
+      setAuthError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Logout Method
+  const logout = useCallback(() => {
+    setSession(null);
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  }, []);
 
   // Strict Role & Authority Matrix Permission Checkers
   const isApplicant = currentRole === ROLES.APPLICANT;
@@ -233,7 +221,7 @@ export function AuthProvider({ children }) {
   const canManageEngagements = [ROLES.EXECUTION, ROLES.PILLAR_LEAD, ROLES.PROJECT_DIRECTOR, ROLES.ADMIN].includes(currentRole);
 
   /**
-   * Evaluates whether the currently authenticated persona is authorized to approve
+   * Evaluates whether the currently authenticated user is authorized to approve
    * a specific application dossier under the VIKAS Authority Matrix.
    */
   const canApproveApplication = (app) => {
@@ -241,7 +229,7 @@ export function AuthProvider({ children }) {
 
     // Conflict of interest check: An applicant/user can NEVER approve their own application
     const appEmail = app.email?.toLowerCase();
-    const userEmail = currentUser.email?.toLowerCase();
+    const userEmail = currentUser?.email?.toLowerCase();
     if (appEmail && userEmail && appEmail === userEmail) {
       return { authorized: false, reason: 'Conflict of Interest: You cannot authorize an application you submitted.' };
     }
@@ -261,10 +249,9 @@ export function AuthProvider({ children }) {
 
     // Pillar-level delegated cases
     if (currentRole === ROLES.PILLAR_LEAD) {
-      const userVertical = currentUser.assignedVertical;
+      const userVertical = currentUser?.assignedVertical;
       const appVertical = (app.assignedVertical || '').toLowerCase();
       
-      // If pillar lead has specific vertical assignment, enforce vertical domain match
       if (userVertical) {
         const isTechMatch = userVertical === 'TECH_DEV' && (appVertical.includes('tech') || appVertical.includes('6.1'));
         const isStartupMatch = userVertical === 'STARTUP' && (appVertical.includes('startup') || appVertical.includes('6.2'));
@@ -293,28 +280,32 @@ export function AuthProvider({ children }) {
 
   /**
    * Authenticated HTTP Fetch Wrapper:
-   * Injects the active user identity and role into request headers for backend RBAC enforcement.
+   * Injects the active session token and user identity headers into request headers.
    */
   const authFetch = async (url, options = {}) => {
     const headers = {
       ...(options.headers || {}),
-      'X-User-Id': currentUser.id,
-      'X-User-Role': currentUser.role,
-      'X-User-Email': currentUser.email,
-      'X-User-Name': currentUser.name,
-      'X-User-Type': currentUser.applicantType || '',
-      'X-User-Stakeholder-Type': currentUser.stakeholderType || '',
-      'X-User-Vertical': currentUser.assignedVertical || ''
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(currentUser?.id ? { 'X-User-Id': currentUser.id } : {}),
+      'X-User-Role': currentRole,
+      ...(currentUser?.email ? { 'X-User-Email': currentUser.email } : {}),
+      ...(currentUser?.name ? { 'X-User-Name': currentUser.name } : {}),
+      ...(currentUser?.stakeholderType ? { 'X-User-Stakeholder-Type': currentUser.stakeholderType } : {})
     };
     return fetch(url, { ...options, headers });
   };
 
   const value = {
+    session,
     currentUser,
     currentRole,
-    selectedPersonaId,
-    systemPersonas: SYSTEM_PERSONAS,
-    switchPersona,
+    token,
+    isAuthenticated,
+    loading,
+    authError,
+    login,
+    register,
+    logout,
     isApplicant,
     isOperations,
     isPillarLead,
