@@ -5,18 +5,10 @@ import {
   ArrowRight, 
   ShieldCheck, 
   AlertCircle, 
-  KeyRound, 
-  Building2, 
-  CheckCircle2, 
   Eye, 
-  EyeOff, 
-  Sparkles,
-  ChevronDown,
-  ChevronUp,
-  UserCheck,
-  Briefcase
+  EyeOff 
 } from 'lucide-react';
-import { useAuth, EVALUATION_STAFF_ACCOUNTS, ROLES } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
   const { login, loading } = useAuth();
@@ -24,42 +16,39 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showStaffPanel, setShowStaffPanel] = useState(true);
+
+  // Validate email format
+  const isValidEmail = (val) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+  };
+
+  const isFormIncomplete = !email.trim() || !password.trim();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
+    // Basic required field validation
     if (!email.trim()) {
       setErrorMessage('Please enter your registered email address.');
       return;
     }
-    if (!password) {
-      setErrorMessage('Please enter your account password.');
+    if (!isValidEmail(email)) {
+      setErrorMessage('Please enter a valid email address (e.g. name@domain.com).');
+      return;
+    }
+    if (!password.trim()) {
+      setErrorMessage('Please enter your password.');
       return;
     }
 
     try {
-      const res = await login(email, password);
+      const res = await login(email.trim(), password);
       if (onLoginSuccess) {
-        onLoginSuccess(res.user);
+        onLoginSuccess(res.user, res.applications);
       }
     } catch (err) {
-      setErrorMessage(err.message || 'Login failed. Please check your credentials.');
-    }
-  };
-
-  const handleQuickStaffLogin = async (staffAccount) => {
-    setEmail(staffAccount.email);
-    setPassword(staffAccount.password);
-    setErrorMessage('');
-    try {
-      const res = await login(staffAccount.email, staffAccount.password);
-      if (onLoginSuccess) {
-        onLoginSuccess(res.user);
-      }
-    } catch (err) {
-      setErrorMessage(err.message || 'Staff login failed.');
+      setErrorMessage(err.message || 'Login failed. Please verify your credentials.');
     }
   };
 
@@ -89,10 +78,10 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handleSubmit} className="login-form" noValidate>
           <div className="form-group">
             <label className="form-label" htmlFor="login-email">
-              Registered Email Address
+              Registered Email Address <span className="text-required">*</span>
             </label>
             <div className="input-with-icon">
               <Mail size={16} className="input-icon" />
@@ -100,9 +89,12 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
                 id="login-email"
                 type="email"
                 className="form-input"
-                placeholder="name@organization.com or email@example.com"
+                placeholder="Enter your registered email address"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errorMessage) setErrorMessage('');
+                }}
                 autoComplete="email"
                 required
               />
@@ -112,7 +104,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
           <div className="form-group">
             <div className="label-row">
               <label className="form-label" htmlFor="login-password">
-                Password
+                Password <span className="text-required">*</span>
               </label>
             </div>
             <div className="input-with-icon">
@@ -123,7 +115,10 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
                 className="form-input"
                 placeholder="Enter your password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errorMessage) setErrorMessage('');
+                }}
                 autoComplete="current-password"
                 required
               />
@@ -131,6 +126,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
                 type="button" 
                 className="password-toggle-btn"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -141,7 +137,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
           <button 
             type="submit" 
             className="btn-submit-login" 
-            disabled={loading}
+            disabled={loading || isFormIncomplete}
           >
             {loading ? (
               <span className="btn-loading-state">
@@ -149,7 +145,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
               </span>
             ) : (
               <span className="btn-label-state">
-                Sign In to Dashboard <ArrowRight size={16} />
+                Sign In <ArrowRight size={16} />
               </span>
             )}
           </button>
@@ -163,77 +159,8 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
             className="btn-link-register"
             onClick={onNavigateToRegister}
           >
-            Register as an Applicant <ArrowRight size={14} />
+            Register <ArrowRight size={14} />
           </button>
-        </div>
-
-        {/* Institutional & Evaluator Access Helper Panel */}
-        <div className="evaluation-panel-wrapper">
-          <button 
-            type="button"
-            className="evaluation-panel-toggle"
-            onClick={() => setShowStaffPanel(!showStaffPanel)}
-          >
-            <div className="toggle-left">
-              <Building2 size={15} />
-              <span>Internal Authority & Evaluator Login</span>
-            </div>
-            {showStaffPanel ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
-
-          {showStaffPanel && (
-            <div className="evaluation-staff-grid animate-slide-down">
-              <p className="eval-note">
-                For administrative review and RBAC evaluation, authorized internal officers may authenticate using the pre-seeded credentials below:
-              </p>
-              <div className="staff-cards-list">
-                {EVALUATION_STAFF_ACCOUNTS.map((staff) => (
-                  <div 
-                    key={staff.email}
-                    className="staff-quick-card"
-                    onClick={() => handleQuickStaffLogin(staff)}
-                  >
-                    <div className="staff-card-header">
-                      <span className="staff-emoji">{staff.badge}</span>
-                      <div className="staff-meta">
-                        <span className="staff-role-name">{staff.roleLabel}</span>
-                        <span className="staff-email font-mono">{staff.email}</span>
-                      </div>
-                    </div>
-                    <p className="staff-desc">{staff.description}</p>
-                    <div className="quick-login-btn-row">
-                      <span className="quick-sign-in-text">Click to Log In</span>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Seeded Applicant Card */}
-                <div 
-                  className="staff-quick-card applicant-card"
-                  onClick={() => {
-                    setEmail('aasritareddy.c@gmail.com');
-                    setPassword('password123');
-                    setErrorMessage('');
-                    login('aasritareddy.c@gmail.com', 'password123').then(res => {
-                      if (onLoginSuccess) onLoginSuccess(res.user);
-                    }).catch(e => setErrorMessage(e.message));
-                  }}
-                >
-                  <div className="staff-card-header">
-                    <span className="staff-emoji">🚀</span>
-                    <div className="staff-meta">
-                      <span className="staff-role-name">Aasrita Reddy (Applicant)</span>
-                      <span className="staff-email font-mono">aasritareddy.c@gmail.com</span>
-                    </div>
-                  </div>
-                  <p className="staff-desc">Test STARTUP applicant with active application IITTNIF-2026-007.</p>
-                  <div className="quick-login-btn-row">
-                    <span className="quick-sign-in-text">Click to Log In</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -341,6 +268,11 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
           color: var(--text-primary);
         }
 
+        .text-required {
+          color: #dc2626;
+          margin-left: 2px;
+        }
+
         .input-with-icon {
           position: relative;
           display: flex;
@@ -383,6 +315,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
           display: flex;
           align-items: center;
           justify-content: center;
+          transition: color var(--transition-fast);
         }
 
         .password-toggle-btn:hover {
@@ -413,8 +346,10 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
         }
 
         .btn-submit-login:disabled {
-          opacity: 0.7;
+          opacity: 0.5;
           cursor: not-allowed;
+          box-shadow: none;
+          transform: none;
         }
 
         .btn-label-state, .btn-loading-state {
@@ -468,128 +403,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess }) {
         .btn-link-register:hover {
           text-decoration: underline;
           transform: translateX(2px);
-        }
-
-        /* Evaluation Panel */
-        .evaluation-panel-wrapper {
-          border-top: 1px dashed var(--border-color);
-          padding-top: 16px;
-        }
-
-        .evaluation-panel-toggle {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 8px 12px;
-          background-color: rgba(var(--color-accent-rgb), 0.05);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-sm);
-          color: var(--text-secondary);
-          font-size: 11.5px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all var(--transition-fast);
-        }
-
-        .evaluation-panel-toggle:hover {
-          color: var(--text-primary);
-          border-color: var(--color-accent);
-        }
-
-        .toggle-left {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .evaluation-staff-grid {
-          margin-top: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .eval-note {
-          font-size: 11px;
-          color: var(--text-muted);
-          margin: 0 0 6px 0;
-          line-height: 1.35;
-        }
-
-        .staff-cards-list {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          max-height: 280px;
-          overflow-y: auto;
-          padding-right: 4px;
-        }
-
-        .staff-quick-card {
-          padding: 10px 12px;
-          background-color: var(--bg-primary);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-sm);
-          cursor: pointer;
-          transition: all var(--transition-fast);
-        }
-
-        .staff-quick-card:hover {
-          border-color: var(--color-accent);
-          background-color: var(--bg-surface);
-          transform: translateX(3px);
-        }
-
-        .staff-quick-card.applicant-card {
-          border-left: 3px solid #10b981;
-        }
-
-        .staff-card-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .staff-emoji {
-          font-size: 16px;
-        }
-
-        .staff-meta {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .staff-role-name {
-          font-size: 12px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-
-        .staff-email {
-          font-size: 10.5px;
-          color: var(--text-muted);
-        }
-
-        .staff-desc {
-          font-size: 10.5px;
-          color: var(--text-secondary);
-          margin: 4px 0 0 0;
-          line-height: 1.3;
-        }
-
-        .quick-login-btn-row {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 4px;
-        }
-
-        .quick-sign-in-text {
-          font-size: 10px;
-          font-weight: 700;
-          color: var(--color-accent);
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
         }
       `}</style>
     </div>

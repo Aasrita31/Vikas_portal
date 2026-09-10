@@ -230,7 +230,8 @@ export default function Header({
           </div>
         )}
 
-        {/* Notifications Button & Dropdown */}
+        {/* Notifications Button & Dropdown (Hidden on Sign In page / unauthenticated) */}
+        {isAuthenticated && activeTab !== 'login' && (
         <div className="notif-selector-container" style={{ position: 'relative' }}>
           <button 
             className="navbar-icon-btn-light" 
@@ -301,6 +302,7 @@ export default function Header({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Column 2: Centered Large Highlighted Heading */}

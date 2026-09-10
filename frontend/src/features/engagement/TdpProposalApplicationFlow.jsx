@@ -25,7 +25,6 @@ import {
   RotateCcw,
   CheckCircle2
 } from 'lucide-react';
-import UnsavedChangesModal from '../../components/UnsavedChangesModal';
 
 export const SAMPLE_DEMO_DATA = {
   // Step 1: Applicant Details
@@ -201,22 +200,9 @@ export default function TdpProposalApplicationFlow({
   const [isAuthenticated, setIsAuthenticated] = useState(currentUser?.authenticated || true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [copiedAppNo, setCopiedAppNo] = useState(false);
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const handleBackClick = () => {
-    const isDirty = Boolean(
-      !submittedReceipt && (
-        formData.applicantName?.trim() ||
-        formData.organization?.trim() ||
-        formData.email?.trim() ||
-        formData.mobile?.trim() ||
-        formData.projectTitle?.trim() ||
-        formData.problemStatement?.trim()
-      )
-    );
-    if (isDirty) {
-      setShowExitConfirm(true);
-    } else if (onBack) {
+    if (onBack) {
       onBack();
     }
   };
@@ -1537,18 +1523,6 @@ export default function TdpProposalApplicationFlow({
           </div>
         </div>
       )}
-
-      {/* Unsaved Changes Confirmation Modal */}
-      <UnsavedChangesModal 
-        isOpen={showExitConfirm}
-        title="Leave site?"
-        message="Changes you made may not be saved."
-        onConfirm={() => {
-          setShowExitConfirm(false);
-          if (onBack) onBack();
-        }}
-        onCancel={() => setShowExitConfirm(false)}
-      />
 
       {/* Scoped CSS */}
       <style>{`

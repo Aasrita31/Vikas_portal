@@ -11,7 +11,6 @@ import ApprovalPanel from './features/approval/ApprovalPanel';
 import EngagementsList from './features/engagement/EngagementsList';
 import AuditLogs from './features/audit/AuditLogs';
 import VikasFlow from './features/flow/VikasFlow';
-import UnsavedChangesModal from './components/UnsavedChangesModal';
 import { 
   NOTIFICATION_EVENTS, 
   createNotification, 
@@ -244,12 +243,6 @@ function AppContent() {
   const [featureSubTab, setFeatureSubTab] = useState('onboard');
   const [overviewKey, setOverviewKey] = useState(0);
 
-  // Unsaved Changes & Navigation Guard States
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState(null);
-  const [preventDialogs, setPreventDialogs] = useState(false);
-
   // Role Guard: If activeTab becomes forbidden when persona changes, redirect safely to applicant dashboard
   useEffect(() => {
     if (isApplicant && (activeTab === 'screening' || activeTab === 'approval')) {
@@ -266,29 +259,9 @@ function AppContent() {
         return newItems.length > 0 ? [...newItems, ...prev] : prev;
       });
     }
-    const role = (user?.role || '').toLowerCase();
-    if (role === 'applicant') {
-      setActiveTab('tracking');
-    } else if (role === 'operations') {
-      setActiveTab('screening');
-    } else if (role === 'pillar_lead' || role === 'project_director' || role === 'pd') {
-      setActiveTab('approval');
-    } else {
-      setActiveTab('overview');
-    }
+    // Redirect user to the VIKAS Welcome/Introduction page
+    executeTabNavigation('overview');
   };
-
-  // Browser-level reload/close interceptor when form has unsaved inputs
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (hasUnsavedChanges && !preventDialogs) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges, preventDialogs]);
 
   // System & Applicant Notifications State (seeded with standard workflow events)
   const [notifications, setNotifications] = useState(() => {
@@ -363,7 +336,7 @@ function AppContent() {
       setOverviewKey(prev => prev + 1);
     }
     setActiveTab(tabId);
-    setHasUnsavedChanges(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleTabChange = (tabId) => {
@@ -379,12 +352,7 @@ function AppContent() {
       return;
     }
 
-    if (hasUnsavedChanges && !preventDialogs) {
-      setPendingNavigation({ type: 'tab', target: tabId });
-      setShowLeaveModal(true);
-    } else {
-      executeTabNavigation(tabId);
-    }
+    executeTabNavigation(tabId);
   };
 
   const handleFeatureSubTabChange = (tabId) => {
@@ -395,33 +363,7 @@ function AppContent() {
       return;
     }
 
-    if (hasUnsavedChanges && !preventDialogs) {
-      setPendingNavigation({ type: 'subtab', target: tabId });
-      setShowLeaveModal(true);
-    } else {
-      setFeatureSubTab(tabId);
-      setHasUnsavedChanges(false);
-    }
-  };
-
-  const handleConfirmLeave = () => {
-    setShowLeaveModal(false);
-    setHasUnsavedChanges(false);
-    if (pendingNavigation) {
-      if (pendingNavigation.type === 'tab') {
-        executeTabNavigation(pendingNavigation.target);
-      } else if (pendingNavigation.type === 'subtab') {
-        setFeatureSubTab(pendingNavigation.target);
-      } else if (pendingNavigation.type === 'callback' && typeof pendingNavigation.target === 'function') {
-        pendingNavigation.target();
-      }
-      setPendingNavigation(null);
-    }
-  };
-
-  const handleCancelLeave = () => {
-    setShowLeaveModal(false);
-    setPendingNavigation(null);
+    setFeatureSubTab(tabId);
   };
 
   // Applications State: seeded with structured records, with auto-merge for demonstration records
@@ -771,7 +713,6 @@ function AppContent() {
         return (
           <OnboardingForm 
             onSubmitApplication={handleAddNewApplication} 
-            onDirtyChange={(isDirty) => setHasUnsavedChanges(isDirty)}
             onNavigateToLogin={() => handleTabChange('login')}
           />
         );
@@ -897,16 +838,6 @@ function AppContent() {
         <div className="content-body">
           {renderActiveMainTab()}
         </div>
-
-        {/* Unsaved Changes Navigation Confirmation Modal */}
-        <UnsavedChangesModal 
-          isOpen={showLeaveModal}
-          title="Leave site?"
-          message="Changes you made may not be saved."
-          onConfirm={handleConfirmLeave}
-          onCancel={handleCancelLeave}
-          onPreventDialogsChange={(prevent) => setPreventDialogs(prevent)}
-        />
 
         <style>{`
           .floating-toast-alert {
