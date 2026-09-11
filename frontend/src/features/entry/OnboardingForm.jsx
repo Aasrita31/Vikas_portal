@@ -41,36 +41,36 @@ export default function OnboardingForm({
   onNavigateToLogin,
   onNavigateToDashboard 
 }) {
-  const { register, authFetch, loading: authLoading } = useAuth();
+  const { currentUser, user, register, authFetch, loading: authLoading } = useAuth();
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
-  // 7-Section Form State (Starts completely blank - no prefilled mock personas)
+  // 5-Section Form State (Starts clean and synced with authenticated account)
   const [formData, setFormData] = useState({
-    // Section 1: Basic Details
-    name: '',
-    organization: '',
-    email: '',
-    phone: '',
-    location: '',
+    // Profile coordinates inherited from login / auth session
+    name: currentUser?.name || '',
+    organization: currentUser?.organization || '',
+    email: currentUser?.email || '',
+    phone: currentUser?.phone || '',
+    location: currentUser?.location || '',
     password: '',
     confirmPassword: '',
 
-    // Section 2: Stakeholder Type (Select one - Default unselected)
-    stakeholderType: '',
+    // Stakeholder Track (defaults to user's registered track or Startup)
+    stakeholderType: currentUser?.stakeholderType || 'Startup',
     otherStakeholderType: '',
 
-    // Section 3: Domain Selection (Multiple choice - initially empty)
+    // Section 1: Domain Selection (Multiple choice - initially empty)
     domains: [],
     otherDomain: '',
 
-    // Section 4: Intent of Engagement (Single choice, initially unselected)
+    // Section 2: Intent of Engagement (Single choice, initially unselected)
     intentOfEngagement: '',
     otherIntent: '',
 
-    // Section 5: Detailed Inputs (Dynamic based on type)
+    // Section 3: Detailed Inputs (Dynamic based on type)
     // Startup
     startupStage: 'Prototype',
     startupDomain: '',
@@ -104,10 +104,10 @@ export default function OnboardingForm({
     otherFocusArea: '',
     otherEngagementDetails: '',
 
-    // Section 6: Problem Statement / Interest
+    // Section 4: Problem Statement / Interest
     problemStatement: '',
 
-    // Section 7: Consent
+    // Section 5: Consent
     agreeToTerms: false,
     acknowledgeNonIncubation: false,
 
@@ -118,6 +118,21 @@ export default function OnboardingForm({
   });
 
   const [submittedData, setSubmittedData] = useState(null);
+
+  // Sync profile details if currentUser loads or updates
+  React.useEffect(() => {
+    if (currentUser) {
+      setFormData(prev => ({
+        ...prev,
+        name: currentUser.name || prev.name,
+        organization: currentUser.organization || prev.organization,
+        email: currentUser.email || prev.email,
+        phone: currentUser.phone || prev.phone,
+        location: currentUser.location || prev.location,
+        stakeholderType: currentUser.stakeholderType || prev.stakeholderType || 'Startup'
+      }));
+    }
+  }, [currentUser]);
 
   // Dynamic Vertical Auto-Mapping Rule Engine preview
   const getMappedVerticals = () => {
@@ -428,72 +443,30 @@ export default function OnboardingForm({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Validate Form
+  // Validate 5-Section Proposal Form
   const validateForm = () => {
     const errors = {};
-    if (!formData.name.trim()) {
-      errors.name = 'Applicant name is required';
-    } else if (!/^[a-zA-Z\s.'-]+$/.test(formData.name.trim())) {
-      errors.name = 'Name should only contain letters and spaces (no special characters)';
-    }
 
-    if (!formData.organization.trim()) errors.organization = 'Organization / Institution is required';
-    if (!formData.email.trim()) {
-      errors.email = 'Email address is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Please provide a valid email address';
-    }
-    if (!formData.phone.trim()) {
-      errors.phone = 'Phone number is required';
-    } else if (!/^\d{10}$/.test(formData.phone.trim())) {
-      errors.phone = 'Phone number must be exactly 10 digits';
-    }
-    if (!formData.location.trim()) {
-      errors.location = 'Location (City, State) is required';
-    } else if (!/^[a-zA-Z0-9\s,.-]+$/.test(formData.location.trim())) {
-      errors.location = 'Location should not contain special characters';
-    }
-
-    // Section 2: Stakeholder Type
-    if (!formData.stakeholderType) {
-      errors.stakeholderType = 'Please select a stakeholder type in Section 2';
-    } else if (formData.stakeholderType === 'Other' && !formData.otherStakeholderType.trim()) {
-      errors.otherStakeholderType = 'Please specify your other stakeholder type';
-    }
-
-    // Section 3: Domain Selection
+    // Section 1: Domain Selection
     if (formData.domains.length === 0) {
-      errors.domains = 'Please select at least one technology domain in Section 3';
+      errors.domains = 'Please select at least one technology domain in Section 1';
     } else if (formData.domains.includes('Others') && !formData.otherDomain.trim()) {
       errors.otherDomain = 'Please specify your other domain';
     }
 
-    // Section 4: Intent of Engagement
+    // Section 2: Intent of Engagement
     if (!formData.intentOfEngagement || (Array.isArray(formData.intentOfEngagement) && formData.intentOfEngagement.length === 0)) {
-      errors.intentOfEngagement = 'Please select your intent of engagement in Section 4';
+      errors.intentOfEngagement = 'Please select your intent of engagement in Section 2';
     } else if (formData.intentOfEngagement === 'Other' && !formData.otherIntent.trim()) {
       errors.otherIntent = 'Please specify your other intent of engagement';
     }
 
-    // Section 6: Problem Statement / Interest
+    // Section 4: Problem Statement / Interest
     if (!formData.problemStatement.trim()) {
-      errors.problemStatement = 'Please provide a brief problem statement or description of interest in Section 6';
+      errors.problemStatement = 'Please articulate the challenge or interest in Section 4';
     }
 
-    // Section 1: Password Validation for account creation
-    if (!formData.password) {
-      errors.password = 'Password is required to create your account';
-    } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters long';
-    }
-
-    if (!formData.confirmPassword) {
-      errors.confirmPassword = 'Confirm your account password';
-    } else if (formData.confirmPassword !== formData.password) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
-
-    // Section 7: Consent
+    // Section 5: Consent
     if (!formData.agreeToTerms) {
       errors.agreeToTerms = 'You must agree to the terms to proceed';
     }
@@ -576,53 +549,93 @@ export default function OnboardingForm({
 
     // Call real backend registration
     try {
-      const regResult = await register({
-        name: formData.name.trim(),
-        organization: formData.organization.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        location: formData.location.trim(),
-        password: formData.password,
-        stakeholderType: formData.stakeholderType,
-        domains: formData.domains,
-        intentOfEngagement: formData.intentOfEngagement,
-        problemStatement: formData.problemStatement,
-        dynamicInputs: dynamicSummary
-      });
+      let registeredApp = null;
 
-      const registeredApp = regResult.application || {
-        name: formData.name,
-        applicantName: formData.name,
-        contactPerson: formData.name,
-        organization: formData.organization,
-        email: formData.email,
-        phone: formData.phone,
-        location: formData.location,
-        stakeholderType: formData.stakeholderType,
-        domains: formData.domains,
-        intentOfEngagement: formData.intentOfEngagement,
-        dynamicInputs: dynamicSummary,
-        problemStatement: formData.problemStatement,
-        userId: regResult.user?.id || 'usr_app_registered',
-        user_id: regResult.user?.id || 'usr_app_registered',
-        documentName: finalDocName,
-        documentSize: finalDocSize,
-        documentUrl: formData.documentUrl,
-        fileNumber,
-        status: 'pending_screening',
-        assignedVertical: mapped?.primary || '6.2 Startups & Business Enablement',
-        assignedVerticals: [mapped?.primary || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
-        submissionDate: new Date().toLocaleDateString('en-GB'),
-        isStrategic: formData.stakeholderType === 'Government' || formData.stakeholderType === 'Industry',
-        history: [
-          {
-            date: new Date().toLocaleString('en-GB'),
-            action: 'Account Created & File Submitted',
-            user: `${formData.name} (Applicant)`,
-            details: `Registered as ${formData.stakeholderType}. Auto-mapped to vertical: ${mapped?.primary}. Awaiting initial operations screening.`
-          }
-        ]
-      };
+      // If user is already authenticated, submit proposal directly linked to user
+      if (currentUser && currentUser.id) {
+        registeredApp = {
+          name: formData.name,
+          applicantName: formData.name,
+          contactPerson: formData.name,
+          organization: formData.organization,
+          email: formData.email,
+          phone: formData.phone,
+          location: formData.location,
+          stakeholderType: formData.stakeholderType,
+          domains: formData.domains,
+          intentOfEngagement: formData.intentOfEngagement,
+          dynamicInputs: dynamicSummary,
+          problemStatement: formData.problemStatement,
+          userId: currentUser.id,
+          user_id: currentUser.id,
+          documentName: finalDocName,
+          documentSize: finalDocSize,
+          documentUrl: formData.documentUrl,
+          fileNumber,
+          status: 'pending_screening',
+          assignedVertical: mapped?.primary || '6.2 Startups & Business Enablement',
+          assignedVerticals: [mapped?.primary || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
+          submissionDate: new Date().toLocaleDateString('en-GB'),
+          isStrategic: formData.stakeholderType === 'Government' || formData.stakeholderType === 'Industry',
+          history: [
+            {
+              date: new Date().toLocaleString('en-GB'),
+              action: 'Proposal Dossier Submitted',
+              user: `${formData.name} (Applicant)`,
+              details: `Submitted proposal under ${formData.stakeholderType}. Auto-mapped to vertical: ${mapped?.primary}. Awaiting initial operations screening.`
+            }
+          ]
+        };
+      } else {
+        // Fallback for guest: register account with default password & return app
+        const regResult = await register({
+          name: formData.name.trim(),
+          organization: formData.organization.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          location: formData.location.trim(),
+          password: 'Password@123',
+          stakeholderType: formData.stakeholderType,
+          domains: formData.domains,
+          intentOfEngagement: formData.intentOfEngagement,
+          problemStatement: formData.problemStatement,
+          dynamicInputs: dynamicSummary
+        });
+
+        registeredApp = regResult.application || {
+          name: formData.name,
+          applicantName: formData.name,
+          contactPerson: formData.name,
+          organization: formData.organization,
+          email: formData.email,
+          phone: formData.phone,
+          location: formData.location,
+          stakeholderType: formData.stakeholderType,
+          domains: formData.domains,
+          intentOfEngagement: formData.intentOfEngagement,
+          dynamicInputs: dynamicSummary,
+          problemStatement: formData.problemStatement,
+          userId: regResult.user?.id || 'usr_app_registered',
+          user_id: regResult.user?.id || 'usr_app_registered',
+          documentName: finalDocName,
+          documentSize: finalDocSize,
+          documentUrl: formData.documentUrl,
+          fileNumber,
+          status: 'pending_screening',
+          assignedVertical: mapped?.primary || '6.2 Startups & Business Enablement',
+          assignedVerticals: [mapped?.primary || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
+          submissionDate: new Date().toLocaleDateString('en-GB'),
+          isStrategic: formData.stakeholderType === 'Government' || formData.stakeholderType === 'Industry',
+          history: [
+            {
+              date: new Date().toLocaleString('en-GB'),
+              action: 'Proposal Dossier Submitted',
+              user: `${formData.name} (Applicant)`,
+              details: `Submitted proposal as ${formData.stakeholderType}. Auto-mapped to vertical: ${mapped?.primary}. Awaiting operations screening.`
+            }
+          ]
+        };
+      }
 
       if (onSubmitApplication) {
         onSubmitApplication(registeredApp);
@@ -630,7 +643,7 @@ export default function OnboardingForm({
 
       setSubmittedData(registeredApp);
     } catch (err) {
-      setFormErrors({ api: err.message || 'Registration failed. Please check inputs.' });
+      setFormErrors({ api: err.message || 'Submission failed. Please check inputs.' });
       const apiErrEl = document.getElementById('field-name');
       if (apiErrEl) apiErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -872,32 +885,35 @@ export default function OnboardingForm({
           </div>
         </div>
       ) : (
-        /* MAIN 7-SECTION ONBOARDING FORM */
+        /* MAIN 5-SECTION PROPOSAL SUBMISSION FORM */
         <form onSubmit={handleSubmit} className="onboarding-main-form" noValidate>
-          {/* Header Banner - Sleek, Bright & Harmonious */}
+          {/* Header Banner */}
           <div className="card form-masthead">
-            <h1 className="masthead-title">VIKAS Portal Stakeholder Registration</h1>
+            <h1 className="masthead-title">VIKAS Ecosystem Proposal & Onboarding Form</h1>
             <p className="masthead-desc">
-              National single-window registration and onboarding for startups, researchers, institutions, industry, schools, and domain experts.
+              National single-window intake & proposal dossier submission for startups, researchers, institutions, industry, schools, and domain experts.
             </p>
           </div>
 
-          {/* Top Authentication Switch Banner */}
-          <div className="form-auth-switch-banner">
-            <div className="banner-text-wrap">
-              <span className="banner-title-text">Already registered on VIKAS?</span>
-              <span className="banner-sub-text">Sign in to view your application dossier, tracking timeline, and assigned verticals.</span>
+          {/* Active Applicant Identity Strip */}
+          {currentUser && (
+            <div className="applicant-profile-strip animate-fade-in mb-16">
+              <div className="strip-item">
+                <span className="strip-lbl">Applicant:</span>
+                <span className="strip-val">{currentUser.name}</span>
+              </div>
+              <div className="strip-divider" />
+              <div className="strip-item">
+                <span className="strip-lbl">Organization:</span>
+                <span className="strip-val">{currentUser.organization || 'Institutional Entity'}</span>
+              </div>
+              <div className="strip-divider" />
+              <div className="strip-item">
+                <span className="strip-lbl">Track:</span>
+                <span className="badge badge-amber">{currentUser.stakeholderType || 'Startup'}</span>
+              </div>
             </div>
-            {onNavigateToLogin && (
-              <button 
-                type="button" 
-                className="btn-switch-to-login"
-                onClick={onNavigateToLogin}
-              >
-                Sign In to My Dashboard <ArrowRight size={14} />
-              </button>
-            )}
-          </div>
+          )}
 
           {formErrors.api && (
             <div className="alert-error-banner mb-16 animate-shake" id="form-top-error">
@@ -907,293 +923,13 @@ export default function OnboardingForm({
           )}
 
           {/* ========================================================
-              SECTION 1: BASIC DETAILS
-          ======================================================== */}
-          <div className="card section-card" id="field-name">
-            <div className="section-card-header">
-              <div className="section-number-badge">1</div>
-              <div className="section-header-text">
-                <h3>Section 1: Basic Details <span className="text-danger">*</span></h3>
-                <p>Provide your primary point of contact, organization, and create secure account credentials</p>
-              </div>
-            </div>
-
-            <div className="form-grid-2">
-              <div className="form-group">
-                <label className="form-label">
-                  <User size={15} className="label-icon" />
-                  Name <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="Enter full name"
-                  className={`form-control ${formErrors.name ? 'input-error' : ''}`}
-                  value={formData.name}
-                  onChange={(e) => {
-                    const sanitized = e.target.value.replace(/[^a-zA-Z\s.'-]/g, '');
-                    setFormData({...formData, name: sanitized});
-                    if (formErrors.name) setFormErrors({...formErrors, name: null});
-                  }}
-                  required
-                />
-                {formErrors.name && <span className="field-error-msg">{formErrors.name}</span>}
-              </div>
-
-              <div className="form-group" id="field-organization">
-                <label className="form-label">
-                  <Building2 size={15} className="label-icon" />
-                  Organization <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="Company, University or Institution name"
-                  className={`form-control ${formErrors.organization ? 'input-error' : ''}`}
-                  value={formData.organization}
-                  onChange={(e) => {
-                    setFormData({...formData, organization: e.target.value});
-                    if (formErrors.organization) setFormErrors({...formErrors, organization: null});
-                  }}
-                  required
-                />
-                {formErrors.organization && <span className="field-error-msg">{formErrors.organization}</span>}
-              </div>
-            </div>
-
-            <div className="form-grid-3 mt-16">
-              <div className="form-group" id="field-email">
-                <label className="form-label">
-                  <Mail size={15} className="label-icon" />
-                  Email Address <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="email" 
-                  placeholder="Official / contact email"
-                  className={`form-control ${formErrors.email ? 'input-error' : ''}`}
-                  value={formData.email}
-                  onChange={(e) => {
-                    setFormData({...formData, email: e.target.value});
-                    if (formErrors.email) setFormErrors({...formErrors, email: null});
-                  }}
-                  required
-                />
-                {formErrors.email && <span className="field-error-msg">{formErrors.email}</span>}
-              </div>
-
-              <div className="form-group" id="field-phone">
-                <label className="form-label">
-                  <Phone size={15} className="label-icon" />
-                  Phone Number <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="tel" 
-                  maxLength={10}
-                  placeholder="10-digit mobile number"
-                  className={`form-control ${formErrors.phone ? 'input-error' : ''}`}
-                  value={formData.phone}
-                  onChange={(e) => {
-                    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
-                    setFormData({...formData, phone: digitsOnly});
-                    if (formErrors.phone) setFormErrors({...formErrors, phone: null});
-                  }}
-                  required
-                />
-                {formErrors.phone && <span className="field-error-msg">{formErrors.phone}</span>}
-              </div>
-
-              <div className="form-group" id="field-location">
-                <label className="form-label">
-                  <MapPin size={15} className="label-icon" />
-                  Location <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="City, State"
-                  className={`form-control ${formErrors.location ? 'input-error' : ''}`}
-                  value={formData.location}
-                  onChange={(e) => {
-                    const sanitized = e.target.value.replace(/[^a-zA-Z0-9\s,.-]/g, '');
-                    setFormData({...formData, location: sanitized});
-                    if (formErrors.location) setFormErrors({...formErrors, location: null});
-                  }}
-                  required
-                />
-                {formErrors.location && <span className="field-error-msg">{formErrors.location}</span>}
-              </div>
-            </div>
-
-            {/* Account Password Inputs */}
-            <div className="form-grid-2 mt-16">
-              <div className="form-group" id="field-password">
-                <label className="form-label">
-                  <Lock size={15} className="label-icon" />
-                  Create Password <span className="text-danger">*</span>
-                </label>
-                <div className="input-with-toggle">
-                  <input 
-                    type={showPassword ? 'text' : 'password'} 
-                    placeholder="Create secure password (min 6 chars)"
-                    className={`form-control ${formErrors.password ? 'input-error' : ''}`}
-                    value={formData.password}
-                    onChange={(e) => {
-                      setFormData({...formData, password: e.target.value});
-                      if (formErrors.password) setFormErrors({...formErrors, password: null});
-                    }}
-                    required
-                  />
-                  <button 
-                    type="button" 
-                    className="password-toggle-btn-field"
-                    onClick={() => setShowPassword(!showPassword)}
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-                {formErrors.password && <span className="field-error-msg">{formErrors.password}</span>}
-              </div>
-
-              <div className="form-group" id="field-confirmPassword">
-                <label className="form-label">
-                  <KeyRound size={15} className="label-icon" />
-                  Confirm Password <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type={showPassword ? 'text' : 'password'} 
-                  placeholder="Re-enter password to confirm"
-                  className={`form-control ${formErrors.confirmPassword ? 'input-error' : ''}`}
-                  value={formData.confirmPassword}
-                  onChange={(e) => {
-                    setFormData({...formData, confirmPassword: e.target.value});
-                    if (formErrors.confirmPassword) setFormErrors({...formErrors, confirmPassword: null});
-                  }}
-                  required
-                />
-                {formErrors.confirmPassword && <span className="field-error-msg">{formErrors.confirmPassword}</span>}
-              </div>
-            </div>
-          </div>
-
-          {/* ========================================================
-              SECTION 2: STAKEHOLDER TYPE
-          ======================================================== */}
-          <div className="card section-card" id="field-stakeholderType">
-            <div className="section-card-header">
-              <div className="section-number-badge">2</div>
-              <div className="section-header-text">
-                <h3>Section 2: Stakeholder Type <span className="text-danger">*</span></h3>
-                <p>Select one primary stakeholder category that represents your engagement</p>
-              </div>
-            </div>
-
-            {formErrors.stakeholderType && (
-              <div className="alert-error-banner mb-16">
-                <AlertCircle size={15} />
-                <span>{formErrors.stakeholderType}</span>
-              </div>
-            )}
-
-            <div className="stakeholder-selector-grid">
-              {stakeholderTypes.map((type) => {
-                const IconComponent = type.icon;
-                const isSelected = formData.stakeholderType === type.id;
-                return (
-                  <div
-                    key={type.id}
-                    className={`stakeholder-type-pill-card ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleSelectStakeholder(type.id)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSelectStakeholder(type.id);
-                      }
-                    }}
-                  >
-                    <div className="card-top-row">
-                      <div className="stakeholder-icon-box" style={{ backgroundColor: `${type.color}15`, color: type.color }}>
-                        <IconComponent size={20} />
-                      </div>
-                      <span className="stakeholder-badge font-mono" style={{ color: type.color, borderColor: `${type.color}40`, backgroundColor: `${type.color}10` }}>
-                        {type.badge}
-                      </span>
-                    </div>
-                    <div className="stakeholder-info">
-                      <h4 className="stakeholder-title">{type.title}</h4>
-                      <p className="stakeholder-sub">{type.subtitle}</p>
-                    </div>
-                    <div className="stakeholder-radio-indicator">
-                      <div className={`radio-dot ${isSelected ? 'active' : ''}`}>
-                        {isSelected && <Check size={12} color="#ffffff" strokeWidth={3} />}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Conditional Other Stakeholder Input */}
-            {formData.stakeholderType === 'Other' && (
-              <div className="form-group mt-16 animate-fade-in" id="field-otherStakeholderType">
-                <label className="form-label">
-                  Specify Stakeholder Entity Type <span className="text-danger">*</span>
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Non-profit research consortium, community collective, etc."
-                  className={`form-control ${formErrors.otherStakeholderType ? 'input-error' : ''}`}
-                  value={formData.otherStakeholderType}
-                  onChange={(e) => {
-                    setFormData({...formData, otherStakeholderType: e.target.value});
-                    if (formErrors.otherStakeholderType) setFormErrors({...formErrors, otherStakeholderType: null});
-                  }}
-                />
-                {formErrors.otherStakeholderType && <span className="field-error-msg">{formErrors.otherStakeholderType}</span>}
-              </div>
-            )}
-
-            {/* Real-Time Institutional Vertical Auto-Routing Decision Preview */}
-            {formData.stakeholderType && (
-              <div className="vertical-auto-routing-card animate-fade-in mt-16">
-                <div className="routing-card-top">
-                  <div className="routing-title-row">
-                    <ShieldCheck size={18} className="text-emerald" />
-                    <span className="routing-heading">Institutional Vertical Auto-Routing Decision</span>
-                  </div>
-                  <span className="badge badge-emerald font-bold">System-Determined</span>
-                </div>
-                <p className="routing-desc">
-                  Based on your selected stakeholder track (<strong>{formData.stakeholderType}</strong>)
-                  {formData.domains.length > 0 && <span> and focus areas ({formData.domains.join(', ')})</span>}, 
-                  VIKAS will automatically assign your dossier to the following institutional vertical(s):
-                </p>
-                <div className="mapped-verticals-tags">
-                  <div className="primary-vertical-pill">
-                    <span className="pill-tag">Primary Vertical:</span>
-                    <span className="pill-val">{getMappedVerticals()?.primary}</span>
-                  </div>
-                  {getMappedVerticals()?.additional?.map(v => (
-                    <div key={v} className="additional-vertical-pill">
-                      <span className="pill-tag">Joint Track:</span>
-                      <span className="pill-val">{v}</span>
-                    </div>
-                  ))}
-                </div>
-                <span className="routing-guarantee-note">
-                  ✓ System-governed routing: No manual administrative classification required from applicant.
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* ========================================================
-              SECTION 3: DOMAIN SELECTION
+              SECTION 1: DOMAIN SELECTION
           ======================================================== */}
           <div className="card section-card" id="field-domains">
             <div className="section-card-header">
-              <div className="section-number-badge">3</div>
+              <div className="section-number-badge">1</div>
               <div className="section-header-text">
-                <h3>Section 3: Domain Selection <span className="text-danger">*</span></h3>
+                <h3>Section 1: Domain Selection <span className="text-danger">*</span></h3>
                 <p>Multiple choice — Select all core technology domains aligned with your proposal</p>
               </div>
             </div>
@@ -1231,7 +967,7 @@ export default function OnboardingForm({
                   Please Specify Other Domain(s) <span className="text-danger">*</span>
                 </label>
                 <input 
-                  type="text"
+                  type="text" 
                   className={`form-control ${formErrors.otherDomain ? 'input-error' : ''}`}
                   value={formData.otherDomain}
                   onChange={(e) => {
@@ -1245,13 +981,13 @@ export default function OnboardingForm({
           </div>
 
           {/* ========================================================
-              SECTION 4: INTENT OF ENGAGEMENT
+              SECTION 2: INTENT OF ENGAGEMENT
           ======================================================== */}
           <div className="card section-card" id="field-intentOfEngagement">
             <div className="section-card-header">
-              <div className="section-number-badge">4</div>
+              <div className="section-number-badge">2</div>
               <div className="section-header-text">
-                <h3>Section 4: Intent of Engagement <span className="text-danger">*</span></h3>
+                <h3>Section 2: Intent of Engagement <span className="text-danger">*</span></h3>
                 <p>Select your intended mode and purpose of engagement with IITTNiF (Single choice)</p>
               </div>
             </div>
@@ -1289,7 +1025,7 @@ export default function OnboardingForm({
                   Please Specify Other Intent <span className="text-danger">*</span>
                 </label>
                 <input 
-                  type="text"
+                  type="text" 
                   className={`form-control ${formErrors.otherIntent ? 'input-error' : ''}`}
                   placeholder="Please specify your intended mode or purpose of engagement..."
                   value={formData.otherIntent}
@@ -1304,23 +1040,43 @@ export default function OnboardingForm({
           </div>
 
           {/* ========================================================
-              SECTION 5: DETAILED INPUTS (DYNAMIC BASED ON TYPE)
+              SECTION 3: DETAILED INPUTS (DYNAMIC BASED ON TYPE)
           ======================================================== */}
           <div className="card section-card dynamic-section-card animate-fade-in" id="field-dynamicDetails">
             <div className="section-card-header">
-              <div className="section-number-badge">5</div>
+              <div className="section-number-badge">3</div>
               <div className="section-header-text">
                 <div className="dynamic-title-row">
-                  <h3>Section 5: Detailed Inputs <span className="text-danger">*</span></h3>
+                  <h3>Section 3: Detailed Inputs <span className="text-danger">*</span></h3>
                   <span className="badge badge-amber">
-                    {formData.stakeholderType ? `Dynamic: ${formData.stakeholderType === 'Other' && formData.otherStakeholderType ? formData.otherStakeholderType : formData.stakeholderType}` : 'Awaiting Selection'}
+                    {formData.stakeholderType ? `Track: ${formData.stakeholderType}` : 'Project Scope'}
                   </span>
                 </div>
                 <p>
                   {formData.stakeholderType 
                     ? `Specific operational parameters customized for ${formData.stakeholderType}`
-                    : 'Please select a stakeholder type in Section 2 above to view specialized inputs'}
+                    : 'Configure tailored operational and development parameters for your proposal'}
                 </p>
+              </div>
+            </div>
+
+            {/* Stakeholder Track Pills Selector */}
+            <div className="track-selector-bar mb-20">
+              <label className="form-label" style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>
+                Engagement Track / Category:
+              </label>
+              <div className="stage-pills-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                {['Startup', 'Student / Researcher', 'School', 'Institution', 'Industry', 'Government', 'Expert', 'Other'].map((type) => (
+                  <button
+                    type="button"
+                    key={type}
+                    className={`stage-pill ${formData.stakeholderType === type ? 'active' : ''}`}
+                    onClick={() => setFormData({...formData, stakeholderType: type})}
+                  >
+                    {formData.stakeholderType === type && <Check size={13} />}
+                    <span>{type}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1329,7 +1085,7 @@ export default function OnboardingForm({
               <div className="empty-dynamic-prompt animate-fade-in">
                 <Compass size={28} className="text-amber animate-pulse" />
                 <p className="empty-dynamic-text">
-                  Please select a <strong>Stakeholder Type</strong> in Section 2 above to configure tailored operational parameters.
+                  Please select an engagement track above to view customized parameters.
                 </p>
               </div>
             )}
@@ -1655,13 +1411,13 @@ export default function OnboardingForm({
           </div>
 
           {/* ========================================================
-              SECTION 6: PROBLEM STATEMENT / INTEREST
+              SECTION 4: PROBLEM STATEMENT / INTEREST
           ======================================================== */}
           <div className="card section-card" id="field-problemStatement">
             <div className="section-card-header">
-              <div className="section-number-badge">6</div>
+              <div className="section-number-badge">4</div>
               <div className="section-header-text">
-                <h3>Section 6: Problem Statement / Interest <span className="text-danger">*</span></h3>
+                <h3>Section 4: Problem Statement / Interest <span className="text-danger">*</span></h3>
                 <p>Open text — Articulate the challenge, technological problem, or specific interest you wish to pursue</p>
               </div>
             </div>
@@ -1670,6 +1426,7 @@ export default function OnboardingForm({
               <textarea 
                 className={`form-control text-area-large ${formErrors.problemStatement ? 'input-error' : ''}`}
                 rows="5"
+                placeholder="Articulate the challenge, technological problem, or specific innovation scope..."
                 value={formData.problemStatement}
                 onChange={(e) => {
                   setFormData({...formData, problemStatement: e.target.value});
@@ -1750,13 +1507,13 @@ export default function OnboardingForm({
           </div>
 
           {/* ========================================================
-              SECTION 7: CONSENT
+              SECTION 5: CONSENT
           ======================================================== */}
           <div className="card section-card" id="field-agreeToTerms">
             <div className="section-card-header">
-              <div className="section-number-badge">7</div>
+              <div className="section-number-badge">5</div>
               <div className="section-header-text">
-                <h3>Section 7: Consent</h3>
+                <h3>Section 5: Consent</h3>
                 <p>Review and agree to the portal operational terms and non-incubation acknowledgment</p>
               </div>
             </div>
@@ -2019,6 +1776,43 @@ export default function OnboardingForm({
           margin-right: 6px;
           color: #d97706;
           vertical-align: -2px;
+        }
+
+        /* Applicant Profile Strip */
+        .applicant-profile-strip {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 12px 20px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-left: 4px solid #d97706;
+          border-radius: 12px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          flex-wrap: wrap;
+        }
+
+        .strip-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 13px;
+        }
+
+        .strip-lbl {
+          color: #64748b;
+          font-weight: 500;
+        }
+
+        .strip-val {
+          color: #0f172a;
+          font-weight: 700;
+        }
+
+        .strip-divider {
+          width: 1px;
+          height: 16px;
+          background: #cbd5e1;
         }
 
         .text-danger {

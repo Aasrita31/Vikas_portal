@@ -237,11 +237,12 @@ const INITIAL_SEED_APPLICATIONS = [
 function AppContent() {
   const { currentRole, currentUser, isAuthenticated, isApplicant, canScreen, canRoute, canApprove, canApproveApplication } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
-    if (isApplicant) return 'tracking';
-    return 'overview';
+    if (isApplicant) return 'entry';
+    return 'login';
   });
   const [featureSubTab, setFeatureSubTab] = useState('onboard');
   const [overviewKey, setOverviewKey] = useState(0);
+  const [highlightedVerticalTrack, setHighlightedVerticalTrack] = useState(null);
 
   // Role Guard: If activeTab becomes forbidden when persona changes, redirect safely to applicant dashboard
   useEffect(() => {
@@ -259,8 +260,16 @@ function AppContent() {
         return newItems.length > 0 ? [...newItems, ...prev] : prev;
       });
     }
-    // Redirect user to the VIKAS Welcome/Introduction page
-    executeTabNavigation('overview');
+    
+    // Redirect to Proposal Submission ('entry') for applicants, or appropriate role queue for staff
+    const userRole = (user?.role || '').toLowerCase();
+    if (userRole === 'operations') {
+      executeTabNavigation('screening');
+    } else if (userRole === 'pd' || userRole === 'pillar_lead') {
+      executeTabNavigation('approval');
+    } else {
+      executeTabNavigation('entry');
+    }
   };
 
   // System & Applicant Notifications State (seeded with standard workflow events)
@@ -403,6 +412,9 @@ function AppContent() {
 
   // Operations Handlers
   const handleAddNewApplication = (newApp) => {
+    const track = newApp.stakeholderType || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup';
+    setHighlightedVerticalTrack(track);
+
     const stampedApp = {
       ...newApp,
       userId: newApp.userId || newApp.user_id || currentUser?.id || `usr_app_${Date.now()}`,
@@ -412,7 +424,7 @@ function AppContent() {
       organization: newApp.organization || currentUser?.organization || 'Registered Entity',
       phone: newApp.phone || currentUser?.phone || '',
       location: newApp.location || currentUser?.location || '',
-      stakeholderType: newApp.stakeholderType || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup',
+      stakeholderType: track,
       assignedVertical: newApp.assignedVertical || (newApp.assignedVerticals ? newApp.assignedVerticals[0] : '6.2 Startups & Business Enablement'),
       assignedVerticals: newApp.assignedVerticals || (newApp.assignedVertical ? [newApp.assignedVertical] : ['6.2 Startups & Business Enablement'])
     };
@@ -430,16 +442,14 @@ function AppContent() {
     setNotifications(prev => [newNotif, ...prev]);
 
     showToast(
-      'Registration Successfully Logged',
-      `File ${stampedApp.fileNumber} has been logged in registry and queued for screening.`,
-      'info',
+      'Proposal Dossier Submitted Successfully',
+      `File ${stampedApp.fileNumber} has been logged in registry and routed to ${stampedApp.assignedVertical}.`,
+      'success',
       stampedApp.fileNumber
     );
 
-    // If applicant, steer directly to My Applications & Status tracker
-    if (isApplicant) {
-      setActiveTab('tracking');
-    }
+    // Steer directly to VIKAS Verticals page
+    executeTabNavigation('overview');
   };
 
   const handleRouteApplication = (fileNumber, updates) => {
@@ -700,6 +710,7 @@ function AppContent() {
             applications={applications} 
             onNavigateToTab={(tab) => handleTabChange(tab)} 
             onAddApplication={handleAddNewApplication}
+            highlightedTrack={highlightedVerticalTrack || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup'}
           />
         );
       case 'login':

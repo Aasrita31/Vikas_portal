@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException, Query, Depends, Header, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List, Dict, Any, Union
-from datetime import datetime
+from datetime import datetime 
+from app.database.connection import engine, SessionLocal
+from app.database.base import Base
+from app.database.models import UserDB
 import random
 import secrets
 from app.schemas.project import TDPProjectResponse

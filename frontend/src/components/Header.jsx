@@ -16,7 +16,8 @@ import {
   LogIn,
   LogOut,
   UserPlus,
-  LayoutDashboard
+  LayoutDashboard,
+  FileText
 } from 'lucide-react';
 import { useAuth, ROLES } from '../context/AuthContext';
 
@@ -51,19 +52,19 @@ export default function Header({
   const getRoleBasedNavs = () => {
     if (!isAuthenticated) {
       return [
-        { id: 'overview', label: '1. VIKAS Verticals' },
-        { id: 'flow', label: '2. System Flow' },
-        { id: 'login', label: '3. Sign In' },
-        { id: 'entry', label: '4. Register' }
+        { id: 'login', label: '1. Sign In' },
+        { id: 'entry', label: '2. Proposal Submission' },
+        { id: 'overview', label: '3. VIKAS Verticals' },
+        { id: 'flow', label: '4. System Flow' }
       ];
     }
 
     switch (currentRole) {
       case ROLES.APPLICANT:
         return [
-          { id: 'tracking', label: '1. My Dashboard & Status' },
-          { id: 'entry', label: '2. Submit Application' },
-          { id: 'overview', label: '3. VIKAS Verticals' },
+          { id: 'entry', label: '1. Proposal Submission' },
+          { id: 'overview', label: '2. VIKAS Verticals' },
+          { id: 'tracking', label: '3. My Dashboard & Status' },
           { id: 'flow', label: '4. System Flow' }
         ];
 
@@ -225,7 +226,7 @@ export default function Header({
               className="btn-header-signup"
               onClick={() => setActiveTab('entry')}
             >
-              <UserPlus size={14} /> Register
+              <FileText size={14} /> Submit Proposal
             </button>
           </div>
         )}

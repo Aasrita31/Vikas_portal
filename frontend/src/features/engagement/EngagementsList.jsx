@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Cpu, 
   Building2, 
@@ -8,15 +8,26 @@ import {
   Map, 
   Layers, 
   Network, 
-  UserCheck,
-  ShieldCheck,
-  X
+  UserCheck, 
+  ShieldCheck, 
+  X,
+  Sparkles,
+  Rocket,
+  Compass,
+  ArrowRight,
+  CheckCircle2,
+  Filter
 } from 'lucide-react';
 import SchoolDetailPage from './SchoolDetailPage';
 import TechDevDetailPage from './TechDevDetailPage';
 import SpinLabDetailPage from './SpinLabDetailPage';
 
-export default function EngagementsList({ applications = [], onNavigateToTab, onAddApplication }) {
+export default function EngagementsList({ 
+  applications = [], 
+  onNavigateToTab, 
+  onAddApplication,
+  highlightedTrack = 'Startup'
+}) {
   const [selectedVertical, setSelectedVertical] = useState(null);
   const [showSchoolDetail, setShowSchoolDetail] = useState(false);
   const [showTechDevDetail, setShowTechDevDetail] = useState(() => {
@@ -24,7 +35,28 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
   });
   const [showLabNetDetail, setShowLabNetDetail] = useState(false);
 
-  React.useEffect(() => {
+  // Helper to map track string to Vertical ID
+  const mapTrackToVerticalId = (track) => {
+    if (!track) return 'STARTUP';
+    const t = String(track).toUpperCase();
+    if (t.includes('STARTUP')) return 'STARTUP';
+    if (t.includes('STUDENT') || t.includes('RESEARCH') || t.includes('HRD')) return 'HRD';
+    if (t.includes('SCHOOL') || t.includes('OUTREACH') || t.includes('VIDYAGIS')) return 'SCHOOL';
+    if (t.includes('INSTITUT') || t.includes('LAB') || t.includes('SPIN')) return 'LAB_NET';
+    if (t.includes('INDUSTRY') || t.includes('GOVT') || t.includes('GOVERNMENT')) return 'INDUSTRY';
+    if (t.includes('EXPERT') || t.includes('MENTOR') || t.includes('ADVISORY')) return 'EXPERT';
+    if (t.includes('TECH') || t.includes('TDP') || t.includes('PROTOTYPE')) return 'TECH_DEV';
+    if (t.includes('SKILL')) return 'SKILL';
+    if (t.includes('COLLAB')) return 'COLLAB';
+    return 'STARTUP';
+  };
+
+  const initialVerticalId = mapTrackToVerticalId(highlightedTrack);
+  const [activePreference, setActivePreference] = useState(initialVerticalId);
+  const [pulseAnim, setPulseAnim] = useState(true);
+  const gridRef = useRef(null);
+
+  useEffect(() => {
     const handlePop = () => {
       if (window.location.pathname.startsWith('/vikas/technology-development')) {
         setShowTechDevDetail(true);
@@ -34,6 +66,15 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
     return () => window.removeEventListener('popstate', handlePop);
   }, []);
 
+  // Sync preference if highlightedTrack prop changes
+  useEffect(() => {
+    const mapped = mapTrackToVerticalId(highlightedTrack);
+    setActivePreference(mapped);
+    setPulseAnim(true);
+    const timer = setTimeout(() => setPulseAnim(false), 4000);
+    return () => clearTimeout(timer);
+  }, [highlightedTrack]);
+
   // Group 9 Verticals matching the exact titles requested
   const verticalsData = [
     {
@@ -42,12 +83,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.1',
       icon: Cpu,
       color: '#10b981', // emerald green
-      desc: 'Prototype development and lab translation projects.',
+      desc: 'Prototype development, lab translation, and hardware testbed validation projects.',
+      tag: 'TRL 3–7 Acceleration',
       items: [
-        'TDP projects',
-        'Prototype development',
-        'Lab integration (Geo-Intel, PNT, CV, etc.)',
-        'Industry-driven R&D'
+        'TDP projects & Grand Challenges',
+        'Prototype development & bench-testing',
+        'Lab integration (Geo-Intel, PNT, CV, Sensors)',
+        'Industry-driven R&D pipelines'
       ]
     },
     {
@@ -56,12 +98,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.2',
       icon: Building2,
       color: '#d97706', // amber gold
-      desc: 'Onboarding support, project allocation and deployment.',
+      desc: 'Deep-tech startup incubation, prototype grant support, commercial pilot deployment, and investor access.',
+      tag: 'Incubation & Grants',
       items: [
-        'Startup onboarding',
-        'Project allocation',
-        'Revenue generation',
-        'Deployment support'
+        'Startup onboarding & acceleration',
+        'Seed funding & milestone-based capital',
+        'Commercial revenue generation support',
+        'National deployment & market access'
       ]
     },
     {
@@ -70,11 +113,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.3',
       icon: Users,
       color: '#3b82f6', // blue
-      desc: 'Research fellowships, Chanakya scholars and internships.',
+      desc: 'Chanakya Post-Doc fellowships, graduate research stipends, faculty research grants, and specialized internships.',
+      tag: 'Chanakya Fellowships',
       items: [
-        'Fellowships (Post-doc, Faculty)',
-        'Internships',
-        'Chanakya Fellows'
+        'Chanakya Post-Doctoral & Doctoral Fellowships',
+        'Undergraduate & Master Research Internships',
+        'Faculty-guided deep-tech project grants',
+        'National Cyber-Physical talent pipeline'
       ]
     },
     {
@@ -83,11 +128,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.4',
       icon: GraduationCap,
       color: '#8b5cf6', // purple
-      desc: 'Govt training and industry upskilling certifications.',
+      desc: 'Government capacity building, professional certifications, and industry workforce upskilling in CPS & GIS.',
+      tag: 'National Certifications',
       items: [
-        'Govt training programs',
-        'Industry upskilling',
-        'Certification programs'
+        'Government officer training programs',
+        'Industry workforce upskilling cohorts',
+        'PNT, NavIC & Spatial Analytics certifications',
+        'Hands-on sensor testbed workshops'
       ]
     },
     {
@@ -96,11 +143,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.5',
       icon: Link,
       color: '#f59e0b', // orange
-      desc: 'MoUs, strategic alliances and international programs.',
+      desc: 'Institutional MoUs, cross-hub strategic alliances, international consortia, and co-development charters.',
+      tag: 'Strategic MoUs',
       items: [
-        'MoUs & strategic alliances',
-        'International programs',
-        'Academic collaborations'
+        'National Hub-to-Hub collaborations',
+        'International research & innovation alliances',
+        'Academic-Industry co-creation agreements',
+        'Inter-agency geospatial data consortium'
       ]
     },
     {
@@ -109,11 +158,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.6',
       icon: Map,
       color: '#06b6d4', // cyan
-      desc: 'Teacher training and spatial school learning programs.',
+      desc: 'VidyaGIS spatial learning kits, Atal Tinkering Lab mentorship, and secondary school teacher training.',
+      tag: 'VidyaGIS & ATLs',
       items: [
-        'Spatial learning programs',
-        'Teacher training',
-        'High school GIS mapping and academic outreach'
+        'VidyaGIS Spatial intelligence learning kits',
+        'Atal Tinkering Labs (ATL) technical mentoring',
+        'K-12 STEM & GIS teacher training modules',
+        'High school student innovation challenges'
       ]
     },
     {
@@ -122,11 +173,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.7',
       icon: Layers,
       color: '#ec4899', // pink
-      desc: 'Joint Centres of Excellence, SPIN and PNT Labs.',
+      desc: 'Joint Centres of Excellence, Spatial Intelligence (SPIN) Labs, and distributed NavIC testing facilities.',
+      tag: 'SPIN & PNT Labs',
       items: [
-        'SPIN Labs',
-        'PNT Labs',
-        'Centres of Excellence'
+        'Spatial Intelligence (SPIN) Labs setup',
+        'NavIC & GNSS precision testing nodes',
+        'Centres of Excellence (CoE) infrastructure',
+        'Multi-university distributed testbed grid'
       ]
     },
     {
@@ -135,11 +188,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.8',
       icon: Network,
       color: '#f43f5e', // rose
-      desc: 'Problem statements, consultancy and pilot runs.',
+      desc: 'Public sector problem statements, MSME testbed access, technology licensing, and pilot procurement.',
+      tag: 'MSME & Govt Pilots',
       items: [
-        'Problem statements',
-        'Consultancy & PILOT deployments',
-        'Govt projects interface'
+        'Ministry & PSU problem statements interface',
+        'Technology transfer & licensing agreements',
+        'MSME hardware testbed access & procurement',
+        'State government field pilot deployments'
       ]
     },
     {
@@ -148,11 +203,13 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
       code: '6.9',
       icon: UserCheck,
       color: '#64748b', // slate
-      desc: 'Mentoring panel onboarding and peer review panels.',
+      desc: 'Domain specialist registry, technical evaluation panels, strategic mentorship, and peer review committees.',
+      tag: 'Advisory Panel',
       items: [
-        'Expert onboarding & review panels',
-        'Mentoring and advisory network',
-        'Strategic advisor logs'
+        'Domain expert onboarding & registry',
+        'Technical evaluation & review committees',
+        'Founders mentorship & advisory logs',
+        'National technology roadmap contributions'
       ]
     }
   ];
@@ -166,6 +223,7 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
 
   const activeVerticalData = verticalsData.find(v => v.id === selectedVertical);
   const activeFilesForSelected = selectedVertical ? getActiveFilesInVertical(selectedVertical) : [];
+  const preferenceVerticalObj = verticalsData.find(v => v.id === activePreference) || verticalsData[1];
 
   const handleCardClick = (vertId) => {
     if (vertId === 'SCHOOL') {
@@ -220,24 +278,140 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
   }
 
   return (
-    <div className="verticals-directory animate-fade-in">
-      {/* 9 Verticals Responsive Square Grid */}
+    <div className="verticals-directory animate-fade-in" ref={gridRef}>
+      {/* 1. Dynamic User Preference & Spotlight Banner */}
+      {preferenceVerticalObj && (
+        <div 
+          className="verticals-preference-spotlight animate-slide-down"
+          style={{ 
+            borderLeft: `5px solid ${preferenceVerticalObj.color}`,
+            background: `linear-gradient(135deg, #ffffff 0%, #f8fafc 60%, ${preferenceVerticalObj.color}15 100%)`
+          }}
+        >
+          <div className="spotlight-left">
+            <div 
+              className="spotlight-badge"
+              style={{ 
+                backgroundColor: `${preferenceVerticalObj.color}18`, 
+                color: preferenceVerticalObj.color,
+                borderColor: `${preferenceVerticalObj.color}35`
+              }}
+            >
+              <Sparkles size={14} className="sparkle-icon" />
+              <span>ALIGNED TO YOUR TRACK: {highlightedTrack?.toUpperCase() || 'STARTUP'}</span>
+            </div>
+            
+            <h2 className="spotlight-title">
+              <span className="spotlight-code" style={{ color: preferenceVerticalObj.color }}>
+                Vertical {preferenceVerticalObj.code}:
+              </span>{' '}
+              {preferenceVerticalObj.title}
+            </h2>
+            
+            <p className="spotlight-desc">
+              {preferenceVerticalObj.desc}
+            </p>
+          </div>
+
+          <div className="spotlight-actions">
+            <button 
+              type="button" 
+              className="btn-spotlight-dive"
+              style={{ backgroundColor: preferenceVerticalObj.color }}
+              onClick={() => handleCardClick(preferenceVerticalObj.id)}
+            >
+              <span>Explore Programs & Guidelines</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Interactive Track / Preference Filter Bar */}
+      <div className="verticals-filter-bar">
+        <div className="filter-bar-header">
+          <div className="filter-title-group">
+            <Filter size={15} className="text-amber" />
+            <span className="filter-bar-title">Filter & Highlight by Stakeholder Track:</span>
+          </div>
+          {activePreference !== 'ALL' && (
+            <button 
+              type="button" 
+              className="btn-filter-showall"
+              onClick={() => setActivePreference('ALL')}
+            >
+              Show All 9 Verticals
+            </button>
+          )}
+        </div>
+
+        <div className="vertical-filter-pills-row">
+          <button 
+            type="button"
+            className={`vert-filter-pill ${activePreference === 'ALL' ? 'active-all' : ''}`}
+            onClick={() => setActivePreference('ALL')}
+          >
+            All 9 Verticals
+          </button>
+          {verticalsData.map((v) => {
+            const isSelected = activePreference === v.id;
+            return (
+              <button
+                type="button"
+                key={v.id}
+                className={`vert-filter-pill ${isSelected ? 'active' : ''}`}
+                style={isSelected ? { 
+                  borderColor: v.color, 
+                  color: v.color, 
+                  backgroundColor: `${v.color}18`,
+                  fontWeight: 700 
+                } : {}}
+                onClick={() => {
+                  setActivePreference(v.id);
+                  setPulseAnim(true);
+                }}
+              >
+                <span>{v.code} {v.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. 9 Verticals Responsive Square Grid with Animated Highlight */}
       <div className="verticals-square-grid">
         {verticalsData.map((vert) => {
           const IconComponent = vert.icon;
+          const isHighlighted = activePreference === vert.id;
+          const isFaded = activePreference !== 'ALL' && !isHighlighted;
           
           return (
             <button 
               key={vert.id} 
-              className="vertical-square-card" 
+              className={`vertical-square-card ${isHighlighted ? 'highlighted-track-card' : ''} ${isFaded ? 'faded-card' : ''}`} 
+              style={isHighlighted ? {
+                borderColor: vert.color,
+                boxShadow: `0 0 0 2px ${vert.color}, 0 16px 36px ${vert.color}25`
+              } : {}}
               onClick={() => handleCardClick(vert.id)}
             >
+              {/* Highlight Badge */}
+              {isHighlighted && (
+                <div 
+                  className="user-selected-badge animate-fade-in"
+                  style={{ backgroundColor: vert.color }}
+                >
+                  <Sparkles size={11} />
+                  <span>Your Aligned Track</span>
+                </div>
+              )}
+
               {/* Top-Left: Icon block in a square wrapper */}
               <div 
-                className="vert-square-icon-box"
+                className={`vert-square-icon-box ${isHighlighted ? 'icon-box-pulsing' : ''}`}
                 style={{ 
-                  backgroundColor: `${vert.color}08`, 
-                  border: `1px solid ${vert.color}20`,
+                  backgroundColor: `${vert.color}12`, 
+                  border: `1px solid ${vert.color}35`,
                   color: vert.color
                 }}
               >
@@ -253,6 +427,23 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
               <p className="vert-square-desc">
                 {vert.desc}
               </p>
+
+              {/* Card Footer Pill */}
+              <div className="vert-card-footer">
+                <span 
+                  className="vert-tag-pill"
+                  style={{ 
+                    backgroundColor: `${vert.color}10`,
+                    color: vert.color,
+                    border: `1px solid ${vert.color}25`
+                  }}
+                >
+                  {vert.tag}
+                </span>
+                <span className="vert-explore-cta">
+                  Explore <ArrowRight size={13} />
+                </span>
+              </div>
             </button>
           );
         })}
@@ -364,7 +555,169 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
           padding: 16px 20px 48px;
         }
 
-        /* 3x3 Perfectly Symmetrical Grid (3 cards per row, 3 rows total = 9 cards) */
+        /* Preference Spotlight Banner */
+        .verticals-preference-spotlight {
+          padding: 24px 28px;
+          margin-bottom: 24px;
+          border-radius: 16px;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 24px;
+          flex-wrap: wrap;
+        }
+
+        .spotlight-left {
+          flex: 1;
+          min-width: 280px;
+        }
+
+        .spotlight-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 800;
+          padding: 4px 10px;
+          border-radius: var(--radius-full);
+          border: 1px solid transparent;
+          letter-spacing: 0.6px;
+          margin-bottom: 10px;
+        }
+
+        .sparkle-icon {
+          animation: spinPulse 3s linear infinite;
+        }
+
+        @keyframes spinPulse {
+          0% { transform: scale(1) rotate(0deg); }
+          50% { transform: scale(1.15) rotate(180deg); }
+          100% { transform: scale(1) rotate(360deg); }
+        }
+
+        .spotlight-title {
+          font-size: 20px;
+          font-weight: 800;
+          color: var(--text-primary);
+          line-height: 1.3;
+          margin-bottom: 8px;
+        }
+
+        .spotlight-code {
+          font-weight: 900;
+        }
+
+        .spotlight-desc {
+          font-size: 13.5px;
+          color: var(--text-secondary);
+          line-height: 1.5;
+          margin: 0;
+          max-width: 780px;
+        }
+
+        .spotlight-actions {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
+        }
+
+        .btn-spotlight-dive {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #ffffff;
+          font-size: 13.5px;
+          font-weight: 700;
+          padding: 12px 20px;
+          border-radius: 10px;
+          border: none;
+          cursor: pointer;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+          transition: all 0.2s ease;
+        }
+
+        .btn-spotlight-dive:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+        }
+
+        /* Filter Bar */
+        .verticals-filter-bar {
+          background-color: var(--bg-surface);
+          border: 1px solid var(--border-color);
+          border-radius: 14px;
+          padding: 14px 18px;
+          margin-bottom: 24px;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .filter-bar-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+
+        .filter-title-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .filter-bar-title {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+
+        .btn-filter-showall {
+          background: transparent;
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
+          font-size: 11.5px;
+          font-weight: 600;
+          padding: 4px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .btn-filter-showall:hover {
+          background-color: var(--bg-primary);
+          color: var(--text-primary);
+        }
+
+        .vertical-filter-pills-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .vert-filter-pill {
+          background-color: var(--bg-primary);
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
+          font-size: 12px;
+          font-weight: 600;
+          padding: 6px 12px;
+          border-radius: var(--radius-full);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .vert-filter-pill:hover {
+          border-color: var(--text-muted);
+          color: var(--text-primary);
+          transform: translateY(-1px);
+        }
+
+        .vert-filter-pill.active {
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 3x3 Symmetrical Grid */
         .verticals-square-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -385,55 +738,110 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
           }
         }
 
-        /* Square Card Styling with refined padding and uniform internal structure */
+        /* Square Card Styling */
         .vertical-square-card {
           background-color: var(--bg-surface);
           border: 1px solid var(--border-color);
           border-radius: 16px;
-          padding: 28px 26px;
+          padding: 26px 24px;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
           text-align: left;
           width: 100%;
-          min-height: 215px;
+          min-height: 230px;
           cursor: pointer;
-          transition: all var(--transition-normal);
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
           box-shadow: var(--shadow-sm);
           position: relative;
         }
 
         .vertical-square-card:hover {
-          transform: translateY(-4px);
+          transform: translateY(-5px);
           border-color: var(--border-color-active);
           box-shadow: var(--shadow-md);
         }
 
+        /* Highlighted Pop & Glow Card */
+        .highlighted-track-card {
+          transform: translateY(-6px) scale(1.02);
+          animation: cardPopGlow 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          background: linear-gradient(180deg, var(--bg-surface) 0%, #fafcff 100%);
+          z-index: 2;
+        }
+
+        @keyframes cardPopGlow {
+          0% {
+            transform: scale(0.96) translateY(0);
+          }
+          50% {
+            transform: scale(1.035) translateY(-8px);
+          }
+          100% {
+            transform: scale(1.02) translateY(-6px);
+          }
+        }
+
+        .faded-card {
+          opacity: 0.72;
+          transition: opacity 0.25s ease;
+        }
+
+        .faded-card:hover {
+          opacity: 1;
+        }
+
+        /* User Selected Badge */
+        .user-selected-badge {
+          position: absolute;
+          top: 14px;
+          right: 14px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          color: #ffffff;
+          font-size: 10px;
+          font-weight: 800;
+          padding: 3px 8px;
+          border-radius: var(--radius-full);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          letter-spacing: 0.4px;
+        }
+
         /* Square Icon Wrapper */
         .vert-square-icon-box {
-          width: 50px;
-          height: 50px;
+          width: 48px;
+          height: 48px;
           border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 20px;
+          margin-bottom: 16px;
           flex-shrink: 0;
-          transition: transform var(--transition-fast);
+          transition: transform 0.2s ease;
+        }
+
+        .icon-box-pulsing {
+          animation: iconPulse 2s infinite ease-in-out;
+        }
+
+        @keyframes iconPulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
         }
 
         .vertical-square-card:hover .vert-square-icon-box {
-          transform: scale(1.05);
+          transform: scale(1.06);
         }
 
-        /* Title with uniform min-height for clean baseline alignment across cards */
+        /* Title */
         .vert-square-title {
-          font-size: 16.5px;
+          font-size: 16px;
           font-weight: 700;
           color: var(--text-primary);
           line-height: 1.35;
-          margin-bottom: 10px;
-          min-height: 44px;
+          margin-bottom: 8px;
+          min-height: 42px;
           display: flex;
           align-items: flex-start;
         }
@@ -445,13 +853,46 @@ export default function EngagementsList({ applications = [], onNavigateToTab, on
           flex-shrink: 0;
         }
 
-        /* Clean Description styling */
+        /* Description */
         .vert-square-desc {
-          font-size: 13.5px;
+          font-size: 13px;
           color: var(--text-secondary);
           line-height: 1.5;
           font-weight: 400;
-          margin: 0;
+          margin: 0 0 16px 0;
+          flex: 1;
+        }
+
+        /* Card Footer */
+        .vert-card-footer {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 12px;
+          border-top: 1px solid var(--border-color);
+          margin-top: auto;
+        }
+
+        .vert-tag-pill {
+          font-size: 10.5px;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 4px;
+        }
+
+        .vert-explore-cta {
+          font-size: 11.5px;
+          font-weight: 600;
+          color: var(--text-muted);
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          transition: color 0.15s ease;
+        }
+
+        .vertical-square-card:hover .vert-explore-cta {
+          color: var(--color-accent);
         }
 
         /* Modal Details Overlay Styling */

@@ -173,6 +173,43 @@ class ApplicantRepository:
             stakeholder_type=StakeholderType.OTHER,
             role=SystemRole.ADMIN
         )
+        self._sync_from_postgres()
+
+    def _sync_from_postgres(self):
+        try:
+            from app.database.connection import SessionLocal
+            from app.database.models import UserDB
+            db = SessionLocal()
+            try:
+                db_users = db.query(UserDB).all()
+                for u in db_users:
+                    email_clean = u.email.strip().lower()
+                    if email_clean not in self._users_by_email:
+                        uid = f"usr_{u.id}"
+                        try:
+                            role_enum = SystemRole[u.role.upper()]
+                        except Exception:
+                            role_enum = SystemRole.APPLICANT
+
+                        user = ApplicantUser(
+                            id=uid,
+                            name=u.full_name,
+                            email=email_clean,
+                            phone=u.phone,
+                            role=role_enum,
+                            stakeholder_type=StakeholderType.STARTUP,
+                            is_active=True,
+                            is_verified=True,
+                            hashed_password=u.password_hash,
+                            auth_provider="postgresql"
+                        )
+                        self.save(user)
+            except Exception as e:
+                print(f"[PostgreSQL Sync Notice]: {e}")
+            finally:
+                db.close()
+        except Exception:
+            pass
 
     def create_user(
         self,
@@ -188,6 +225,7 @@ class ApplicantRepository:
     ) -> ApplicantUser:
         """
         Creates and stores a user record with salted PBKDF2 password hash.
+        Persists directly to PostgreSQL database table 'users'.
         """
         email_clean = email.strip().lower()
         if email_clean in self._users_by_email:
@@ -208,8 +246,37 @@ class ApplicantRepository:
             is_active=True,
             is_verified=True,
             hashed_password=hashed,
-            auth_provider="local"
+            auth_provider="postgresql"
         )
+
+        # Persist to PostgreSQL public.users table
+        try:
+            from app.database.connection import SessionLocal
+            from app.database.models import UserDB
+
+            db = SessionLocal()
+            try:
+                existing_db_user = db.query(UserDB).filter(UserDB.email == email_clean).first()
+                if not existing_db_user:
+                    db_user = UserDB(
+                        full_name=name.strip(),
+                        email=email_clean,
+                        phone=phone.strip() if phone else "N/A",
+                        password_hash=hashed,
+                        role=role.value if hasattr(role, 'value') else str(role)
+                    )
+                    db.add(db_user)
+                    db.commit()
+                    db.refresh(db_user)
+                    user.id = f"usr_{db_user.id}"
+            except Exception as db_err:
+                print(f"[PostgreSQL Sync Error] Failed to persist user: {db_err}")
+                db.rollback()
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[PostgreSQL Connection Notice]: {e}")
+
         return self.save(user)
 
     def authenticate(self, email: str, password: str) -> Optional[ApplicantUser]:
@@ -218,6 +285,38 @@ class ApplicantRepository:
         """
         email_clean = email.strip().lower()
         user = self.get_by_email(email_clean)
+        
+        # If not in memory, attempt lookup in PostgreSQL
+        if not user:
+            try:
+                from app.database.connection import SessionLocal
+                from app.database.models import UserDB
+                db = SessionLocal()
+                try:
+                    db_user = db.query(UserDB).filter(UserDB.email == email_clean).first()
+                    if db_user:
+                        try:
+                            role_enum = SystemRole[db_user.role.upper()]
+                        except Exception:
+                            role_enum = SystemRole.APPLICANT
+                        user = ApplicantUser(
+                            id=f"usr_{db_user.id}",
+                            name=db_user.full_name,
+                            email=email_clean,
+                            phone=db_user.phone,
+                            role=role_enum,
+                            stakeholder_type=StakeholderType.STARTUP,
+                            is_active=True,
+                            is_verified=True,
+                            hashed_password=db_user.password_hash,
+                            auth_provider="postgresql"
+                        )
+                        self.save(user)
+                finally:
+                    db.close()
+            except Exception:
+                pass
+
         if not user:
             return None
 
