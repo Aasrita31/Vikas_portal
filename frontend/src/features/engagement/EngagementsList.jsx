@@ -15,8 +15,8 @@ import {
   Rocket,
   Compass,
   ArrowRight,
-  CheckCircle2,
-  Filter
+  ArrowLeft,
+  CheckCircle2
 } from 'lucide-react';
 import SchoolDetailPage from './SchoolDetailPage';
 import TechDevDetailPage from './TechDevDetailPage';
@@ -327,88 +327,20 @@ export default function EngagementsList({
         </div>
       )}
 
-      {/* 2. Interactive Track / Preference Filter Bar */}
-      <div className="verticals-filter-bar">
-        <div className="filter-bar-header">
-          <div className="filter-title-group">
-            <Filter size={15} className="text-amber" />
-            <span className="filter-bar-title">Filter & Highlight by Stakeholder Track:</span>
-          </div>
-          {activePreference !== 'ALL' && (
-            <button 
-              type="button" 
-              className="btn-filter-showall"
-              onClick={() => setActivePreference('ALL')}
-            >
-              Show All 9 Verticals
-            </button>
-          )}
-        </div>
-
-        <div className="vertical-filter-pills-row">
-          <button 
-            type="button"
-            className={`vert-filter-pill ${activePreference === 'ALL' ? 'active-all' : ''}`}
-            onClick={() => setActivePreference('ALL')}
-          >
-            All 9 Verticals
-          </button>
-          {verticalsData.map((v) => {
-            const isSelected = activePreference === v.id;
-            return (
-              <button
-                type="button"
-                key={v.id}
-                className={`vert-filter-pill ${isSelected ? 'active' : ''}`}
-                style={isSelected ? { 
-                  borderColor: v.color, 
-                  color: v.color, 
-                  backgroundColor: `${v.color}18`,
-                  fontWeight: 700 
-                } : {}}
-                onClick={() => {
-                  setActivePreference(v.id);
-                  setPulseAnim(true);
-                }}
-              >
-                <span>{v.code} {v.title}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 3. 9 Verticals Responsive Square Grid with Animated Highlight */}
+      {/* 9 Verticals Responsive Square Grid */}
       <div className="verticals-square-grid">
         {verticalsData.map((vert) => {
           const IconComponent = vert.icon;
-          const isHighlighted = activePreference === vert.id;
-          const isFaded = activePreference !== 'ALL' && !isHighlighted;
           
           return (
             <button 
               key={vert.id} 
-              className={`vertical-square-card ${isHighlighted ? 'highlighted-track-card' : ''} ${isFaded ? 'faded-card' : ''}`} 
-              style={isHighlighted ? {
-                borderColor: vert.color,
-                boxShadow: `0 0 0 2px ${vert.color}, 0 16px 36px ${vert.color}25`
-              } : {}}
+              className="vertical-square-card" 
               onClick={() => handleCardClick(vert.id)}
             >
-              {/* Highlight Badge */}
-              {isHighlighted && (
-                <div 
-                  className="user-selected-badge animate-fade-in"
-                  style={{ backgroundColor: vert.color }}
-                >
-                  <Sparkles size={11} />
-                  <span>Your Aligned Track</span>
-                </div>
-              )}
-
               {/* Top-Left: Icon block in a square wrapper */}
               <div 
-                className={`vert-square-icon-box ${isHighlighted ? 'icon-box-pulsing' : ''}`}
+                className="vert-square-icon-box"
                 style={{ 
                   backgroundColor: `${vert.color}12`, 
                   border: `1px solid ${vert.color}35`,

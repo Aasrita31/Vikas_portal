@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
   /* Color System - Bright Theme */
@@ -92,6 +92,11 @@ body {
   height: 100vh;
   overflow: hidden;
   background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
+}
+
+.main-content-dark {
+  background-color: #070c18 !important;
 }
 
 .content-body {
@@ -100,6 +105,13 @@ body {
   overflow-y: auto;
   position: relative;
 }
+
+.content-body-hero {
+  padding: 0 !important;
+  background-color: #070c18 !important;
+  overflow-x: hidden;
+}
+
 
 /* Animations */
 @keyframes fadeIn {
@@ -319,6 +331,9 @@ body {
   }
   .app-container {
     flex-direction: column;
+  }
+  .content-body {
+    padding: 16px;
   }
 }
 

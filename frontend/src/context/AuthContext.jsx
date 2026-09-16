@@ -133,8 +133,8 @@ export function AuthProvider({ children }) {
           organization: data.user.organization,
           location: data.user.location,
           role: data.user.role.toLowerCase(),
-          stakeholderType: data.user.stakeholder_type || data.user.stakeholderType || 'STARTUP',
-          applicantType: data.user.applicant_type || data.user.applicantType || 'Startup',
+          stakeholderType: data.user.stakeholder_type || data.user.stakeholderType || null,
+          applicantType: data.user.applicant_type || data.user.applicantType || null,
           assignedVertical: data.application?.assignedVertical || data.application?.assigned_vertical || null
         }
       };
@@ -165,24 +165,21 @@ export function AuthProvider({ children }) {
         throw new Error(data.detail || 'Registration failed. Please check your inputs.');
       }
 
-      const newSession = {
-        token: data.token,
-        user: {
-          id: data.user.id,
-          name: data.user.name,
-          email: data.user.email,
-          phone: data.user.phone,
-          organization: data.user.organization,
-          location: data.user.location,
-          role: data.user.role.toLowerCase(),
-          stakeholderType: data.user.stakeholder_type || data.user.stakeholderType || 'STARTUP',
-          applicantType: data.user.applicant_type || data.user.applicantType || 'Startup',
-          assignedVertical: data.application?.assignedVertical || data.application?.assigned_vertical || null
-        }
+      const mappedUser = {
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        phone: data.user.phone,
+        organization: data.user.organization,
+        location: data.user.location,
+        role: data.user.role.toLowerCase(),
+        stakeholderType: data.user.stakeholder_type || data.user.stakeholderType || null,
+        applicantType: data.user.applicant_type || data.user.applicantType || null,
+        assignedVertical: data.application?.assignedVertical || data.application?.assigned_vertical || null
       };
 
-      setSession(newSession);
-      return { success: true, user: newSession.user, application: data.application, applications: data.applications };
+      // Do not open a portal session on register — the user must sign in next.
+      return { success: true, user: mappedUser, application: data.application, applications: data.applications };
     } catch (err) {
       setAuthError(err.message);
       throw err;
@@ -198,12 +195,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Strict Role & Authority Matrix Permission Checkers
-  const isApplicant = currentRole === ROLES.APPLICANT;
-  const isOperations = currentRole === ROLES.OPERATIONS;
-  const isPillarLead = currentRole === ROLES.PILLAR_LEAD;
-  const isProjectDirector = currentRole === ROLES.PROJECT_DIRECTOR;
-  const isExecution = currentRole === ROLES.EXECUTION;
-  const isAdmin = currentRole === ROLES.ADMIN;
+  const isApplicant = isAuthenticated && currentRole === ROLES.APPLICANT;
+  const isOperations = isAuthenticated && currentRole === ROLES.OPERATIONS;
+  const isPillarLead = isAuthenticated && currentRole === ROLES.PILLAR_LEAD;
+  const isProjectDirector = isAuthenticated && currentRole === ROLES.PROJECT_DIRECTOR;
+  const isExecution = isAuthenticated && currentRole === ROLES.EXECUTION;
+  const isAdmin = isAuthenticated && currentRole === ROLES.ADMIN;
+
 
   // Screening & Routing actions are strictly restricted to Operations (and Admin)
   const canScreen = [ROLES.OPERATIONS, ROLES.ADMIN].includes(currentRole);

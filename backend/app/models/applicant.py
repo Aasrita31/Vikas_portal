@@ -174,6 +174,36 @@ class ApplicantRepository:
             role=SystemRole.ADMIN
         )
         self._sync_from_postgres()
+        self._ensure_default_admin_row()
+
+    def _ensure_default_admin_row(self):
+        try:
+            from app.database.connection import SessionLocal
+            from app.database.models import AdminDB
+            admin = self.get_by_email("admin@iittnif.in")
+            if not admin:
+                return
+            db = SessionLocal()
+            try:
+                existing = db.query(AdminDB).filter(AdminDB.email == "admin@iittnif.in").first()
+                if not existing:
+                    db.add(AdminDB(
+                        full_name=admin.name,
+                        email=admin.email,
+                        phone=admin.phone,
+                        department=admin.organization or "IITTNiF Central Administration",
+                        password_hash=admin.hashed_password,
+                        role="ADMIN",
+                        is_active=True
+                    ))
+                    db.commit()
+            except Exception as e:
+                print(f"[PostgreSQL] Could not seed admins row: {e}")
+                db.rollback()
+            finally:
+                db.close()
+        except Exception:
+            pass
 
     def _sync_from_postgres(self):
         try:
@@ -229,17 +259,30 @@ class ApplicantRepository:
         """
         email_clean = email.strip().lower()
         if email_clean in self._users_by_email:
-            raise ValueError(f"An account with email '{email}' already exists.")
+            existing_user = self._users_by_email[email_clean]
+            if name and not existing_user.name:
+                existing_user.name = name.strip()
+            if phone and not existing_user.phone:
+                existing_user.phone = phone.strip()
+            if organization and not existing_user.organization:
+                existing_user.organization = organization.strip()
+            if location and not existing_user.location:
+                existing_user.location = location.strip()
+            return self.save(existing_user)
 
         uid = user_id or f"usr_{secrets.token_hex(8)}"
         hashed = hash_password(password)
+        role_val = role.value if hasattr(role, "value") else str(role)
+        is_admin_role = str(role_val).upper() == "ADMIN"
+        phone_val = phone.strip() if phone else None
+        org_val = organization.strip() if organization else None
 
         user = ApplicantUser(
             id=uid,
             name=name.strip(),
             email=email_clean,
-            phone=phone.strip() if phone else None,
-            organization=organization.strip() if organization else None,
+            phone=phone_val,
+            organization=org_val,
             location=location.strip() if location else None,
             stakeholder_type=stakeholder_type,
             role=role,
@@ -249,10 +292,10 @@ class ApplicantRepository:
             auth_provider="postgresql"
         )
 
-        # Persist to PostgreSQL public.users table
+        # Persist to PostgreSQL public.users (and public.admins when role is ADMIN)
         try:
             from app.database.connection import SessionLocal
-            from app.database.models import UserDB
+            from app.database.models import UserDB, AdminDB
 
             db = SessionLocal()
             try:
@@ -261,14 +304,29 @@ class ApplicantRepository:
                     db_user = UserDB(
                         full_name=name.strip(),
                         email=email_clean,
-                        phone=phone.strip() if phone else "N/A",
+                        phone=phone_val,
+                        organization=org_val,
                         password_hash=hashed,
-                        role=role.value if hasattr(role, 'value') else str(role)
+                        role=role_val
                     )
                     db.add(db_user)
-                    db.commit()
-                    db.refresh(db_user)
+                    db.flush()
                     user.id = f"usr_{db_user.id}"
+
+                if is_admin_role:
+                    existing_admin = db.query(AdminDB).filter(AdminDB.email == email_clean).first()
+                    if not existing_admin:
+                        db.add(AdminDB(
+                            full_name=name.strip(),
+                            email=email_clean,
+                            phone=phone_val,
+                            department=org_val or "IITTNiF Central Administration",
+                            password_hash=hashed,
+                            role="ADMIN",
+                            is_active=True
+                        ))
+
+                db.commit()
             except Exception as db_err:
                 print(f"[PostgreSQL Sync Error] Failed to persist user: {db_err}")
                 db.rollback()

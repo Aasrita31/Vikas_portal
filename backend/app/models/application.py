@@ -19,37 +19,45 @@ def map_stakeholder_to_verticals(
     assigned: List[str] = []
     primary: str = "6.2 Startups & Business Enablement"
 
-    if "STARTUP" in st:
+    if "6.1" in st or "TECH_DEV" in st or "TECHNOLOGY_DEVELOPMENT" in st or "TDP" in st:
+        primary = "6.1 Technology Development"
+        assigned.append("6.1 Technology Development")
+
+    elif "6.2" in st or "STARTUP" in st:
         primary = "6.2 Startups & Business Enablement"
         assigned.append("6.2 Startups & Business Enablement")
         if any(k in dom_str for k in ["pnt", "navic", "gnss", "cps", "drone", "robotics"]) or "prototype" in intent_str:
             assigned.append("6.1 Technology Development")
 
-    elif "STUDENT" in st or "RESEARCHER" in st:
+    elif "6.3" in st or "HUMAN_RESOURCE" in st or "STUDENT" in st or "RESEARCHER" in st or "HRD" in st:
         primary = "6.3 Human Resource Development"
         assigned.append("6.3 Human Resource Development")
         if any(k in dom_str for k in ["pnt", "navic", "sensor", "ai", "hardware"]) or "tdp" in intent_str or "grant" in intent_str:
             assigned.append("6.1 Technology Development")
 
-    elif "SCHOOL" in st:
+    elif "6.4" in st or "SKILL" in st:
+        primary = "6.4 Skill Development"
+        assigned.append("6.4 Skill Development")
+
+    elif "6.5" in st or "COLLABORATION" in st or "MOU" in st or "PARTNERSHIP" in st:
+        primary = "6.5 Academic Collaborations & MoUs"
+        assigned.append("6.5 Academic Collaborations & MoUs")
+
+    elif "6.6" in st or "SCHOOL" in st or "VIDYAGIS" in st:
         primary = "6.6 Schools & Academic Outreach (VidyaGIS)"
         assigned.append("6.6 Schools & Academic Outreach (VidyaGIS)")
 
-    elif "INSTITUTION" in st:
+    elif "6.7" in st or "INSTITUTION" in st or "SPIN" in st or "LAB" in st:
         primary = "6.7 Institutions & Labs Network (SPIN Lab)"
         assigned.append("6.7 Institutions & Labs Network (SPIN Lab)")
 
-    elif "INDUSTRY" in st:
+    elif "6.8" in st or "INDUSTRY" in st or "GOVERNMENT" in st:
         primary = "6.8 Industry & Government Interface"
         assigned.append("6.8 Industry & Government Interface")
         if "r&d" in intent_str or "tech transfer" in intent_str or "prototype" in intent_str:
             assigned.append("6.1 Technology Development")
 
-    elif "GOVERNMENT" in st:
-        primary = "6.8 Industry & Government Interface"
-        assigned.append("6.8 Industry & Government Interface")
-
-    elif "EXPERT" in st:
+    elif "6.9" in st or "EXPERT" in st or "ADVISORY" in st:
         primary = "6.9 Experts & Advisory Network"
         assigned.append("6.9 Experts & Advisory Network")
 

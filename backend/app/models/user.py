@@ -229,7 +229,16 @@ class ApplicantRepository:
         """
         email_clean = email.strip().lower()
         if email_clean in self._users_by_email:
-            raise ValueError(f"An account with email '{email}' already exists.")
+            existing_user = self._users_by_email[email_clean]
+            if name and not existing_user.name:
+                existing_user.name = name.strip()
+            if phone and not existing_user.phone:
+                existing_user.phone = phone.strip()
+            if organization and not existing_user.organization:
+                existing_user.organization = organization.strip()
+            if location and not existing_user.location:
+                existing_user.location = location.strip()
+            return self.save(existing_user)
 
         uid = user_id or f"usr_{secrets.token_hex(8)}"
         hashed = hash_password(password)

@@ -6,15 +6,18 @@ import Dashboard from './features/monitoring/Dashboard';
 import OnboardingForm from './features/entry/OnboardingForm';
 import ApplicantMyApplications from './features/entry/ApplicantMyApplications';
 import LoginPage from './features/auth/LoginPage';
+import AdminLoginPage from './features/auth/AdminLoginPage';
+import AdminDashboard from './features/monitoring/AdminDashboard';
 import ScreeningQueue from './features/screening/ScreeningQueue';
 import ApprovalPanel from './features/approval/ApprovalPanel';
+
 import EngagementsList from './features/engagement/EngagementsList';
 import AuditLogs from './features/audit/AuditLogs';
 import VikasFlow from './features/flow/VikasFlow';
+import LandingPage from './features/landing/LandingPage';
 import { 
   NOTIFICATION_EVENTS, 
-  createNotification, 
-  SEED_NOTIFICATIONS 
+  createNotification
 } from './services/notificationService';
 
 const INITIAL_SEED_APPLICATIONS = [
@@ -236,13 +239,11 @@ const INITIAL_SEED_APPLICATIONS = [
 
 function AppContent() {
   const { currentRole, currentUser, isAuthenticated, isApplicant, canScreen, canRoute, canApprove, canApproveApplication } = useAuth();
-  const [activeTab, setActiveTab] = useState(() => {
-    if (isApplicant) return 'entry';
-    return 'login';
-  });
+  const [activeTab, setActiveTab] = useState('landing');
   const [featureSubTab, setFeatureSubTab] = useState('onboard');
   const [overviewKey, setOverviewKey] = useState(0);
   const [highlightedVerticalTrack, setHighlightedVerticalTrack] = useState(null);
+
 
   // Role Guard: If activeTab becomes forbidden when persona changes, redirect safely to applicant dashboard
   useEffect(() => {
@@ -272,23 +273,23 @@ function AppContent() {
     }
   };
 
-  // System & Applicant Notifications State (seeded with standard workflow events)
+  // Approval notifications only (persisted). Seed demo alerts are not loaded.
   const [notifications, setNotifications] = useState(() => {
+    const isApproval = (n) =>
+      n?.event === NOTIFICATION_EVENTS.APPLICATION_APPROVED ||
+      n?.type === 'approval_success' ||
+      /approved/i.test(n?.event || '') ||
+      /approved/i.test(n?.title || '');
     try {
       const saved = localStorage.getItem('VIKAS_NOTIFICATIONS');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map(n => n.id));
-          const missingSeeds = SEED_NOTIFICATIONS.filter(s => !existingIds.has(s.id));
-          if (missingSeeds.length > 0) {
-            return [...parsed, ...missingSeeds];
-          }
-          return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(isApproval);
         }
       }
     } catch (e) {}
-    return SEED_NOTIFICATIONS;
+    return [];
   });
 
   // Toggle single notification read state
@@ -431,16 +432,6 @@ function AppContent() {
 
     setApplications(prev => [stampedApp, ...prev]);
 
-    // Dispatch formal Application Submitted notification
-    const newNotif = createNotification({
-      event: NOTIFICATION_EVENTS.APPLICATION_SUBMITTED,
-      fileNumber: stampedApp.fileNumber,
-      recipientEmail: stampedApp.email,
-      recipientName: stampedApp.contactPerson,
-      type: 'info'
-    });
-    setNotifications(prev => [newNotif, ...prev]);
-
     showToast(
       'Proposal Dossier Submitted Successfully',
       `File ${stampedApp.fileNumber} has been logged in registry and routed to ${stampedApp.assignedVertical}.`,
@@ -485,15 +476,6 @@ function AppContent() {
 
     // Handle "Return for Correction" workflow state
     if (updates.status === 'returned_for_correction') {
-      const correctionNotif = createNotification({
-        event: NOTIFICATION_EVENTS.CORRECTION_REQUESTED,
-        fileNumber,
-        recipientEmail: routedApp?.email || currentUser?.email,
-        recipientName: routedApp?.contactPerson,
-        type: 'warning'
-      });
-      setNotifications(prev => [correctionNotif, ...prev]);
-
       showToast(
         'Correction Requested',
         `File ${fileNumber} returned for stakeholder revision.`,
@@ -525,36 +507,6 @@ function AppContent() {
       );
       setActiveTab('overview');
     } else {
-      // Dispatch 3 workflow events for the applicant:
-      // 1. Screening Completed
-      const screenedNotif = createNotification({
-        event: NOTIFICATION_EVENTS.SCREENING_COMPLETED,
-        fileNumber,
-        recipientEmail: routedApp?.email || currentUser?.email,
-        recipientName: routedApp?.contactPerson,
-        type: 'info'
-      });
-      // 2. Application Routed to Vertical
-      const routedNotif = createNotification({
-        event: NOTIFICATION_EVENTS.APPLICATION_ROUTED,
-        fileNumber,
-        recipientEmail: routedApp?.email || currentUser?.email,
-        recipientName: routedApp?.contactPerson,
-        extra: { vertical: updates.assignedVertical },
-        type: 'info'
-      });
-      // 3. Approval Pending under Authority Matrix
-      const pendingNotif = createNotification({
-        event: NOTIFICATION_EVENTS.APPROVAL_PENDING,
-        fileNumber,
-        recipientEmail: routedApp?.email || currentUser?.email,
-        recipientName: routedApp?.contactPerson,
-        extra: { authority: updates.approvalAuthority },
-        type: 'warning'
-      });
-
-      setNotifications(prev => [pendingNotif, routedNotif, screenedNotif, ...prev]);
-
       showToast(
         'File Screened & Routed',
         `File ${fileNumber} forwarded for ${updates.approvalAuthority === 'pd' ? 'PD' : 'Pillar Lead'} authorization.`,
@@ -607,17 +559,7 @@ function AppContent() {
       type: 'success'
     });
 
-    // 2. Dispatch Engagement Assigned notification
-    const engagementNotif = createNotification({
-      event: NOTIFICATION_EVENTS.ENGAGEMENT_ASSIGNED,
-      fileNumber,
-      recipientEmail: approvedApp?.email || currentUser?.email,
-      recipientName: approvedApp?.contactPerson,
-      extra: { vertical: approvedApp?.assignedVertical },
-      type: 'info'
-    });
-
-    setNotifications(prev => [engagementNotif, approvedNotif, ...prev]);
+    setNotifications(prev => [approvedNotif, ...prev]);
 
     showToast(
       'Authorization & E-Sign Complete!',
@@ -663,15 +605,6 @@ function AppContent() {
     }));
 
     if (isFormalRejection) {
-      const rejectNotif = createNotification({
-        event: NOTIFICATION_EVENTS.APPLICATION_REJECTED,
-        fileNumber,
-        recipientEmail: updatedTargetApp?.email || currentUser?.email,
-        recipientName: updatedTargetApp?.contactPerson,
-        type: 'error'
-      });
-      setNotifications(prev => [rejectNotif, ...prev]);
-
       showToast(
         'Application Decision Issued',
         `File ${fileNumber} status marked as Application Declined.`,
@@ -703,6 +636,16 @@ function AppContent() {
 
   const renderActiveMainTab = () => {
     switch (activeTab) {
+      case 'landing':
+        return (
+          <LandingPage 
+            onNavigateToRegister={() => handleTabChange('entry')}
+            onNavigateToLogin={() => handleTabChange('login')}
+            onNavigateToEntry={() => handleTabChange('entry')}
+            onNavigateToOverview={() => handleTabChange('overview')}
+            onNavigateToAdmin={() => handleTabChange('admin-login')}
+          />
+        );
       case 'overview':
         return (
           <EngagementsList 
@@ -718,6 +661,31 @@ function AppContent() {
           <LoginPage 
             onNavigateToRegister={() => handleTabChange('entry')}
             onLoginSuccess={(user, userApps) => handleUserLoggedIn(user, userApps)}
+            onNavigateToAdmin={() => handleTabChange('admin-login')}
+            onNavigateToLanding={() => handleTabChange('landing')}
+          />
+        );
+      case 'admin-login':
+        return (
+          <AdminLoginPage 
+            onNavigateToApplicantLogin={() => handleTabChange('login')}
+            onNavigateToAdminDashboard={() => handleTabChange('admin')}
+            onNavigateToLanding={() => handleTabChange('landing')}
+            onAdminLoginSuccess={(user, userApps) => {
+              handleUserLoggedIn(user, userApps);
+              executeTabNavigation('admin');
+            }}
+          />
+        );
+      case 'admin':
+        return (
+          <AdminDashboard 
+            applications={applications}
+            onRouteApplication={handleRouteApplication}
+            onApproveApplication={handleApproveApplication}
+            onRejectApplication={handleRejectApplication}
+            onNavigateToTab={(tab) => handleTabChange(tab)}
+            onNavigateToAdminRegister={() => handleTabChange('admin-login')}
           />
         );
       case 'entry':
@@ -725,8 +693,10 @@ function AppContent() {
           <OnboardingForm 
             onSubmitApplication={handleAddNewApplication} 
             onNavigateToLogin={() => handleTabChange('login')}
+            onNavigateToLanding={() => handleTabChange('landing')}
           />
         );
+
       case 'screening':
         if (isApplicant) {
           return (
@@ -799,19 +769,23 @@ function AppContent() {
     }
   };
 
+  const isHeroDark = activeTab === 'landing' || activeTab === 'login' || activeTab === 'admin-login';
+
   return (
     <div className="app-container">
-      <main className="main-content">
-        <Header 
-          activeTab={activeTab} 
-          setActiveTab={handleTabChange}
-          pendingTotalCount={pendingTotalCount}
-          pendingScreeningCount={pendingScreeningCount}
-          pendingApprovalCount={pendingApprovalCount}
-          notifications={notifications}
-          onClearNotifications={handleClearNotifications}
-          onNotificationClick={handleNotificationClick}
-        />
+      <main className={`main-content ${isHeroDark ? 'main-content-dark' : ''}`}>
+        {activeTab !== 'landing' && (
+          <Header 
+            activeTab={activeTab} 
+            setActiveTab={handleTabChange}
+            pendingTotalCount={pendingTotalCount}
+            pendingScreeningCount={pendingScreeningCount}
+            pendingApprovalCount={pendingApprovalCount}
+            notifications={notifications}
+            onClearNotifications={handleClearNotifications}
+            onNotificationClick={handleNotificationClick}
+          />
+        )}
 
         {/* Floating Toast Notification Banner */}
         {toast && (
@@ -846,9 +820,10 @@ function AppContent() {
           </div>
         )}
 
-        <div className="content-body">
+        <div className={`content-body ${isHeroDark ? 'content-body-hero' : ''}`}>
           {renderActiveMainTab()}
         </div>
+
 
         <style>{`
           .floating-toast-alert {

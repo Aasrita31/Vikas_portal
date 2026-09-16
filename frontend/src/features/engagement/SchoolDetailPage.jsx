@@ -68,9 +68,6 @@ export default function SchoolDetailPage({ onBack }) {
           <ArrowLeft size={16} />
           <span>Back to VIKAS</span>
         </button>
-        <span className="top-nav-breadcrumb">
-          VIKAS Platform / Platform Verticals / <strong>6.6 Schools & Academic Outreach</strong>
-        </span>
       </div>
 
       {/* 2. Hero Section Card */}

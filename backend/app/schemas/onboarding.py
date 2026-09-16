@@ -143,6 +143,7 @@ class UserRegisterRequest(BaseModel):
     phone: Optional[str] = None
     location: Optional[str] = None
     password: str
+    role: Optional[str] = "APPLICANT"
     stakeholder_type: Optional[str] = "STARTUP"
     stakeholderType: Optional[str] = None
     domains: List[str] = []
@@ -152,6 +153,7 @@ class UserRegisterRequest(BaseModel):
     problemStatement: Optional[str] = None
     dynamic_inputs: Optional[Dict[str, Any]] = None
     dynamicInputs: Optional[Dict[str, Any]] = None
+
 
     @model_validator(mode="before")
     @classmethod

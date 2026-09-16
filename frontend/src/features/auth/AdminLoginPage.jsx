@@ -3,127 +3,135 @@ import {
   Lock, 
   Mail, 
   ArrowRight, 
+  ShieldCheck, 
   AlertCircle, 
   Eye, 
   EyeOff, 
   Building, 
   User, 
+  Sparkles, 
+  Shield, 
+  Key, 
   CheckCircle2, 
   ChevronRight, 
-  Layers
+  Layers,
+  Cpu,
+  Award,
+  ArrowLeft,
+  LayoutDashboard
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { Shield } from 'lucide-react';
+import { useAuth, ROLES } from '../../context/AuthContext';
 
-export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavigateToAdmin, onNavigateToLanding }) {
+export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateToAdminDashboard, onAdminLoginSuccess, onNavigateToLanding }) {
   const { login, register, loading } = useAuth();
-
   const [activeTab, setActiveTab] = useState('signin'); // 'signin' | 'register'
   
-  // Sign In State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Admin Sign In State
+  const [email, setEmail] = useState('admin@iittnif.in');
+  const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Quick Register State
-  const [regName, setRegName] = useState('');
-  const [regOrg, setRegOrg] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+  // Admin Register State
+  const [adminName, setAdminName] = useState('');
+  const [adminDept, setAdminDept] = useState('IITTNiF Central Administration');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPhone, setAdminPhone] = useState('');
+  const [adminPasscode, setAdminPasscode] = useState('VIKAS-ADMIN-2026');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
 
   // Validate email format
   const isValidEmail = (val) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
   };
 
-  const handleSignInSubmit = async (e) => {
+  const handleAdminSignInSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
     if (!email.trim()) {
-      setErrorMessage('Please enter your registered email address.');
+      setErrorMessage('Please enter your official administrator email.');
       return;
     }
     if (!isValidEmail(email)) {
-      setErrorMessage('Please enter a valid email address (e.g. name@domain.com).');
+      setErrorMessage('Please enter a valid official email address.');
       return;
     }
     if (!password.trim()) {
-      setErrorMessage('Please enter your password.');
+      setErrorMessage('Please enter your administrator password.');
       return;
     }
 
     try {
       const res = await login(email.trim(), password);
-      if (onLoginSuccess) {
-        onLoginSuccess(res.user, res.applications);
-      }
+      setSuccessMessage('Administrator authenticated successfully! Loading Admin Dashboard...');
+      setTimeout(() => {
+        if (onAdminLoginSuccess) {
+          onAdminLoginSuccess(res.user, res.applications);
+        } else if (onNavigateToAdminDashboard) {
+          onNavigateToAdminDashboard();
+        }
+      }, 500);
     } catch (err) {
-      setErrorMessage(err.message || 'Login failed. Please verify your credentials.');
+      setErrorMessage(err.message || 'Administrator authentication failed. Please verify credentials.');
     }
   };
 
-  const handleRegisterSubmit = async (e) => {
+  const handleAdminRegisterSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!regName.trim()) {
-      setErrorMessage('Please enter your full name.');
+    if (!adminName.trim()) {
+      setErrorMessage('Please enter the administrator full name.');
       return;
     }
-    if (!regOrg.trim()) {
-      setErrorMessage('Please enter your company, institution or startup name.');
+    if (!adminEmail.trim() || !isValidEmail(adminEmail)) {
+      setErrorMessage('Please enter a valid official administrator email.');
       return;
     }
-    if (!regEmail.trim() || !isValidEmail(regEmail)) {
-      setErrorMessage('Please enter a valid email address.');
+    if (adminPasscode.trim() !== 'VIKAS-ADMIN-2026' && adminPasscode.trim() !== 'admin123') {
+      setErrorMessage('Invalid Admin Security Passcode. Default security key is VIKAS-ADMIN-2026.');
       return;
     }
-    if (!regPassword.trim() || regPassword.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
-      return;
-    }
-    if (!regConfirmPassword.trim()) {
-      setErrorMessage('Please verify your password.');
-      return;
-    }
-    if (regPassword !== regConfirmPassword) {
-      setErrorMessage('Passwords do not match. Please re-enter.');
+    if (!adminPassword.trim() || adminPassword.length < 6) {
+      setErrorMessage('Admin password must be at least 6 characters.');
       return;
     }
 
     try {
       await register({
-        name: regName.trim(),
-        organization: regOrg.trim(),
-        email: regEmail.trim().toLowerCase(),
-        phone: regPhone.trim() || undefined,
-        password: regPassword,
-        stakeholder_type: 'STARTUP',
-        domains: ['PNT / NavIC / GNSS', 'IoT / Sensor Fusion'],
-        intent_of_engagement: 'VIKAS Portal Incubation & Technology Development'
+        name: adminName.trim(),
+        organization: adminDept.trim() || 'IITTNiF Central Administration',
+        email: adminEmail.trim().toLowerCase(),
+        phone: adminPhone.trim() || '+91 98765 00006',
+        password: adminPassword,
+        role: 'ADMIN',
+        stakeholder_type: 'OTHER',
+        domains: ['Spatial Intelligence', 'Cyber-Physical Systems', 'Executive Governance'],
+        intent_of_engagement: 'Central Administration & Governance'
       });
 
-      setEmail(regEmail.trim().toLowerCase());
+      setEmail(adminEmail.trim().toLowerCase());
       setPassword('');
-      setRegName('');
-      setRegOrg('');
-      setRegEmail('');
-      setRegPassword('');
-      setRegConfirmPassword('');
+      setAdminName('');
+      setAdminEmail('');
+      setAdminPhone('');
+      setAdminPassword('');
       setActiveTab('signin');
-      setSuccessMessage('Account registered successfully. Please sign in to continue.');
+      setSuccessMessage('Admin account registered successfully. Please sign in to continue.');
     } catch (err) {
-      setErrorMessage(err.message || 'Registration failed. Please try again.');
+      setErrorMessage(err.message || 'Admin registration failed. Please check inputs.');
     }
+  };
+
+  const handleQuickFill = (adminUserEmail, adminUserPassword) => {
+    setEmail(adminUserEmail);
+    setPassword(adminUserPassword);
+    setErrorMessage('');
   };
 
   return (
@@ -141,52 +149,90 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         <div className="hero-left-column">
 
 
+          <div className="hero-institution-badge animate-fade-in">
+            <span className="badge-pulse" style={{ backgroundColor: '#ef4444', boxShadow: '0 0 10px #ef4444' }} />
+            <span className="badge-text">
+              DST NM-ICPS • EXECUTIVE GOVERNANCE & CENTRAL ADMINISTRATION
+            </span>
+          </div>
+
           <h1 className="hero-headline animate-slide-up">
-            Onboard to the <br />
-            <span className="hero-headline-highlight">VIKAS Ecosystem</span> & <br />
-            <span className="hero-headline-sub">Submit Your Proposals</span>
+            Central Governance & <br />
+            <span className="hero-headline-highlight">Executive Administration</span> & <br />
+            <span className="hero-headline-sub">Authority Matrix Control</span>
           </h1>
 
           {/* Angled Accent High-Tech Banner */}
           <div className="hero-accent-banner animate-slide-up delay-1">
-            <div className="accent-banner-shape">
-              <span className="accent-banner-title">VIKAS PORTAL</span>
+            <div className="accent-banner-shape" style={{ background: 'linear-gradient(115deg, #d97706 0%, #b45309 35%, #991b1b 70%, #7f1d1d 100%)' }}>
+              <span className="accent-banner-title">VIKAS ADMIN PORTAL</span>
               <span className="accent-banner-subtitle">
-                Technology Development
+                Apex Governance, Authority Matrix & Compliance Management
               </span>
             </div>
           </div>
+
+          <p className="hero-playbook-tagline animate-slide-up delay-2">
+            Centralized Intake Monitoring • Authority Matrix E-Sign • National Audit Trail
+          </p>
 
           {/* Key Pillars / Value Props */}
           <div className="hero-pillars-grid animate-slide-up delay-3">
             <div className="pillar-item">
               <div className="pillar-icon-box" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', color: '#f59e0b' }}>
-                <Layers size={18} />
+                <ShieldCheck size={18} />
               </div>
               <div className="pillar-text-wrap">
-                <h4 className="pillar-title">9 Focus Verticals</h4>
-                <p className="pillar-desc">Startups, MSMEs, Deep-Tech, Academia</p>
+                <h4 className="pillar-title">9 Verticals Oversight</h4>
+                <p className="pillar-desc">Portfolio governance & multi-pillar coordination</p>
               </div>
             </div>
-            <button
-              type="button"
-              className="pillar-item admin-portal-pillar"
-              onClick={onNavigateToAdmin}
-            >
-              <div className="pillar-icon-box" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', color: '#f59e0b' }}>
-                <Shield size={18} />
+
+            <div className="pillar-item">
+              <div className="pillar-icon-box" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8' }}>
+                <Key size={18} />
               </div>
               <div className="pillar-text-wrap">
-                <h4 className="pillar-title">Administrator</h4>
-                <p className="pillar-desc">Executive Portal</p>
+                <h4 className="pillar-title">Authority Matrix & E-Sign</h4>
+                <p className="pillar-desc">Strategic file routing & executive sign-off</p>
               </div>
+            </div>
+
+            <div className="pillar-item">
+              <div className="pillar-icon-box" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
+                <Award size={18} />
+              </div>
+              <div className="pillar-text-wrap">
+                <h4 className="pillar-title">Audit Trail & Compliance</h4>
+                <p className="pillar-desc">Immutable tamper-proof digital log records</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Return to Applicant Portal */}
+          <div className="mt-8 flex items-center gap-3">
+            <button 
+              type="button" 
+              className="btn-link-switch flex items-center gap-2"
+              onClick={onNavigateToApplicantLogin}
+              style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, background: 'rgba(255,255,255,0.06)', padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.12)' }}
+            >
+              <ArrowLeft size={16} /> Return to Applicant Portal
+            </button>
+            <button 
+              type="button" 
+              className="btn-link-switch flex items-center gap-2"
+              onClick={onNavigateToAdminDashboard}
+              style={{ color: '#f59e0b', fontSize: '13px', fontWeight: 700, background: 'rgba(217,119,6,0.12)', padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(217,119,6,0.3)' }}
+            >
+              <LayoutDashboard size={16} /> Direct Admin Dashboard
             </button>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: SIGN IN & REGISTER CARD */}
+        {/* RIGHT COLUMN: ADMIN AUTH CARD */}
         <div className="hero-right-column">
-          <div className="auth-glass-card animate-slide-left">
+          <div className="auth-glass-card animate-slide-left" style={{ borderColor: 'rgba(217, 119, 6, 0.3)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(217, 119, 6, 0.2)' }}>
             {/* Top Switcher Tabs */}
             <div className="auth-tab-bar">
               <button 
@@ -198,8 +244,8 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                   setSuccessMessage('');
                 }}
               >
-                <Lock size={15} />
-                <span>Sign In</span>
+                <Shield size={15} />
+                <span>Admin Sign In</span>
               </button>
               <button 
                 type="button"
@@ -210,8 +256,8 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                   setSuccessMessage('');
                 }}
               >
-                <User size={15} />
-                <span>Register</span>
+                <Key size={15} />
+                <span>Register Admin</span>
               </button>
             </div>
 
@@ -229,28 +275,30 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
               </div>
             )}
 
-            {/* ----------------- TAB 1: SIGN IN ----------------- */}
+            {/* ----------------- TAB 1: ADMIN SIGN IN ----------------- */}
             {activeTab === 'signin' ? (
               <div className="auth-tab-content">
                 <div className="auth-header-mini">
-                  <h3 className="auth-card-title">Welcome to VIKAS</h3>
+                  <h3 className="auth-card-title flex items-center gap-2">
+                    <Shield size={20} className="text-amber-500" /> Administrator Sign In
+                  </h3>
                   <p className="auth-card-subtitle">
-                    Enter your credentials to access your dashboard & proposals
+                    Enter official administrator credentials to access the governance panel
                   </p>
                 </div>
 
-                <form onSubmit={handleSignInSubmit} className="auth-form" noValidate>
+                <form onSubmit={handleAdminSignInSubmit} className="auth-form" noValidate>
                   <div className="form-group">
-                    <label className="form-label" htmlFor="login-email">
-                      Registered Email Address <span className="text-required">*</span>
+                    <label className="form-label" htmlFor="admin-login-email">
+                      Official Admin Email <span className="text-required">*</span>
                     </label>
                     <div className="input-with-icon">
                       <Mail size={16} className="input-icon" />
                       <input 
-                        id="login-email"
+                        id="admin-login-email"
                         type="email"
                         className="form-input"
-                        placeholder="name@domain.com"
+                        placeholder="admin@iittnif.in"
                         value={email}
                         onChange={(e) => {
                           setEmail(e.target.value);
@@ -264,17 +312,17 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
 
                   <div className="form-group">
                     <div className="label-row">
-                      <label className="form-label" htmlFor="login-password">
-                        Password <span className="text-required">*</span>
+                      <label className="form-label" htmlFor="admin-login-password">
+                        Admin Password <span className="text-required">*</span>
                       </label>
                     </div>
                     <div className="input-with-icon">
                       <Lock size={16} className="input-icon" />
                       <input 
-                        id="login-password"
+                        id="admin-login-password"
                         type={showPassword ? 'text' : 'password'}
                         className="form-input"
-                        placeholder="Enter your password"
+                        placeholder="Enter password (default: admin123)"
                         value={password}
                         onChange={(e) => {
                           setPassword(e.target.value);
@@ -298,43 +346,78 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                     type="submit" 
                     className="btn-auth-primary" 
                     disabled={loading || !email.trim() || !password.trim()}
+                    style={{ background: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #991b1b 100%)' }}
                   >
                     {loading ? (
                       <span className="btn-loading-state">
-                        <span className="spinner-sm" /> Authenticating...
+                        <span className="spinner-sm" /> Authenticating Admin...
                       </span>
                     ) : (
                       <span className="btn-label-state">
-                        Sign In to Portal <ArrowRight size={16} />
+                        Sign In as Administrator <ArrowRight size={16} />
                       </span>
                     )}
                   </button>
                 </form>
 
+                {/* Quick Persona Demo Selector */}
+                <div className="demo-personas-section">
+                  <div className="demo-label">
+                    <span>Quick Admin Sign-In:</span>
+                  </div>
+                  <div className="demo-pills-row">
+                    <button 
+                      type="button" 
+                      className="demo-pill"
+                      onClick={() => handleQuickFill('admin@iittnif.in', 'admin123')}
+                      title="Master System Administrator"
+                    >
+                      ⚙️ Master Admin
+                    </button>
+                    <button 
+                      type="button" 
+                      className="demo-pill"
+                      onClick={() => handleQuickFill('director@iittnif.in', 'admin123')}
+                      title="Project Director"
+                    >
+                      ⭐ Project Director
+                    </button>
+                    <button 
+                      type="button" 
+                      className="demo-pill"
+                      onClick={() => handleQuickFill('ops@iittnif.in', 'admin123')}
+                      title="Operations & Screening"
+                    >
+                      🛡️ Ops Lead
+                    </button>
+                  </div>
+                </div>
+
                 {/* Switch to Register */}
                 <div className="auth-footer-prompt">
-                  <span>New to VIKAS?</span>
+                  <span>Need an Admin Account?</span>
                   <button 
                     type="button" 
                     className="btn-link-switch"
                     onClick={() => setActiveTab('register')}
                   >
-                    Register here <ChevronRight size={14} />
+                    Register Admin <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
             ) : (
-
-              /* ----------------- TAB 2: REGISTER ----------------- */
+              /* ----------------- TAB 2: REGISTER ADMIN ----------------- */
               <div className="auth-tab-content">
                 <div className="auth-header-mini">
-                  <h3 className="auth-card-title">Register on VIKAS</h3>
+                  <h3 className="auth-card-title flex items-center gap-2">
+                    <Key size={20} className="text-amber-500" /> Register Administrator
+                  </h3>
                   <p className="auth-card-subtitle">
-                    Register to submit proposals
+                    Provision new administrative credentials with full portal governance rights
                   </p>
                 </div>
 
-                <form onSubmit={handleRegisterSubmit} className="auth-form" noValidate>
+                <form onSubmit={handleAdminRegisterSubmit} className="auth-form" noValidate>
                   <div className="form-group">
                     <label className="form-label">
                       Full Name <span className="text-required">*</span>
@@ -344,8 +427,9 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                       <input 
                         type="text"
                         className="form-input"
-                        value={regName}
-                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder="e.g. Dr. A. K. Sharma"
+                        value={adminName}
+                        onChange={(e) => setAdminName(e.target.value)}
                         required
                       />
                     </div>
@@ -353,80 +437,77 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
 
                   <div className="form-group">
                     <label className="form-label">
-                      Organization Name <span className="text-required">*</span>
+                      Department / Designation <span className="text-required">*</span>
                     </label>
                     <div className="input-with-icon">
                       <Building size={16} className="input-icon" />
                       <input 
                         type="text"
                         className="form-input"
-                        value={regOrg}
-                        onChange={(e) => setRegOrg(e.target.value)}
+                        placeholder="IITTNiF Central Administration"
+                        value={adminDept}
+                        onChange={(e) => setAdminDept(e.target.value)}
                         required
                       />
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">
-                      Email Address <span className="text-required">*</span>
-                    </label>
-                    <div className="input-with-icon">
-                      <Mail size={16} className="input-icon" />
-                      <input 
-                        type="email"
-                        className="form-input"
-                        value={regEmail}
-                        onChange={(e) => setRegEmail(e.target.value)}
-                        required
-                      />
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label className="form-label">
+                        Official Admin Email <span className="text-required">*</span>
+                      </label>
+                      <div className="input-with-icon">
+                        <Mail size={16} className="input-icon" />
+                        <input 
+                          type="email"
+                          className="form-input"
+                          placeholder="admin.user@iittnif.in"
+                          value={adminEmail}
+                          onChange={(e) => setAdminEmail(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">
+                        Security Passcode <span className="text-required">*</span>
+                      </label>
+                      <div className="input-with-icon">
+                        <Key size={16} className="input-icon" />
+                        <input 
+                          type="text"
+                          className="form-input font-mono"
+                          placeholder="VIKAS-ADMIN-2026"
+                          value={adminPasscode}
+                          onChange={(e) => setAdminPasscode(e.target.value)}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">
-                      Create Password <span className="text-required">*</span>
+                      Create Admin Password <span className="text-required">*</span>
                     </label>
                     <div className="input-with-icon">
                       <Lock size={16} className="input-icon" />
                       <input 
-                        type={showRegPassword ? 'text' : 'password'}
+                        type={showAdminPassword ? 'text' : 'password'}
                         className="form-input"
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
                         required
                       />
                       <button 
                         type="button" 
                         className="password-toggle-btn"
-                        onClick={() => setShowRegPassword(!showRegPassword)}
-                        aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowAdminPassword(!showAdminPassword)}
                       >
-                        {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Verify Password <span className="text-required">*</span>
-                    </label>
-                    <div className="input-with-icon">
-                      <Lock size={16} className="input-icon" />
-                      <input 
-                        type={showRegConfirmPassword ? 'text' : 'password'}
-                        className="form-input"
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        required
-                      />
-                      <button 
-                        type="button" 
-                        className="password-toggle-btn"
-                        onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
-                        aria-label={showRegConfirmPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showRegConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
                   </div>
@@ -434,15 +515,16 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                   <button 
                     type="submit" 
                     className="btn-auth-primary" 
-                    disabled={loading || !regName || !regOrg || !regEmail || !regPassword || !regConfirmPassword}
+                    disabled={loading || !adminName || !adminEmail || !adminPassword}
+                    style={{ background: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #991b1b 100%)' }}
                   >
                     {loading ? (
                       <span className="btn-loading-state">
-                        <span className="spinner-sm" /> Registering...
+                        <span className="spinner-sm" /> Provisioning Admin...
                       </span>
                     ) : (
                       <span className="btn-label-state">
-                        Register & Proceed <ArrowRight size={16} />
+                        Register Admin & Proceed <ArrowRight size={16} />
                       </span>
                     )}
                   </button>
@@ -450,13 +532,13 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
 
                 {/* Switch to Sign In */}
                 <div className="auth-footer-prompt">
-                  <span>Already registered?</span>
+                  <span>Already an Admin?</span>
                   <button 
                     type="button" 
                     className="btn-link-switch"
                     onClick={() => setActiveTab('signin')}
                   >
-                    Sign in here <ChevronRight size={14} />
+                    Admin sign in here <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
@@ -466,22 +548,18 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
       </div>
 
       <style>{`
-        /* ======================================================== */
-        /* VIKAS HERO AUTH SECTION - MODERN HIGH-TECH AESTHETIC    */
-        /* ======================================================== */
         .vikas-hero-auth-container {
           position: relative;
-          min-height: calc(100vh - 92px);
+          min-height: calc(100vh - 82px);
           width: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 48px 40px;
           background: #070c18;
-          overflow-x: hidden;
+          overflow: hidden;
         }
 
-        /* Ambient Bokeh Background */
         .hero-bg-overlay {
           position: absolute;
           inset: 0;
@@ -544,7 +622,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           100% { transform: translate(-20px, 30px) scale(0.95); }
         }
 
-        /* 2-Column Hero Content */
         .hero-content-wrapper {
           position: relative;
           z-index: 2;
@@ -561,23 +638,9 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           .hero-content-wrapper {
             grid-template-columns: 1fr;
             gap: 40px;
-            max-width: 720px;
-          }
-
-          .hero-left-column {
-            align-items: flex-start;
-          }
-
-          .hero-pillars-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-
-          .auth-glass-card {
-            max-width: 100%;
           }
         }
 
-        /* LEFT COLUMN */
         .hero-left-column {
           display: flex;
           flex-direction: column;
@@ -619,11 +682,11 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         }
 
         .hero-headline {
-          font-size: clamp(32px, 4.6vw, 56px);
+          font-size: 38px;
           font-weight: 800;
-          line-height: 1.12;
+          line-height: 1.2;
           color: #ffffff;
-          letter-spacing: -0.8px;
+          letter-spacing: -0.6px;
           margin: 4px 0;
           font-family: 'Outfit', 'Inter', sans-serif;
         }
@@ -639,7 +702,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           color: #f8fafc;
         }
 
-        /* Angled High-Tech Accent Banner */
         .hero-accent-banner {
           position: relative;
           margin: 4px 0 8px 0;
@@ -657,7 +719,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         }
 
         .accent-banner-title {
-          font-size: clamp(22px, 3vw, 34px);
+          font-size: 30px;
           font-weight: 900;
           color: #ffffff;
           letter-spacing: 1.5px;
@@ -666,7 +728,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         }
 
         .accent-banner-subtitle {
-          font-size: 12.5px;
+          font-size: 12px;
           font-weight: 600;
           color: rgba(255, 255, 255, 0.95);
           letter-spacing: 0.3px;
@@ -674,27 +736,17 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         }
 
         .hero-playbook-tagline {
-          font-size: 14px;
+          font-size: 13.5px;
           color: #94a3b8;
           font-weight: 500;
           margin: 2px 0 10px 0;
         }
 
-        /* Pillars Grid */
         .hero-pillars-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, max-content));
+          grid-template-columns: repeat(3, 1fr);
           gap: 14px;
           margin-top: 6px;
-          align-items: stretch;
-        }
-
-        .admin-portal-pillar {
-          cursor: pointer;
-          font: inherit;
-          text-align: left;
-          color: inherit;
-          appearance: none;
         }
 
         @media (max-width: 640px) {
@@ -750,7 +802,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           line-height: 1.35;
         }
 
-        /* RIGHT COLUMN: AUTH CARD */
         .hero-right-column {
           display: flex;
           justify-content: center;
@@ -771,7 +822,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           gap: 18px;
         }
 
-        /* Tab Switcher */
         .auth-tab-bar {
           display: flex;
           background: rgba(0, 0, 0, 0.4);
@@ -807,7 +857,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           color: #e2e8f0;
         }
 
-        /* Auth Header */
         .auth-header-mini {
           text-align: left;
         }
@@ -828,7 +877,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           line-height: 1.4;
         }
 
-        /* Form Controls */
         .auth-form {
           display: flex;
           flex-direction: column;
@@ -870,7 +918,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           pointer-events: none;
         }
 
-        .form-input, .form-select {
+        .form-input {
           width: 100%;
           padding: 10px 38px 10px 36px;
           font-size: 13px;
@@ -882,7 +930,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           font-family: inherit;
         }
 
-        /* Override Browser Chrome Autofill Light Blue Background */
         .form-input:-webkit-autofill,
         .form-input:-webkit-autofill:hover,
         .form-input:-webkit-autofill:focus {
@@ -891,13 +938,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           border-color: rgba(255, 255, 255, 0.2) !important;
         }
 
-        .form-select {
-          padding: 10px 12px;
-          color: #e2e8f0;
-          background-color: #0f172a;
-        }
-
-        .form-input:focus, .form-select:focus {
+        .form-input:focus {
           outline: none;
           border-color: #f59e0b;
           background: rgba(15, 23, 42, 0.95);
@@ -921,12 +962,10 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           color: #ffffff;
         }
 
-        /* Buttons */
         .btn-auth-primary {
           margin-top: 6px;
           width: 100%;
           padding: 12px;
-          background: linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%);
           color: #ffffff;
           border: none;
           border-radius: 8px;
@@ -942,9 +981,9 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         }
 
         .btn-auth-primary:hover:not(:disabled) {
-          background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
           transform: translateY(-1px);
           box-shadow: 0 6px 22px rgba(217, 119, 6, 0.5);
+          filter: brightness(1.1);
         }
 
         .btn-auth-primary:disabled {
@@ -973,7 +1012,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           to { transform: rotate(360deg); }
         }
 
-        /* Demo Personas */
         .demo-personas-section {
           display: flex;
           flex-direction: column;
@@ -1018,40 +1056,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           transform: translateY(-1px);
         }
 
-        /* Direct Onboarding Link */
-        .full-onboarding-callout {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px dashed rgba(255, 255, 255, 0.12);
-          border-radius: 8px;
-          padding: 8px 12px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 4px;
-          text-align: center;
-        }
-
-        .full-onboarding-callout span {
-          font-size: 11px;
-          color: #94a3b8;
-        }
-
-        .btn-link-full-form {
-          background: transparent;
-          border: none;
-          color: #38bdf8;
-          font-size: 11.5px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: color 0.15s ease;
-        }
-
-        .btn-link-full-form:hover {
-          color: #7dd3fc;
-          text-decoration: underline;
-        }
-
-        /* Footer Prompt */
         .auth-footer-prompt {
           display: flex;
           align-items: center;
@@ -1080,7 +1084,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           text-decoration: underline;
         }
 
-        /* Alerts */
         .auth-alert-banner {
           display: flex;
           align-items: center;
@@ -1101,85 +1104,6 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           background: rgba(16, 185, 129, 0.15);
           border: 1px solid rgba(16, 185, 129, 0.35);
           color: #6ee7b7;
-        }
-
-        .animate-slide-up {
-          animation: heroSlideUp 0.55s ease both;
-        }
-
-        .animate-slide-left {
-          animation: heroSlideLeft 0.6s ease both;
-        }
-
-        .delay-1 { animation-delay: 0.08s; }
-        .delay-2 { animation-delay: 0.16s; }
-        .delay-3 { animation-delay: 0.24s; }
-
-        @keyframes heroSlideUp {
-          from { opacity: 0; transform: translateY(18px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes heroSlideLeft {
-          from { opacity: 0; transform: translateX(22px); }
-          to { opacity: 1; transform: translateX(0); }
-        }
-
-        @media (max-width: 768px) {
-          .vikas-hero-auth-container {
-            min-height: auto;
-            align-items: flex-start;
-            padding: 28px 16px 48px;
-          }
-
-          .hero-content-wrapper {
-            gap: 28px;
-          }
-
-          .hero-institution-badge {
-            max-width: 100%;
-          }
-
-          .badge-text {
-            font-size: 10px;
-            letter-spacing: 0.4px;
-            line-height: 1.35;
-          }
-
-          .accent-banner-shape {
-            padding: 12px 32px 12px 16px;
-          }
-
-          .form-row-2 {
-            grid-template-columns: 1fr;
-          }
-
-          .auth-glass-card {
-            padding: 22px 18px;
-          }
-
-          .hero-playbook-tagline {
-            font-size: 13px;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .vikas-hero-auth-container {
-            padding: 20px 12px 40px;
-          }
-
-          .hero-headline br {
-            display: none;
-          }
-
-          .demo-pills-row {
-            flex-direction: column;
-          }
-
-          .demo-pill {
-            justify-content: center;
-            width: 100%;
-          }
         }
       `}</style>
     </div>

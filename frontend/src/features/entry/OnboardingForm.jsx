@@ -1,13 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
-  FileText, 
   CheckCircle, 
   RefreshCw, 
   Layers, 
-  UploadCloud, 
-  Trash2, 
-  Eye, 
-  Paperclip,
   CheckCircle2,
   Rocket,
   GraduationCap,
@@ -29,9 +24,10 @@ import {
   FileCheck,
   Clock,
   Lock,
-  EyeOff,
   KeyRound,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  Cpu
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -39,12 +35,10 @@ export default function OnboardingForm({
   onSubmitApplication, 
   onDirtyChange, 
   onNavigateToLogin,
-  onNavigateToDashboard 
+  onNavigateToDashboard,
+  onNavigateToLanding
 }) {
   const { currentUser, user, register, authFetch, loading: authLoading } = useAuth();
-  const fileInputRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
 
   // 5-Section Form State (Starts clean and synced with authenticated account)
@@ -58,8 +52,8 @@ export default function OnboardingForm({
     password: '',
     confirmPassword: '',
 
-    // Stakeholder Track (defaults to user's registered track or Startup)
-    stakeholderType: currentUser?.stakeholderType || 'Startup',
+    // Stakeholder Track / VIKAS Vertical
+    stakeholderType: '',
     otherStakeholderType: '',
 
     // Section 1: Domain Selection (Multiple choice - initially empty)
@@ -70,51 +64,63 @@ export default function OnboardingForm({
     intentOfEngagement: '',
     otherIntent: '',
 
-    // Section 3: Detailed Inputs (Dynamic based on type)
-    // Startup
+    // Section 3: Detailed Inputs (Dynamic based on 9 VIKAS Verticals)
+    // 6.1 Technology Development
+    techStage: 'TRL 3 - Proof of Concept',
+    techDomain: '',
+    techTargetTrl: 'TRL 6 - Field Prototype Demonstration',
+    techLabRequirements: '',
+    techMilestones: '',
+
+    // 6.2 Startups & Business Enablement
     startupStage: 'Prototype',
     startupDomain: '',
     startupTeamSize: '1 - 5',
     startupPreviousWork: '',
 
-    // Expert
+    // 6.3 Human Resource Development
+    studentProgram: 'Chanakya Ph.D. Fellow',
+    studentDepartment: '',
+    studentResearchArea: '',
+
+    // 6.4 Skill Development
+    skillTargetAudience: 'Engineering Students & Faculty',
+    skillDomain: 'GIS & Spatial Analytics',
+    skillTrainingFormat: 'Hands-on Bootcamp (3-5 Days)',
+    skillCohortSize: '50 - 100 Participants',
+
+    // 6.5 Academic Collaborations & MoUs
+    collabPartnerName: '',
+    collabMode: 'Joint R&D Project',
+    collabCoordinator: '',
+    collabExpectedOutcome: '',
+
+    // 6.6 Schools & Academic Outreach (VidyaGIS)
+    schoolCurriculum: 'CBSE',
+    schoolInterest: 'VidyaGIS & Spatial Intelligence Lab Setup',
+    schoolStudentCount: '100 - 500 Students',
+
+    // 6.7 Institutions & Labs Network (SPIN Lab)
+    institutionType: 'University',
+    institutionInterest: ['SPIN Lab Setup', 'Faculty Upskilling'],
+
+    // 6.8 Industry & Government Interface
+    industryDepartment: '',
+    industryEngagementMode: 'Collaborative R&D / Tech Transfer',
+    industryProblemStatementScope: '',
+
+    // 6.9 Experts & Advisory Network
     expertAreaOfExpertise: '',
     expertExperience: '',
     expertAffiliation: '',
-    expertWillingness: ['Mentor'],
-
-    // Institution
-    institutionType: 'University',
-    institutionInterest: ['SPIN Lab'],
-
-    // Student / Researcher
-    studentProgram: 'Ph.D. / Research Scholar',
-    studentDepartment: '',
-
-    // School
-    schoolCurriculum: 'CBSE',
-    schoolInterest: 'VidyaGIS & Spatial Intelligence Lab',
-
-    // Industry / Govt
-    industryDepartment: '',
-    industryEngagementMode: 'Collaborative R&D / Tech Transfer',
-
-    // Other Stakeholder Type Details
-    otherEntityCategory: '',
-    otherFocusArea: '',
-    otherEngagementDetails: '',
+    expertWillingness: ['Mentor', 'Advisory Panel'],
 
     // Section 4: Problem Statement / Interest
     problemStatement: '',
 
     // Section 5: Consent
     agreeToTerms: false,
-    acknowledgeNonIncubation: false,
-
-    // Document Attachment (Supporting)
-    documentName: '',
-    documentSize: '',
-    documentUrl: ''
+    acknowledgeNonIncubation: false
   });
 
   const [submittedData, setSubmittedData] = useState(null);
@@ -128,8 +134,7 @@ export default function OnboardingForm({
         organization: currentUser.organization || prev.organization,
         email: currentUser.email || prev.email,
         phone: currentUser.phone || prev.phone,
-        location: currentUser.location || prev.location,
-        stakeholderType: currentUser.stakeholderType || prev.stakeholderType || 'Startup'
+        location: currentUser.location || prev.location
       }));
     }
   }, [currentUser]);
@@ -141,32 +146,38 @@ export default function OnboardingForm({
     const doms = formData.domains.join(' ').toLowerCase();
     const intent = (formData.intentOfEngagement || '').toLowerCase();
     
-    let primary = '6.2 Startups & Business Enablement';
+    let primary = formData.stakeholderType;
     let additional = [];
-    if (st.includes('STARTUP')) {
+
+    if (st.includes('6.1') || st.includes('TECHNOLOGY DEVELOPMENT') || st.includes('TECH_DEV') || st.includes('TDP')) {
+      primary = '6.1 Technology Development';
+    } else if (st.includes('6.2') || st.includes('STARTUP')) {
       primary = '6.2 Startups & Business Enablement';
       if (doms.includes('pnt') || doms.includes('navic') || doms.includes('sensor') || intent.includes('prototype') || doms.includes('cps') || doms.includes('drone')) {
         additional.push('6.1 Technology Development');
       }
-    } else if (st.includes('STUDENT') || st.includes('RESEARCHER')) {
+    } else if (st.includes('6.3') || st.includes('HUMAN RESOURCE') || st.includes('STUDENT') || st.includes('RESEARCHER') || st.includes('FELLOW') || st.includes('HRD')) {
       primary = '6.3 Human Resource Development';
       if (doms.includes('pnt') || doms.includes('navic') || doms.includes('ai') || intent.includes('research') || intent.includes('grant')) {
         additional.push('6.1 Technology Development');
       }
-    } else if (st.includes('SCHOOL')) {
+    } else if (st.includes('6.4') || st.includes('SKILL')) {
+      primary = '6.4 Skill Development';
+    } else if (st.includes('6.5') || st.includes('COLLABORATION') || st.includes('MOU')) {
+      primary = '6.5 Academic Collaborations & MoUs';
+    } else if (st.includes('6.6') || st.includes('SCHOOL') || st.includes('VIDYAGIS')) {
       primary = '6.6 Schools & Academic Outreach (VidyaGIS)';
-    } else if (st.includes('INSTITUTION')) {
+    } else if (st.includes('6.7') || st.includes('INSTITUTION') || st.includes('SPIN') || st.includes('LAB')) {
       primary = '6.7 Institutions & Labs Network (SPIN Lab)';
-    } else if (st.includes('INDUSTRY')) {
+    } else if (st.includes('6.8') || st.includes('INDUSTRY') || st.includes('GOVERNMENT')) {
       primary = '6.8 Industry & Government Interface';
       if (intent.includes('r&d') || intent.includes('tech transfer') || intent.includes('prototype')) {
         additional.push('6.1 Technology Development');
       }
-    } else if (st.includes('GOVERNMENT')) {
-      primary = '6.8 Industry & Government Interface';
-    } else if (st.includes('EXPERT')) {
+    } else if (st.includes('6.9') || st.includes('EXPERT') || st.includes('ADVISORY')) {
       primary = '6.9 Experts & Advisory Network';
     }
+
     return { primary, additional };
   };
 
@@ -183,8 +194,7 @@ export default function OnboardingForm({
         formData.stakeholderType ||
         formData.domains.length > 0 ||
         formData.intentOfEngagement ||
-        formData.problemStatement.trim() ||
-        formData.documentName
+        formData.problemStatement.trim()
       )
     );
     if (onDirtyChange) {
@@ -192,71 +202,79 @@ export default function OnboardingForm({
     }
   }, [formData, submittedData, onDirtyChange]);
 
-  // Available Stakeholder Types
-  const stakeholderTypes = [
+  // The 9 VIKAS Verticals
+  const vikasVerticals = [
     { 
-      id: 'Startup', 
-      title: 'Startup', 
+      id: '6.1 Technology Development', 
+      title: '6.1 Technology Development', 
+      subtitle: 'TDP projects, TRL 3 to 6 prototypes, lab testing', 
+      icon: Cpu,
+      badge: 'TDP / TRL 3-6',
+      color: '#059669'
+    },
+    { 
+      id: '6.2 Startups & Business Enablement', 
+      title: '6.2 Startups & Business Enablement', 
       subtitle: 'Early-stage or growth deep-tech venture', 
       icon: Rocket,
       badge: 'Deep Tech',
       color: '#d97706'
     },
     { 
-      id: 'Student / Researcher', 
-      title: 'Student / Researcher', 
-      subtitle: 'B.Tech, M.Tech, Ph.D. or Chanakya Fellow', 
+      id: '6.3 Human Resource Development', 
+      title: '6.3 Human Resource Development', 
+      subtitle: 'Ph.D., Post-Doc, Chanakya Fellow or Intern', 
       icon: GraduationCap,
-      badge: 'Academic',
+      badge: 'Chanakya Fellow',
       color: '#2563eb'
     },
     { 
-      id: 'School', 
-      title: 'School', 
-      subtitle: 'K-12 school or Atal Tinkering Lab', 
-      icon: School,
-      badge: 'Outreach',
-      color: '#059669'
+      id: '6.4 Skill Development', 
+      title: '6.4 Skill Development', 
+      subtitle: 'National training programs, upskilling & certifications', 
+      icon: Sparkles,
+      badge: 'Upskilling',
+      color: '#0284c7'
     },
     { 
-      id: 'Institution', 
-      title: 'Institution', 
-      subtitle: 'College, University or Academic Center', 
-      icon: Building2,
-      badge: 'Network',
+      id: '6.5 Academic Collaborations & MoUs', 
+      title: '6.5 Academic Collaborations & MoUs', 
+      subtitle: 'Strategic MoUs, bilateral agreements & joint R&D', 
+      icon: Layers,
+      badge: 'Partnership',
       color: '#7c3aed'
     },
     { 
-      id: 'Industry', 
-      title: 'Industry', 
-      subtitle: 'Enterprise, MSME or R&D partner', 
+      id: '6.6 Schools & Academic Outreach (VidyaGIS)', 
+      title: '6.6 Schools & Academic Outreach (VidyaGIS)', 
+      subtitle: 'Spatial reasoning, VidyaGIS labs & teacher training', 
+      icon: School,
+      badge: 'K-12 Outreach',
+      color: '#0d9488'
+    },
+    { 
+      id: '6.7 Institutions & Labs Network (SPIN Lab)', 
+      title: '6.7 Institutions & Labs Network (SPIN Lab)', 
+      subtitle: 'SPIN Labs, Centres of Excellence & academic labs', 
+      icon: Building2,
+      badge: 'Lab Network',
+      color: '#4f46e5'
+    },
+    { 
+      id: '6.8 Industry & Government Interface', 
+      title: '6.8 Industry & Government Interface', 
+      subtitle: 'Ministry, PSU, State agency & enterprise pilots', 
       icon: Briefcase,
-      badge: 'Commercial',
+      badge: 'Govt / Industry',
       color: '#b45309'
     },
     { 
-      id: 'Government', 
-      title: 'Government', 
-      subtitle: 'Ministry, PSU, State or National Agency', 
-      icon: ShieldCheck,
-      badge: 'Public Sector',
-      color: '#db2777'
-    },
-    { 
-      id: 'Expert', 
-      title: 'Expert', 
-      subtitle: 'Domain specialist, scientist or mentor', 
+      id: '6.9 Experts & Advisory Network', 
+      title: '6.9 Experts & Advisory Network', 
+      subtitle: 'Domain specialist, advisory panel, mentor or reviewer', 
       icon: Award,
       badge: 'Advisory',
       color: '#ca8a04'
-    },
-    { 
-      id: 'Other', 
-      title: 'Other', 
-      subtitle: 'NGO, Community, Consortium or other entity', 
-      icon: Compass,
-      badge: 'Custom',
-      color: '#8b5cf6'
     }
   ];
 
@@ -283,21 +301,21 @@ export default function OnboardingForm({
   ];
 
   // Startup Stages
-  const startupStages = ['Idea', 'Prototype', 'Revenue'];
+  const startupStages = ['Idea', 'Prototype', 'Revenue', 'Scaling'];
 
   // Expert Willingness Options
-  const expertWillingnessOptions = ['Mentor', 'Advisor', 'Reviewer'];
+  const expertWillingnessOptions = ['Mentor', 'Advisory Panel', 'Proposal Reviewer', 'Technical Evaluator'];
 
   // Institution Types & Interests
-  const institutionTypes = ['College', 'University'];
-  const institutionInterests = ['SPIN Lab', 'Training', 'Collaboration'];
+  const institutionTypes = ['University', 'Autonomous Engineering College', 'Research Institute', 'Polytechnic / Science College'];
+  const institutionInterests = ['SPIN Lab Setup', 'Centre of Excellence (CoE)', 'Joint Testing Facility', 'Faculty Upskilling', 'Student Internships'];
 
-  // Handle Stakeholder Type Selection
-  const handleSelectStakeholder = (stakeholderId) => {
+  // Handle Vertical / Stakeholder Selection
+  const handleSelectVertical = (verticalId) => {
     setFormData(prev => ({
       ...prev,
-      stakeholderType: prev.stakeholderType === stakeholderId ? '' : stakeholderId,
-      otherStakeholderType: stakeholderId === 'Other' ? prev.otherStakeholderType : ''
+      stakeholderType: prev.stakeholderType === verticalId ? '' : verticalId,
+      otherStakeholderType: verticalId === 'Other' ? prev.otherStakeholderType : ''
     }));
     if (formErrors.stakeholderType) {
       setFormErrors(prev => ({ ...prev, stakeholderType: null }));
@@ -363,84 +381,20 @@ export default function OnboardingForm({
   const generateFileNumber = (type) => {
     const year = new Date().getFullYear();
     let verticalCode = 'GEN';
-    switch (type) {
-      case 'Startup': verticalCode = 'STARTUP'; break;
-      case 'Student / Researcher': verticalCode = 'HRD'; break;
-      case 'School': verticalCode = 'SCHOOL'; break;
-      case 'Institution': verticalCode = 'LAB_NET'; break;
-      case 'Industry': verticalCode = 'INDUSTRY'; break;
-      case 'Government': verticalCode = 'GOVT'; break;
-      case 'Expert': verticalCode = 'EXPERT'; break;
-      case 'Other': verticalCode = 'OTHER'; break;
-      default: verticalCode = 'PORTAL';
-    }
+    if (!type) verticalCode = 'PORTAL';
+    else if (type.includes('6.1') || type.includes('Technology')) verticalCode = 'TECH_DEV';
+    else if (type.includes('6.2') || type.includes('Startup')) verticalCode = 'STARTUP';
+    else if (type.includes('6.3') || type.includes('Human') || type.includes('Student') || type.includes('Researcher')) verticalCode = 'HRD';
+    else if (type.includes('6.4') || type.includes('Skill')) verticalCode = 'SKILL';
+    else if (type.includes('6.5') || type.includes('Collaboration')) verticalCode = 'COLLAB';
+    else if (type.includes('6.6') || type.includes('School')) verticalCode = 'SCHOOL';
+    else if (type.includes('6.7') || type.includes('Institution')) verticalCode = 'LAB_NET';
+    else if (type.includes('6.8') || type.includes('Industry') || type.includes('Government')) verticalCode = 'INDUSTRY';
+    else if (type.includes('6.9') || type.includes('Expert')) verticalCode = 'EXPERT';
+    else verticalCode = 'PORTAL';
+    
     const serial = Math.floor(Math.random() * 900) + 100;
     return `VIKAS/${year}/${verticalCode}/ONBOARD/${serial}`;
-  };
-
-  // Handle Document File Processing
-  const processUploadedFile = (file) => {
-    if (!file) return;
-    if (file.size > 25 * 1024 * 1024) {
-      alert('File size exceeds 25 MB limit.');
-      return;
-    }
-
-    const formattedSize = file.size > 1024 * 1024 
-      ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` 
-      : `${Math.round(file.size / 1024)} KB`;
-
-    const previewUrl = URL.createObjectURL(file);
-
-    setFormData(prev => ({
-      ...prev,
-      documentName: file.name,
-      documentSize: formattedSize,
-      documentUrl: previewUrl
-    }));
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) processUploadedFile(file);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processUploadedFile(file);
-  };
-
-  const handleRemoveFile = (e) => {
-    e?.stopPropagation();
-    if (formData.documentUrl) {
-      try {
-        URL.revokeObjectURL(formData.documentUrl);
-      } catch (err) {
-        // ignore
-      }
-    }
-    setFormData(prev => ({
-      ...prev,
-      documentName: '',
-      documentSize: '',
-      documentUrl: ''
-    }));
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Validate 5-Section Proposal Form
@@ -491,57 +445,88 @@ export default function OnboardingForm({
     }
 
     const fileNumber = generateFileNumber(formData.stakeholderType);
-    const finalDocName = formData.documentName || null;
-    const finalDocSize = formData.documentSize || null;
 
-    // Build consolidated dynamic details object
+    // Build consolidated dynamic details object based on the 9 Verticals
     let dynamicSummary = {};
-    if (formData.stakeholderType === 'Startup') {
+    if (formData.stakeholderType === '6.1 Technology Development') {
       dynamicSummary = {
-        category: 'Startup',
+        vertical: '6.1 Technology Development',
+        stage: formData.techStage,
+        domain: formData.techDomain || formData.domains.join(', '),
+        targetTrl: formData.techTargetTrl,
+        labRequirements: formData.techLabRequirements,
+        milestones: formData.techMilestones
+      };
+    } else if (formData.stakeholderType === '6.2 Startups & Business Enablement' || formData.stakeholderType === 'Startup') {
+      dynamicSummary = {
+        vertical: '6.2 Startups & Business Enablement',
         stage: formData.startupStage,
         domain: formData.startupDomain || formData.domains.join(', '),
         teamSize: formData.startupTeamSize,
         previousWork: formData.startupPreviousWork
       };
-    } else if (formData.stakeholderType === 'Expert') {
+    } else if (formData.stakeholderType === '6.3 Human Resource Development' || formData.stakeholderType === 'Student / Researcher') {
       dynamicSummary = {
-        category: 'Expert',
+        vertical: '6.3 Human Resource Development',
+        program: formData.studentProgram,
+        department: formData.studentDepartment,
+        researchArea: formData.studentResearchArea
+      };
+    } else if (formData.stakeholderType === '6.4 Skill Development') {
+      dynamicSummary = {
+        vertical: '6.4 Skill Development',
+        targetAudience: formData.skillTargetAudience,
+        skillDomain: formData.skillDomain,
+        trainingFormat: formData.skillTrainingFormat,
+        cohortSize: formData.skillCohortSize
+      };
+    } else if (formData.stakeholderType === '6.5 Academic Collaborations & MoUs') {
+      dynamicSummary = {
+        vertical: '6.5 Academic Collaborations & MoUs',
+        partnerName: formData.collabPartnerName,
+        collaborationMode: formData.collabMode,
+        coordinator: formData.collabCoordinator,
+        expectedOutcome: formData.collabExpectedOutcome
+      };
+    } else if (formData.stakeholderType === '6.6 Schools & Academic Outreach (VidyaGIS)' || formData.stakeholderType === 'School') {
+      dynamicSummary = {
+        vertical: '6.6 Schools & Academic Outreach (VidyaGIS)',
+        curriculum: formData.schoolCurriculum,
+        interest: formData.schoolInterest,
+        studentCount: formData.schoolStudentCount
+      };
+    } else if (formData.stakeholderType === '6.7 Institutions & Labs Network (SPIN Lab)' || formData.stakeholderType === 'Institution') {
+      dynamicSummary = {
+        vertical: '6.7 Institutions & Labs Network (SPIN Lab)',
+        institutionType: formData.institutionType,
+        interest: formData.institutionInterest
+      };
+    } else if (formData.stakeholderType === '6.8 Industry & Government Interface' || formData.stakeholderType === 'Industry' || formData.stakeholderType === 'Government') {
+      dynamicSummary = {
+        vertical: '6.8 Industry & Government Interface',
+        department: formData.industryDepartment,
+        engagementMode: formData.industryEngagementMode,
+        problemScope: formData.industryProblemStatementScope
+      };
+    } else if (formData.stakeholderType === '6.9 Experts & Advisory Network' || formData.stakeholderType === 'Expert') {
+      dynamicSummary = {
+        vertical: '6.9 Experts & Advisory Network',
         areaOfExpertise: formData.expertAreaOfExpertise,
         experience: formData.expertExperience,
         affiliation: formData.expertAffiliation,
         willingness: formData.expertWillingness
       };
-    } else if (formData.stakeholderType === 'Institution') {
-      dynamicSummary = {
-        category: 'Institution',
-        type: formData.institutionType,
-        interest: formData.institutionInterest
-      };
-    } else if (formData.stakeholderType === 'Student / Researcher') {
-      dynamicSummary = {
-        category: 'Student / Researcher',
-        program: formData.studentProgram,
-        department: formData.studentDepartment
-      };
-    } else if (formData.stakeholderType === 'School') {
-      dynamicSummary = {
-        category: 'School',
-        curriculum: formData.schoolCurriculum,
-        interest: formData.schoolInterest
-      };
     } else if (formData.stakeholderType === 'Other') {
       dynamicSummary = {
-        category: `Other: ${formData.otherStakeholderType || 'Custom'}`,
+        vertical: `Other: ${formData.otherStakeholderType || 'Custom'}`,
         entityCategory: formData.otherEntityCategory,
         focusArea: formData.otherFocusArea,
         engagementDetails: formData.otherEngagementDetails
       };
     } else {
       dynamicSummary = {
-        category: formData.stakeholderType,
-        department: formData.industryDepartment,
-        mode: formData.industryEngagementMode
+        vertical: formData.stakeholderType || 'General Engagement',
+        category: formData.stakeholderType
       };
     }
 
@@ -561,28 +546,25 @@ export default function OnboardingForm({
           email: formData.email,
           phone: formData.phone,
           location: formData.location,
-          stakeholderType: formData.stakeholderType,
+          stakeholderType: formData.stakeholderType || mapped?.primary || '6.2 Startups & Business Enablement',
           domains: formData.domains,
           intentOfEngagement: formData.intentOfEngagement,
           dynamicInputs: dynamicSummary,
           problemStatement: formData.problemStatement,
           userId: currentUser.id,
           user_id: currentUser.id,
-          documentName: finalDocName,
-          documentSize: finalDocSize,
-          documentUrl: formData.documentUrl,
           fileNumber,
           status: 'pending_screening',
-          assignedVertical: mapped?.primary || '6.2 Startups & Business Enablement',
-          assignedVerticals: [mapped?.primary || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
+          assignedVertical: mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement',
+          assignedVerticals: [mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
           submissionDate: new Date().toLocaleDateString('en-GB'),
-          isStrategic: formData.stakeholderType === 'Government' || formData.stakeholderType === 'Industry',
+          isStrategic: (formData.stakeholderType || '').includes('6.8') || (formData.stakeholderType || '').includes('Industry') || (formData.stakeholderType || '').includes('Government'),
           history: [
             {
               date: new Date().toLocaleString('en-GB'),
               action: 'Proposal Dossier Submitted',
               user: `${formData.name} (Applicant)`,
-              details: `Submitted proposal under ${formData.stakeholderType}. Auto-mapped to vertical: ${mapped?.primary}. Awaiting initial operations screening.`
+              details: `Submitted proposal under ${formData.stakeholderType || mapped?.primary}. Assigned vertical: ${mapped?.primary}. Awaiting initial operations screening.`
             }
           ]
         };
@@ -595,7 +577,7 @@ export default function OnboardingForm({
           phone: formData.phone.trim(),
           location: formData.location.trim(),
           password: 'Password@123',
-          stakeholderType: formData.stakeholderType,
+          stakeholderType: formData.stakeholderType || mapped?.primary || '6.2 Startups & Business Enablement',
           domains: formData.domains,
           intentOfEngagement: formData.intentOfEngagement,
           problemStatement: formData.problemStatement,
@@ -610,28 +592,25 @@ export default function OnboardingForm({
           email: formData.email,
           phone: formData.phone,
           location: formData.location,
-          stakeholderType: formData.stakeholderType,
+          stakeholderType: formData.stakeholderType || mapped?.primary || '6.2 Startups & Business Enablement',
           domains: formData.domains,
           intentOfEngagement: formData.intentOfEngagement,
           dynamicInputs: dynamicSummary,
           problemStatement: formData.problemStatement,
           userId: regResult.user?.id || 'usr_app_registered',
           user_id: regResult.user?.id || 'usr_app_registered',
-          documentName: finalDocName,
-          documentSize: finalDocSize,
-          documentUrl: formData.documentUrl,
           fileNumber,
           status: 'pending_screening',
-          assignedVertical: mapped?.primary || '6.2 Startups & Business Enablement',
-          assignedVerticals: [mapped?.primary || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
+          assignedVertical: mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement',
+          assignedVerticals: [mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
           submissionDate: new Date().toLocaleDateString('en-GB'),
-          isStrategic: formData.stakeholderType === 'Government' || formData.stakeholderType === 'Industry',
+          isStrategic: (formData.stakeholderType || '').includes('6.8') || (formData.stakeholderType || '').includes('Industry') || (formData.stakeholderType || '').includes('Government'),
           history: [
             {
               date: new Date().toLocaleString('en-GB'),
               action: 'Proposal Dossier Submitted',
               user: `${formData.name} (Applicant)`,
-              details: `Submitted proposal as ${formData.stakeholderType}. Auto-mapped to vertical: ${mapped?.primary}. Awaiting operations screening.`
+              details: `Submitted proposal under ${formData.stakeholderType || mapped?.primary}. Assigned vertical: ${mapped?.primary}. Awaiting operations screening.`
             }
           ]
         };
@@ -650,53 +629,60 @@ export default function OnboardingForm({
   };
 
   const resetForm = () => {
-    if (formData.documentUrl) {
-      try {
-        URL.revokeObjectURL(formData.documentUrl);
-      } catch (err) {
-        // ignore
-      }
-    }
     setFormData({
       name: '',
       organization: '',
       email: '',
       phone: '',
       location: '',
+      password: '',
+      confirmPassword: '',
       stakeholderType: '',
       otherStakeholderType: '',
       domains: [],
       otherDomain: '',
       intentOfEngagement: '',
       otherIntent: '',
+      techStage: 'TRL 3 - Proof of Concept',
+      techDomain: '',
+      techTargetTrl: 'TRL 6 - Field Prototype Demonstration',
+      techLabRequirements: '',
+      techMilestones: '',
       startupStage: 'Prototype',
       startupDomain: '',
       startupTeamSize: '1 - 5',
       startupPreviousWork: '',
+      studentProgram: 'Chanakya Ph.D. Fellow',
+      studentDepartment: '',
+      studentResearchArea: '',
+      skillTargetAudience: 'Engineering Students & Faculty',
+      skillDomain: 'GIS & Spatial Analytics',
+      skillTrainingFormat: 'Hands-on Bootcamp (3-5 Days)',
+      skillCohortSize: '50 - 100 Participants',
+      collabPartnerName: '',
+      collabMode: 'Joint R&D Project',
+      collabCoordinator: '',
+      collabExpectedOutcome: '',
+      schoolCurriculum: 'CBSE',
+      schoolInterest: 'VidyaGIS & Spatial Intelligence Lab Setup',
+      schoolStudentCount: '100 - 500 Students',
+      institutionType: 'University',
+      institutionInterest: ['SPIN Lab Setup', 'Faculty Upskilling'],
+      industryDepartment: '',
+      industryEngagementMode: 'Collaborative R&D / Tech Transfer',
+      industryProblemStatementScope: '',
       expertAreaOfExpertise: '',
       expertExperience: '',
       expertAffiliation: '',
-      expertWillingness: ['Mentor'],
-      institutionType: 'University',
-      institutionInterest: ['SPIN Lab'],
-      studentProgram: 'Ph.D. / Research Scholar',
-      studentDepartment: '',
-      schoolCurriculum: 'CBSE',
-      schoolInterest: 'VidyaGIS & Spatial Intelligence Lab',
-      industryDepartment: '',
-      industryEngagementMode: 'Collaborative R&D / Tech Transfer',
+      expertWillingness: ['Mentor', 'Advisory Panel'],
       otherEntityCategory: '',
       otherFocusArea: '',
       otherEngagementDetails: '',
       problemStatement: '',
       agreeToTerms: false,
-      acknowledgeNonIncubation: false,
-      documentName: '',
-      documentSize: '',
-      documentUrl: ''
+      acknowledgeNonIncubation: false
     });
     setFormErrors({});
-    if (fileInputRef.current) fileInputRef.current.value = '';
     setSubmittedData(null);
   };
 
@@ -814,19 +800,67 @@ export default function OnboardingForm({
             <div className="receipt-summary-block">
               <div className="receipt-block-header">
                 <Layers size={15} className="header-icon-amber" />
-                <span>Section 5: Detailed Inputs ({submittedData.stakeholderType === 'Other' && submittedData.otherStakeholderType ? submittedData.otherStakeholderType : submittedData.stakeholderType})</span>
+                <span>Section 5: Detailed Inputs ({submittedData.assignedVertical || submittedData.stakeholderType})</span>
               </div>
               <div className="receipt-block-content">
                 {submittedData.dynamicInputs?.stage && (
                   <div className="summary-row">
-                    <span className="lbl">Stage:</span>
+                    <span className="lbl">Stage / TRL:</span>
                     <span className="val font-semibold">{submittedData.dynamicInputs.stage}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.targetTrl && (
+                  <div className="summary-row">
+                    <span className="lbl">Target TRL:</span>
+                    <span className="val">{submittedData.dynamicInputs.targetTrl}</span>
                   </div>
                 )}
                 {submittedData.dynamicInputs?.teamSize && (
                   <div className="summary-row">
                     <span className="lbl">Team Size:</span>
                     <span className="val">{submittedData.dynamicInputs.teamSize}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.program && (
+                  <div className="summary-row">
+                    <span className="lbl">Program Track:</span>
+                    <span className="val">{submittedData.dynamicInputs.program}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.department && (
+                  <div className="summary-row">
+                    <span className="lbl">Department / Unit:</span>
+                    <span className="val">{submittedData.dynamicInputs.department}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.targetAudience && (
+                  <div className="summary-row">
+                    <span className="lbl">Target Audience:</span>
+                    <span className="val">{submittedData.dynamicInputs.targetAudience}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.skillDomain && (
+                  <div className="summary-row">
+                    <span className="lbl">Skill Domain:</span>
+                    <span className="val">{submittedData.dynamicInputs.skillDomain}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.partnerName && (
+                  <div className="summary-row">
+                    <span className="lbl">Partner Institution:</span>
+                    <span className="val">{submittedData.dynamicInputs.partnerName}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.collaborationMode && (
+                  <div className="summary-row">
+                    <span className="lbl">Collab Mode:</span>
+                    <span className="val">{submittedData.dynamicInputs.collaborationMode}</span>
+                  </div>
+                )}
+                {submittedData.dynamicInputs?.curriculum && (
+                  <div className="summary-row">
+                    <span className="lbl">Curriculum:</span>
+                    <span className="val">{submittedData.dynamicInputs.curriculum}</span>
                   </div>
                 )}
                 {submittedData.dynamicInputs?.areaOfExpertise && (
@@ -838,28 +872,25 @@ export default function OnboardingForm({
                 {submittedData.dynamicInputs?.willingness && (
                   <div className="summary-row">
                     <span className="lbl">Willingness:</span>
-                    <span className="val">{submittedData.dynamicInputs.willingness.join(', ')}</span>
+                    <span className="val">{Array.isArray(submittedData.dynamicInputs.willingness) ? submittedData.dynamicInputs.willingness.join(', ') : submittedData.dynamicInputs.willingness}</span>
                   </div>
                 )}
-                {submittedData.dynamicInputs?.type && (
+                {submittedData.dynamicInputs?.institutionType && (
                   <div className="summary-row">
                     <span className="lbl">Institution Type:</span>
-                    <span className="val">{submittedData.dynamicInputs.type}</span>
+                    <span className="val">{submittedData.dynamicInputs.institutionType}</span>
                   </div>
                 )}
                 {submittedData.dynamicInputs?.interest && (
                   <div className="summary-row">
-                    <span className="lbl">Interest:</span>
+                    <span className="lbl">Interest / Linkage:</span>
                     <span className="val">{Array.isArray(submittedData.dynamicInputs.interest) ? submittedData.dynamicInputs.interest.join(', ') : submittedData.dynamicInputs.interest}</span>
                   </div>
                 )}
-                {submittedData.documentName && (
+                {submittedData.dynamicInputs?.engagementMode && (
                   <div className="summary-row">
-                    <span className="lbl">Attachment:</span>
-                    <span className="val font-mono text-amber">
-                      <Paperclip size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                      {submittedData.documentName} ({submittedData.documentSize})
-                    </span>
+                    <span className="lbl">Engagement Mode:</span>
+                    <span className="val">{submittedData.dynamicInputs.engagementMode}</span>
                   </div>
                 )}
               </div>
@@ -906,11 +937,6 @@ export default function OnboardingForm({
               <div className="strip-item">
                 <span className="strip-lbl">Organization:</span>
                 <span className="strip-val">{currentUser.organization || 'Institutional Entity'}</span>
-              </div>
-              <div className="strip-divider" />
-              <div className="strip-item">
-                <span className="strip-lbl">Track:</span>
-                <span className="badge badge-amber">{currentUser.stakeholderType || 'Startup'}</span>
               </div>
             </div>
           )}
@@ -1040,7 +1066,7 @@ export default function OnboardingForm({
           </div>
 
           {/* ========================================================
-              SECTION 3: DETAILED INPUTS (DYNAMIC BASED ON TYPE)
+              SECTION 3: DETAILED INPUTS (DYNAMIC BASED ON VERTICAL)
           ======================================================== */}
           <div className="card section-card dynamic-section-card animate-fade-in" id="field-dynamicDetails">
             <div className="section-card-header">
@@ -1049,7 +1075,7 @@ export default function OnboardingForm({
                 <div className="dynamic-title-row">
                   <h3>Section 3: Detailed Inputs <span className="text-danger">*</span></h3>
                   <span className="badge badge-amber">
-                    {formData.stakeholderType ? `Track: ${formData.stakeholderType}` : 'Project Scope'}
+                    {formData.stakeholderType ? `Vertical: ${formData.stakeholderType}` : 'Project Scope'}
                   </span>
                 </div>
                 <p>
@@ -1060,42 +1086,122 @@ export default function OnboardingForm({
               </div>
             </div>
 
-            {/* Stakeholder Track Pills Selector */}
+            {/* VIKAS Verticals Selector */}
             <div className="track-selector-bar mb-20">
               <label className="form-label" style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>
-                Engagement Track / Category:
+                Engagement Track / VIKAS Vertical:
               </label>
               <div className="stage-pills-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
-                {['Startup', 'Student / Researcher', 'School', 'Institution', 'Industry', 'Government', 'Expert', 'Other'].map((type) => (
-                  <button
-                    type="button"
-                    key={type}
-                    className={`stage-pill ${formData.stakeholderType === type ? 'active' : ''}`}
-                    onClick={() => setFormData({...formData, stakeholderType: type})}
-                  >
-                    {formData.stakeholderType === type && <Check size={13} />}
-                    <span>{type}</span>
-                  </button>
-                ))}
+                {vikasVerticals.map((vert) => {
+                  const isSelected = formData.stakeholderType === vert.id;
+                  const VertIcon = vert.icon;
+                  return (
+                    <button
+                      type="button"
+                      key={vert.id}
+                      className={`stage-pill ${isSelected ? 'active' : ''}`}
+                      onClick={() => handleSelectVertical(vert.id)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 14px', fontSize: '12.5px' }}
+                    >
+                      {isSelected ? <Check size={13} /> : (VertIcon && <VertIcon size={13} style={{ opacity: 0.75 }} />)}
+                      <span>{vert.title}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* IF NO STAKEHOLDER TYPE SELECTED YET */}
+            {/* IF NO VERTICAL SELECTED YET */}
             {!formData.stakeholderType && (
               <div className="empty-dynamic-prompt animate-fade-in">
                 <Compass size={28} className="text-amber animate-pulse" />
                 <p className="empty-dynamic-text">
-                  Please select an engagement track above to view customized parameters.
+                  Please select a VIKAS Vertical above to view customized parameters.
                 </p>
               </div>
             )}
 
-            {/* DYNAMIC: IF STARTUP */}
-            {formData.stakeholderType === 'Startup' && (
+            {/* DYNAMIC: 6.1 TECHNOLOGY DEVELOPMENT */}
+            {formData.stakeholderType === '6.1 Technology Development' && (
+              <div className="dynamic-content-box techdev-box animate-fade-in">
+                <div className="form-group">
+                  <label className="form-label">
+                    Current Technology Readiness Level (TRL) <span className="text-danger">*</span>
+                  </label>
+                  <div className="stage-pills-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                    {['TRL 3 - Proof of Concept', 'TRL 4 - Lab Validation', 'TRL 5 - Subsystem Integration', 'TRL 6 - Prototype Demo'].map((trl) => (
+                      <button
+                        type="button"
+                        key={trl}
+                        className={`stage-pill ${formData.techStage === trl ? 'active' : ''}`}
+                        onClick={() => setFormData({...formData, techStage: trl})}
+                      >
+                        {formData.techStage === trl && <Check size={13} />}
+                        <span>{trl}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-grid-2 mt-16">
+                  <div className="form-group">
+                    <label className="form-label">Technology & Prototype Domain</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. NavIC-enabled GNSS receiver, Multi-sensor GIS node"
+                      value={formData.techDomain}
+                      onChange={(e) => setFormData({...formData, techDomain: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Target TRL at Project Completion</label>
+                    <select 
+                      className="form-control"
+                      value={formData.techTargetTrl}
+                      onChange={(e) => setFormData({...formData, techTargetTrl: e.target.value})}
+                    >
+                      <option value="TRL 4 - Lab Validation">TRL 4 - Lab Component Validation</option>
+                      <option value="TRL 5 - Subsystem Integration">TRL 5 - Subsystem Lab Demonstration</option>
+                      <option value="TRL 6 - Field Prototype Demonstration">TRL 6 - Field Prototype Demonstration (VIKAS Target)</option>
+                      <option value="TRL 7 - Operational Pilot Ready">TRL 7 - Operational Pilot Ready</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-grid-2 mt-16">
+                  <div className="form-group">
+                    <label className="form-label">Lab / Testbed Facilities Required</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. NavIC Anechoic Chamber, Drone Testbed, RF Analyzer"
+                      value={formData.techLabRequirements}
+                      onChange={(e) => setFormData({...formData, techLabRequirements: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Key Prototype Milestones / Existing IP</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. Provisional patent filed, Lab bench simulator tested"
+                      value={formData.techMilestones}
+                      onChange={(e) => setFormData({...formData, techMilestones: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DYNAMIC: 6.2 STARTUPS & BUSINESS ENABLEMENT */}
+            {(formData.stakeholderType === '6.2 Startups & Business Enablement' || formData.stakeholderType === 'Startup') && (
               <div className="dynamic-content-box startup-box animate-fade-in">
                 <div className="form-group">
                   <label className="form-label">
-                    Stage (Idea / Prototype / Revenue) <span className="text-danger">*</span>
+                    Stage (Idea / Prototype / Revenue / Scaling) <span className="text-danger">*</span>
                   </label>
                   <div className="stage-pills-row">
                     {startupStages.map((stg) => (
@@ -1120,6 +1226,7 @@ export default function OnboardingForm({
                     <input 
                       type="text" 
                       className="form-control"
+                      placeholder="e.g. NavIC tracking, AI spatial analytics"
                       value={formData.startupDomain}
                       onChange={(e) => setFormData({...formData, startupDomain: e.target.value})}
                     />
@@ -1149,6 +1256,7 @@ export default function OnboardingForm({
                   <textarea 
                     className="form-control"
                     rows="3"
+                    placeholder="Describe existing proof-of-concepts, past pilots, grants, or incubation support..."
                     value={formData.startupPreviousWork}
                     onChange={(e) => setFormData({...formData, startupPreviousWork: e.target.value})}
                   />
@@ -1156,82 +1264,225 @@ export default function OnboardingForm({
               </div>
             )}
 
-            {/* DYNAMIC: IF EXPERT */}
-            {formData.stakeholderType === 'Expert' && (
-              <div className="dynamic-content-box expert-box animate-fade-in">
+            {/* DYNAMIC: 6.3 HUMAN RESOURCE DEVELOPMENT */}
+            {(formData.stakeholderType === '6.3 Human Resource Development' || formData.stakeholderType === 'Student / Researcher') && (
+              <div className="dynamic-content-box student-box animate-fade-in">
                 <div className="form-grid-2">
                   <div className="form-group">
-                    <label className="form-label">
-                      Area of Expertise <span className="text-danger">*</span>
-                    </label>
-                    <input 
-                      type="text" 
+                    <label className="form-label">Fellowship / Academic Program</label>
+                    <select 
                       className="form-control"
-                      value={formData.expertAreaOfExpertise}
-                      onChange={(e) => setFormData({...formData, expertAreaOfExpertise: e.target.value})}
-                      required
-                    />
+                      value={formData.studentProgram}
+                      onChange={(e) => setFormData({...formData, studentProgram: e.target.value})}
+                    >
+                      <option value="Chanakya Ph.D. Fellow">Chanakya Ph.D. Fellowship</option>
+                      <option value="Chanakya Postdoctoral Fellow">Chanakya Postdoctoral Fellowship</option>
+                      <option value="M.Tech / M.S. Research Fellow">M.Tech / M.S. (Research) Fellow</option>
+                      <option value="Undergraduate Fellow / Intern">Undergraduate (B.Tech) Summer Intern</option>
+                    </select>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">
-                      Experience (Years / Track Record) <span className="text-danger">*</span>
-                    </label>
+                    <label className="form-label">Department & Faculty Guide / Supervisor</label>
                     <input 
                       type="text" 
                       className="form-control"
-                      value={formData.expertExperience}
-                      onChange={(e) => setFormData({...formData, expertExperience: e.target.value})}
-                      required
+                      placeholder="e.g. Dept of Geoinformatics, Prof. S. Sharma"
+                      value={formData.studentDepartment}
+                      onChange={(e) => setFormData({...formData, studentDepartment: e.target.value})}
                     />
+                  </div>
+                </div>
+
+                <div className="form-group mt-16">
+                  <label className="form-label">Research Thesis / Fellowship Scope</label>
+                  <input 
+                    type="text" 
+                    className="form-control"
+                    placeholder="e.g. High-precision indoor positioning algorithms using NavIC & BLE"
+                    value={formData.studentResearchArea}
+                    onChange={(e) => setFormData({...formData, studentResearchArea: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* DYNAMIC: 6.4 SKILL DEVELOPMENT */}
+            {formData.stakeholderType === '6.4 Skill Development' && (
+              <div className="dynamic-content-box skill-box animate-fade-in">
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Target Training Audience</label>
+                    <select 
+                      className="form-control"
+                      value={formData.skillTargetAudience}
+                      onChange={(e) => setFormData({...formData, skillTargetAudience: e.target.value})}
+                    >
+                      <option value="Engineering Students & Faculty">Engineering Students & Faculty</option>
+                      <option value="Industry Professionals & MSMEs">Industry Professionals & MSMEs</option>
+                      <option value="Govt & PSU Technical Staff">Government & PSU Technical Staff</option>
+                      <option value="School Educators & Atal Labs">School Educators & Atal Labs</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Skill Domain & Technologies</label>
+                    <select 
+                      className="form-control"
+                      value={formData.skillDomain}
+                      onChange={(e) => setFormData({...formData, skillDomain: e.target.value})}
+                    >
+                      <option value="GIS & Spatial Analytics">GIS & Spatial Analytics</option>
+                      <option value="NavIC & PNT Applications">NavIC & PNT Applications</option>
+                      <option value="AI / ML in Geo-Intelligence">AI / ML in Geo-Intelligence</option>
+                      <option value="Drone Data Processing & Sensors">Drone Data Processing & Sensors</option>
+                      <option value="Cyber-Physical Systems & IoT">Cyber-Physical Systems & IoT</option>
+                    </select>
                   </div>
                 </div>
 
                 <div className="form-grid-2 mt-16">
                   <div className="form-group">
-                    <label className="form-label">
-                      Affiliation (Institution / University / Company) <span className="text-danger">*</span>
-                    </label>
-                    <input 
-                      type="text" 
+                    <label className="form-label">Proposed Training Format</label>
+                    <select 
                       className="form-control"
-                      value={formData.expertAffiliation}
-                      onChange={(e) => setFormData({...formData, expertAffiliation: e.target.value})}
-                      required
-                    />
+                      value={formData.skillTrainingFormat}
+                      onChange={(e) => setFormData({...formData, skillTrainingFormat: e.target.value})}
+                    >
+                      <option value="Hands-on Bootcamp (3-5 Days)">Hands-on Bootcamp (3-5 Days)</option>
+                      <option value="Faculty Development Program (FDP)">Faculty Development Program (FDP - 1 Week)</option>
+                      <option value="Certified Professional Course (4-8 Weeks)">Certified Professional Course (4-8 Weeks)</option>
+                      <option value="Executive Masterclass">Executive Masterclass (1-2 Days)</option>
+                    </select>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">
-                      Willingness (Select all that apply)
-                    </label>
-                    <div className="willingness-pills-row">
-                      {expertWillingnessOptions.map((opt) => {
-                        const isSelected = formData.expertWillingness.includes(opt);
-                        return (
-                          <button
-                            type="button"
-                            key={opt}
-                            className={`willingness-pill ${isSelected ? 'active' : ''}`}
-                            onClick={() => toggleExpertWillingness(opt)}
-                          >
-                            {isSelected && <Check size={12} />}
-                            <span>{opt}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <label className="form-label">Estimated Cohort Size</label>
+                    <select 
+                      className="form-control"
+                      value={formData.skillCohortSize}
+                      onChange={(e) => setFormData({...formData, skillCohortSize: e.target.value})}
+                    >
+                      <option value="25 - 50 Participants">25 - 50 Participants</option>
+                      <option value="50 - 100 Participants">50 - 100 Participants</option>
+                      <option value="100 - 300 Participants">100 - 300 Participants</option>
+                      <option value="300+ Participants (Massive Online)">300+ Participants (Massive Online)</option>
+                    </select>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* DYNAMIC: IF INSTITUTION */}
-            {formData.stakeholderType === 'Institution' && (
+            {/* DYNAMIC: 6.5 ACADEMIC COLLABORATIONS & MOUS */}
+            {formData.stakeholderType === '6.5 Academic Collaborations & MoUs' && (
+              <div className="dynamic-content-box collab-box animate-fade-in">
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Partner Institution / University Name <span className="text-danger">*</span></label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. IIT Madras, IISc Bengaluru, International University"
+                      value={formData.collabPartnerName}
+                      onChange={(e) => setFormData({...formData, collabPartnerName: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Collaboration Mode</label>
+                    <select 
+                      className="form-control"
+                      value={formData.collabMode}
+                      onChange={(e) => setFormData({...formData, collabMode: e.target.value})}
+                    >
+                      <option value="Joint R&D Project">Joint R&D Project</option>
+                      <option value="Strategic MoU / Bilateral Agreement">Strategic MoU / Bilateral Agreement</option>
+                      <option value="Faculty & Student Exchange">Faculty & Student Exchange</option>
+                      <option value="Shared Testbed & Lab Facilities">Shared Testbed & Lab Facilities</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-grid-2 mt-16">
+                  <div className="form-group">
+                    <label className="form-label">Principal Coordinator & Department</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. Dean R&D / Dept of Aerospace"
+                      value={formData.collabCoordinator}
+                      onChange={(e) => setFormData({...formData, collabCoordinator: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Expected Joint Deliverables / Outputs</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. Joint Patent, Joint Testbed, Co-authored Papers"
+                      value={formData.collabExpectedOutcome}
+                      onChange={(e) => setFormData({...formData, collabExpectedOutcome: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* DYNAMIC: 6.6 SCHOOLS & ACADEMIC OUTREACH */}
+            {(formData.stakeholderType === '6.6 Schools & Academic Outreach (VidyaGIS)' || formData.stakeholderType === 'School') && (
+              <div className="dynamic-content-box school-box animate-fade-in">
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Curriculum / Affiliation Board</label>
+                    <select 
+                      className="form-control"
+                      value={formData.schoolCurriculum}
+                      onChange={(e) => setFormData({...formData, schoolCurriculum: e.target.value})}
+                    >
+                      <option value="CBSE">CBSE (Central Board of Secondary Education)</option>
+                      <option value="ICSE">ICSE / ISC</option>
+                      <option value="State Board">State Secondary Board</option>
+                      <option value="International">IB / Cambridge</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">VidyaGIS Outreach Scope</label>
+                    <select 
+                      className="form-control"
+                      value={formData.schoolInterest}
+                      onChange={(e) => setFormData({...formData, schoolInterest: e.target.value})}
+                    >
+                      <option value="VidyaGIS & Spatial Intelligence Lab Setup">VidyaGIS & Spatial Intelligence Lab Setup</option>
+                      <option value="Teacher Training in GIS & Geospatial Tech">Teacher Training in GIS & Geospatial Tech</option>
+                      <option value="Student Workshops & National Competitions">Student Workshops & National Competitions</option>
+                      <option value="Atal Tinkering Lab (ATL) Geospatial Module">Atal Tinkering Lab (ATL) Geospatial Module</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group mt-16">
+                  <label className="form-label">Target Student Impact Count</label>
+                  <select 
+                    className="form-control"
+                    value={formData.schoolStudentCount}
+                    onChange={(e) => setFormData({...formData, schoolStudentCount: e.target.value})}
+                  >
+                    <option value="100 - 500 Students">100 - 500 Students</option>
+                    <option value="500 - 1500 Students">500 - 1,500 Students</option>
+                    <option value="1500+ Students">1,500+ Students (Multi-school cluster)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* DYNAMIC: 6.7 INSTITUTIONS & LABS NETWORK */}
+            {(formData.stakeholderType === '6.7 Institutions & Labs Network (SPIN Lab)' || formData.stakeholderType === 'Institution') && (
               <div className="dynamic-content-box institution-box animate-fade-in">
                 <div className="form-group">
                   <label className="form-label">
-                    Institution Type (College / University) <span className="text-danger">*</span>
+                    Institution Type (College / University / Center) <span className="text-danger">*</span>
                   </label>
                   <div className="stage-pills-row">
                     {institutionTypes.map((t) => (
@@ -1250,7 +1501,7 @@ export default function OnboardingForm({
 
                 <div className="form-group mt-16">
                   <label className="form-label">
-                    Interest (Select areas of institutional linkage)
+                    Institutional Linkage & Interest (Select all that apply)
                   </label>
                   <div className="willingness-pills-row">
                     {institutionInterests.map((interest) => {
@@ -1272,70 +1523,8 @@ export default function OnboardingForm({
               </div>
             )}
 
-            {/* DYNAMIC: IF STUDENT / RESEARCHER */}
-            {formData.stakeholderType === 'Student / Researcher' && (
-              <div className="dynamic-content-box student-box animate-fade-in">
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Academic Program</label>
-                    <select 
-                      className="form-control"
-                      value={formData.studentProgram}
-                      onChange={(e) => setFormData({...formData, studentProgram: e.target.value})}
-                    >
-                      <option value="Ph.D. / Research Scholar">Ph.D. / Research Scholar</option>
-                      <option value="Postdoctoral Fellow / Chanakya">Postdoctoral Fellow / Chanakya</option>
-                      <option value="M.Tech / M.S. (Research)">M.Tech / M.S. (Research)</option>
-                      <option value="B.Tech Final Year / Undergraduate">B.Tech Final Year / Undergraduate</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Department & Faculty Guide</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      value={formData.studentDepartment}
-                      onChange={(e) => setFormData({...formData, studentDepartment: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* DYNAMIC: IF SCHOOL */}
-            {formData.stakeholderType === 'School' && (
-              <div className="dynamic-content-box school-box animate-fade-in">
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Curriculum / Affiliation Board</label>
-                    <select 
-                      className="form-control"
-                      value={formData.schoolCurriculum}
-                      onChange={(e) => setFormData({...formData, schoolCurriculum: e.target.value})}
-                    >
-                      <option value="CBSE">CBSE (Central Board of Secondary Education)</option>
-                      <option value="ICSE">ICSE / ISC</option>
-                      <option value="State Board">State Secondary Board</option>
-                      <option value="International">IB / Cambridge</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">School Outreach Engagement</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      value={formData.schoolInterest}
-                      onChange={(e) => setFormData({...formData, schoolInterest: e.target.value})}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* DYNAMIC: IF INDUSTRY / GOVERNMENT */}
-            {(formData.stakeholderType === 'Industry' || formData.stakeholderType === 'Government') && (
+            {/* DYNAMIC: 6.8 INDUSTRY & GOVERNMENT INTERFACE */}
+            {(formData.stakeholderType === '6.8 Industry & Government Interface' || formData.stakeholderType === 'Industry' || formData.stakeholderType === 'Government') && (
               <div className="dynamic-content-box industry-box animate-fade-in">
                 <div className="form-grid-2">
                   <div className="form-group">
@@ -1343,6 +1532,7 @@ export default function OnboardingForm({
                     <input 
                       type="text" 
                       className="form-control"
+                      placeholder="e.g. Ministry of Earth Sciences, Space Systems Division, Tech Corp"
                       value={formData.industryDepartment}
                       onChange={(e) => setFormData({...formData, industryDepartment: e.target.value})}
                     />
@@ -1358,53 +1548,93 @@ export default function OnboardingForm({
                       <option value="Collaborative R&D / Tech Transfer">Collaborative R&D / Tech Transfer</option>
                       <option value="Grand Challenge / Problem Statement Sponsor">Grand Challenge / Problem Statement Sponsor</option>
                       <option value="Testbed Access & Procurement">Testbed Access & Procurement</option>
-                      <option value="Strategic MoU">Strategic MoU</option>
+                      <option value="Strategic MoU / Direct Procurement">Strategic MoU / Direct Procurement</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="form-group mt-16">
+                  <label className="form-label">Problem Statement / Use Case Scope</label>
+                  <input 
+                    type="text" 
+                    className="form-control"
+                    placeholder="Brief summary of industrial/governmental operational challenge to be solved..."
+                    value={formData.industryProblemStatementScope}
+                    onChange={(e) => setFormData({...formData, industryProblemStatementScope: e.target.value})}
+                  />
                 </div>
               </div>
             )}
 
-            {/* DYNAMIC: IF OTHER */}
-            {formData.stakeholderType === 'Other' && (
-              <div className="dynamic-content-box other-box animate-fade-in">
+            {/* DYNAMIC: 6.9 EXPERTS & ADVISORY NETWORK */}
+            {(formData.stakeholderType === '6.9 Experts & Advisory Network' || formData.stakeholderType === 'Expert') && (
+              <div className="dynamic-content-box expert-box animate-fade-in">
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">
-                      Organization / Entity Category
+                      Area of Expertise <span className="text-danger">*</span>
                     </label>
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. Non-profit, Individual, Consortium"
-                      value={formData.otherEntityCategory}
-                      onChange={(e) => setFormData({...formData, otherEntityCategory: e.target.value})}
+                      placeholder="e.g. NavIC Signal Processing, Edge AI, Satellite Radar"
+                      value={formData.expertAreaOfExpertise}
+                      onChange={(e) => setFormData({...formData, expertAreaOfExpertise: e.target.value})}
+                      required
                     />
                   </div>
+
                   <div className="form-group">
                     <label className="form-label">
-                      Key Operational Focus
+                      Experience (Years / Track Record) <span className="text-danger">*</span>
                     </label>
                     <input 
                       type="text" 
                       className="form-control"
-                      placeholder="e.g. Community Tech, Open Science, Social Impact"
-                      value={formData.otherFocusArea}
-                      onChange={(e) => setFormData({...formData, otherFocusArea: e.target.value})}
+                      placeholder="e.g. 15+ years in GNSS architecture, 20+ patents"
+                      value={formData.expertExperience}
+                      onChange={(e) => setFormData({...formData, expertExperience: e.target.value})}
+                      required
                     />
                   </div>
                 </div>
-                <div className="form-group mt-16">
-                  <label className="form-label">
-                    Proposed Engagement Highlights
-                  </label>
-                  <textarea 
-                    className="form-control"
-                    rows="3"
-                    placeholder="Outline your planned contribution or how you wish to collaborate..."
-                    value={formData.otherEngagementDetails}
-                    onChange={(e) => setFormData({...formData, otherEngagementDetails: e.target.value})}
-                  />
+
+                <div className="form-grid-2 mt-16">
+                  <div className="form-group">
+                    <label className="form-label">
+                      Affiliation (Institution / University / Company) <span className="text-danger">*</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="e.g. Indian Space Research Organisation (ISRO), IIT, Industry"
+                      value={formData.expertAffiliation}
+                      onChange={(e) => setFormData({...formData, expertAffiliation: e.target.value})}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      Advisory Willingness (Select all that apply)
+                    </label>
+                    <div className="willingness-pills-row">
+                      {expertWillingnessOptions.map((opt) => {
+                        const isSelected = formData.expertWillingness.includes(opt);
+                        return (
+                          <button
+                            type="button"
+                            key={opt}
+                            className={`willingness-pill ${isSelected ? 'active' : ''}`}
+                            onClick={() => toggleExpertWillingness(opt)}
+                          >
+                            {isSelected && <Check size={12} />}
+                            <span>{opt}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1440,69 +1670,6 @@ export default function OnboardingForm({
                   <span className="field-error-msg">{formErrors.problemStatement}</span>
                 )}
               </div>
-            </div>
-
-            {/* Optional Supporting Document Upload */}
-            <div className="mt-16 optional-doc-section">
-              <label className="form-label optional-doc-label">
-                <Paperclip size={14} className="text-amber" />
-                Supporting Document / Pitch Deck / Proposal (Optional)
-              </label>
-
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                style={{ display: 'none' }} 
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg" 
-                onChange={handleFileChange}
-              />
-
-              {formData.documentName ? (
-                <div className="doc-uploaded-card animate-fade-in">
-                  <div className="doc-file-info">
-                    <div className="doc-icon-badge">
-                      <FileText size={20} className="text-amber" />
-                    </div>
-                    <div className="doc-details">
-                      <span className="doc-filename">{formData.documentName}</span>
-                      <span className="doc-size-badge">{formData.documentSize} • Ready to submit</span>
-                    </div>
-                  </div>
-                  <div className="doc-actions">
-                    {formData.documentUrl && (
-                      <a 
-                        href={formData.documentUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="btn-doc-action"
-                        title="Preview"
-                      >
-                        <Eye size={14} /> Preview
-                      </a>
-                    )}
-                    <button 
-                      type="button" 
-                      className="btn-doc-action text-danger"
-                      onClick={handleRemoveFile}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div 
-                  className={`mini-dropzone ${isDragging ? 'drag-active' : ''}`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <UploadCloud size={24} className="text-amber" />
-                  <div className="mini-dropzone-text">
-                    <strong>Click to attach file</strong> or drag & drop (PDF, PPT, DOC up to 25 MB)
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -2235,116 +2402,6 @@ export default function OnboardingForm({
         .char-count {
           font-size: 12px;
           color: #94a3b8;
-        }
-
-        /* Optional Attachment Dropzone */
-        .optional-doc-section {
-          padding-top: 16px;
-          border-top: 1px solid #f1f5f9;
-        }
-
-        .optional-doc-label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          color: #334155;
-          font-size: 13px;
-          font-weight: 600;
-          margin-bottom: 8px;
-        }
-
-        .mini-dropzone {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 14px 18px;
-          background: #f8fafc;
-          border: 1.5px dashed #cbd5e1;
-          border-radius: 10px;
-          cursor: pointer;
-          transition: all var(--transition-fast);
-        }
-
-        .mini-dropzone:hover, .mini-dropzone.drag-active {
-          border-color: #d97706;
-          background: #fffbeb;
-        }
-
-        .mini-dropzone-text {
-          font-size: 13px;
-          color: #475569;
-        }
-
-        .mini-dropzone-text strong {
-          color: #b45309;
-        }
-
-        .doc-uploaded-card {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 16px;
-          background: #f8fafc;
-          border: 1px solid #fcd34d;
-          border-radius: 10px;
-        }
-
-        .doc-file-info {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .doc-icon-badge {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
-          background: #fef3c7;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .doc-details {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .doc-filename {
-          font-size: 13px;
-          font-weight: 700;
-          color: #0f172a;
-        }
-
-        .doc-size-badge {
-          font-size: 11px;
-          color: #64748b;
-        }
-
-        .doc-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .btn-doc-action {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 6px 10px;
-          font-size: 12px;
-          font-weight: 600;
-          border-radius: 6px;
-          border: 1px solid #cbd5e1;
-          background: #ffffff;
-          color: #334155;
-          cursor: pointer;
-          text-decoration: none;
-        }
-
-        .btn-doc-action:hover {
-          color: #0f172a;
-          border-color: #94a3b8;
         }
 
         /* SECTION 7: Consent */
