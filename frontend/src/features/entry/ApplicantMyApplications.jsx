@@ -79,6 +79,13 @@ export default function ApplicantMyApplications({
     }
 
     return false;
+  }).filter(app => {
+    const title = String(app.name || app.problemStatement || '').toLowerCase();
+    const intent = String(Array.isArray(app.intentOfEngagement) ? app.intentOfEngagement.join(' ') : (app.intentOfEngagement || '')).toLowerCase();
+    const isAutoRegisterStub =
+      title.includes('ecosystem registration') ||
+      intent.includes('vikas portal incubation');
+    return !isAutoRegisterStub;
   });
 
   const myFileNumbers = new Set(myApplications.map(a => a.fileNumber));
@@ -422,21 +429,28 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
     URL.revokeObjectURL(url);
   };
 
+  const formatTrackLabel = (app) => {
+    const verticals = Array.isArray(app.assignedVerticals) ? app.assignedVerticals.filter(Boolean) : [];
+    const primary = app.assignedVertical || verticals[0] || app.stakeholderType || '';
+    const raw = String(primary).trim();
+    if (!raw || raw.toUpperCase() === 'STARTUP') {
+      const aligned = (() => {
+        try { return localStorage.getItem('VIKAS_ALIGNED_TRACK'); } catch (e) { return null; }
+      })();
+      if (aligned) return aligned;
+    }
+    return raw || 'Not specified';
+  };
+
   return (
     <div className="applicant-portal-container animate-fade-in">
       {/* 1. Header Profile & Applicant Hero Area */}
       <div className="card applicant-hero-card">
         <div className="applicant-hero-content">
           <div className="applicant-hero-avatar">
-            <span>{currentUser.avatarBadge || '👤'}</span>
+            <span>{(currentUser.name || 'U').charAt(0).toUpperCase()}</span>
           </div>
           <div className="applicant-hero-details">
-            <div className="applicant-badge-row">
-              <span className="applicant-type-pill">{currentUser.applicantType || 'External Stakeholder'}</span>
-              <span className="applicant-mode-pill">
-                <ShieldCheck size={12} /> Applicant Dashboard Mode
-              </span>
-            </div>
             <h2 className="applicant-hero-name">{currentUser.name}</h2>
             <p className="applicant-hero-org">{currentUser.organization}</p>
             <span className="applicant-hero-email font-mono">{currentUser.email}</span>
@@ -451,66 +465,6 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
             <PlusCircle size={16} />
             <span>Submit New Application</span>
           </button>
-        </div>
-      </div>
-
-      {/* 2. Key Metrics Row */}
-      <div className="stats-row mt-20">
-        <div 
-          className="card stat-card" 
-          onClick={() => {
-            setDashboardView('applications');
-            setActiveFilterTab('all');
-          }} 
-          style={{ cursor: 'pointer' }}
-        >
-          <span className="stat-label">Total Submissions</span>
-          <span className="stat-value text-accent">{myApplications.length}</span>
-          <span className="stat-sub">Registered in portal</span>
-        </div>
-        <div 
-          className="card stat-card" 
-          onClick={() => {
-            setDashboardView('applications');
-            setActiveFilterTab('under_review');
-          }} 
-          style={{ cursor: 'pointer' }}
-        >
-          <span className="stat-label">In Workflow Progression</span>
-          <span className="stat-value text-warning">
-            {myApplications.filter(a => ['pending_screening', 'under_screening', 'screened', 'routing', 'pending_approval', 'returned_for_correction'].includes(a.status)).length}
-          </span>
-          <span className="stat-sub">Screening / Authority Review</span>
-        </div>
-        <div 
-          className="card stat-card" 
-          onClick={() => {
-            setDashboardView('applications');
-            setActiveFilterTab('approved');
-          }} 
-          style={{ cursor: 'pointer' }}
-        >
-          <span className="stat-label">Approved & Onboarded</span>
-          <span className="stat-value text-success">
-            {myApplications.filter(a => ['approved', 'engagement', 'completed'].includes(a.status)).length}
-          </span>
-          <span className="stat-sub">Enrolled into VIKAS Verticals</span>
-        </div>
-        <div 
-          className="card stat-card" 
-          onClick={() => {
-            setDashboardView('notifications');
-            setNotifCategoryFilter('all');
-          }} 
-          style={{ cursor: 'pointer' }}
-        >
-          <span className="stat-label">Workflow Notifications</span>
-          <span className="stat-value text-cyan">
-            {applicantNotifications.length}
-          </span>
-          <span className="stat-sub font-semibold" style={{ color: unreadNotifCount > 0 ? '#ef4444' : 'var(--text-muted)' }}>
-            {unreadNotifCount > 0 ? `${unreadNotifCount} Unread Alert${unreadNotifCount > 1 ? 's' : ''}` : 'All caught up'}
-          </span>
         </div>
       </div>
 
@@ -852,15 +806,17 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
 
                         <div className="meta-box">
                           <span className="meta-kicker">Stakeholder Category:</span>
-                          <strong className="meta-strong">{app.stakeholderType || currentUser.applicantType || 'Startup'}</strong>
+                          <strong className="meta-strong">{formatTrackLabel(app)}</strong>
                         </div>
 
                         <div className="meta-box">
                           <span className="meta-kicker">Assigned VIKAS Vertical(s):</span>
                           <strong className={`meta-strong ${(app.assignedVerticals?.length || app.assignedVertical) ? 'text-accent font-semibold' : 'text-muted'}`}>
-                            {Array.isArray(app.assignedVerticals) && app.assignedVerticals.length > 0 
-                              ? app.assignedVerticals.join(', ') 
-                              : (app.assignedVertical || 'Pending Operations Routing')}
+                            {Array.isArray(app.assignedVerticals) && app.assignedVerticals.length > 0
+                              ? app.assignedVerticals.filter((item) => item && String(item).toUpperCase() !== 'STARTUP').join(', ') || formatTrackLabel(app)
+                              : (app.assignedVertical && String(app.assignedVertical).toUpperCase() !== 'STARTUP'
+                                ? app.assignedVertical
+                                : formatTrackLabel(app))}
                           </strong>
                         </div>
 
@@ -1456,12 +1412,14 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
         }
 
         .applicant-hero-card {
-          padding: 24px;
+          padding: 22px 26px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(16, 185, 129, 0.05) 100%);
-          border-left: 4px solid var(--color-accent);
+          background: linear-gradient(180deg, #ffffff 0%, #fffdf8 70%, #fff7ed 100%);
+          border: 1px solid #e2e8f0;
+          border-radius: 24px;
+          box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
           flex-wrap: wrap;
           gap: 20px;
         }
@@ -1475,13 +1433,15 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
         .applicant-hero-avatar {
           width: 56px;
           height: 56px;
-          border-radius: var(--radius-full);
-          background: rgba(16, 185, 129, 0.15);
-          border: 2px solid rgba(16, 185, 129, 0.3);
+          border-radius: 16px;
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          color: #c2410c;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 26px;
+          font-size: 22px;
+          font-weight: 800;
           flex-shrink: 0;
         }
 
@@ -1565,9 +1525,9 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
         }
 
         .view-mode-btn.active {
-          color: var(--color-accent);
-          background: rgba(16, 185, 129, 0.12);
-          border-bottom: 3px solid var(--color-accent);
+          color: #b45309;
+          background: #fff7ed;
+          border-bottom: 3px solid #d97706;
         }
 
         .notif-tab-badge {

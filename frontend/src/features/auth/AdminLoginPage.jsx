@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuth, ROLES } from '../../context/AuthContext';
 
-export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateToAdminDashboard, onAdminLoginSuccess, onNavigateToLanding }) {
+export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateToAdminDashboard, onAdminLoginSuccess, onNavigateToLanding, theme = 'bright' }) {
   const { login, register, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('signin'); // 'signin' | 'register'
   
@@ -135,12 +135,16 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
   };
 
   return (
-    <div className="vikas-hero-auth-container">
+    <div className={`vikas-hero-auth-container theme-${theme}`}>
       {/* Background Ambience & Bokeh Particles */}
       <div className="hero-bg-overlay">
-        <div className="bokeh-circle bokeh-1" />
-        <div className="bokeh-circle bokeh-2" />
-        <div className="bokeh-circle bokeh-3" />
+        {theme === 'dark' && (
+          <>
+            <div className="bokeh-circle bokeh-1" />
+            <div className="bokeh-circle bokeh-2" />
+            <div className="bokeh-circle bokeh-3" />
+          </>
+        )}
         <div className="grid-overlay-lines" />
       </div>
 
@@ -555,7 +559,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 48px 40px;
+          padding: 24px 40px;
           background: #070c18;
           overflow: hidden;
         }
@@ -630,21 +634,21 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
           margin: 0 auto;
           display: grid;
           grid-template-columns: 1.15fr 0.85fr;
-          gap: 56px;
+          gap: 32px;
           align-items: center;
         }
 
         @media (max-width: 1024px) {
           .hero-content-wrapper {
             grid-template-columns: 1fr;
-            gap: 40px;
+            gap: 24px;
           }
         }
 
         .hero-left-column {
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 10px;
         }
 
         .hero-institution-badge {
@@ -687,7 +691,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
           line-height: 1.2;
           color: #ffffff;
           letter-spacing: -0.6px;
-          margin: 4px 0;
+          margin: 0;
           font-family: 'Outfit', 'Inter', sans-serif;
         }
 
@@ -704,7 +708,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
 
         .hero-accent-banner {
           position: relative;
-          margin: 4px 0 8px 0;
+          margin: 0;
           width: fit-content;
         }
 
@@ -745,8 +749,8 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
         .hero-pillars-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 14px;
-          margin-top: 6px;
+          gap: 10px;
+          margin-top: 2px;
         }
 
         @media (max-width: 640px) {
@@ -814,12 +818,12 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
           background: rgba(13, 20, 36, 0.88);
           border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 20px;
-          padding: 28px 26px;
+          padding: 20px 22px;
           box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6), 0 0 35px rgba(217, 119, 6, 0.12);
           backdrop-filter: blur(20px);
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 12px;
         }
 
         .auth-tab-bar {
@@ -857,6 +861,12 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
           color: #e2e8f0;
         }
 
+        .auth-tab-content {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
         .auth-header-mini {
           text-align: left;
         }
@@ -880,7 +890,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
         .auth-form {
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 10px;
         }
 
         .form-row-2 {
@@ -963,7 +973,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
         }
 
         .btn-auth-primary {
-          margin-top: 6px;
+          margin-top: 2px;
           width: 100%;
           padding: 12px;
           color: #ffffff;

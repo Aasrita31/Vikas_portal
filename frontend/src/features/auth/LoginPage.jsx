@@ -7,7 +7,8 @@ import {
   Eye, 
   EyeOff, 
   Building, 
-  User, 
+  User,
+  Phone, 
   CheckCircle2, 
   ChevronRight, 
   Layers
@@ -15,7 +16,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { Shield } from 'lucide-react';
 
-export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavigateToAdmin, onNavigateToLanding }) {
+export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavigateToAdmin, onNavigateToLanding, theme = 'bright' }) {
   const { login, register, loading } = useAuth();
 
   const [activeTab, setActiveTab] = useState('signin'); // 'signin' | 'register'
@@ -87,6 +88,11 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
       setErrorMessage('Please enter a valid email address.');
       return;
     }
+    const phoneDigits = regPhone.replace(/\D/g, '');
+    if (!regPhone.trim() || phoneDigits.length < 10) {
+      setErrorMessage('Please enter a valid phone number with at least 10 digits.');
+      return;
+    }
     if (!regPassword.trim() || regPassword.length < 6) {
       setErrorMessage('Password must be at least 6 characters long.');
       return;
@@ -105,18 +111,20 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         name: regName.trim(),
         organization: regOrg.trim(),
         email: regEmail.trim().toLowerCase(),
-        phone: regPhone.trim() || undefined,
+        phone: regPhone.trim(),
         password: regPassword,
         stakeholder_type: 'STARTUP',
         domains: ['PNT / NavIC / GNSS', 'IoT / Sensor Fusion'],
         intent_of_engagement: 'VIKAS Portal Incubation & Technology Development'
       });
 
-      setEmail(regEmail.trim().toLowerCase());
+      setEmail('');
       setPassword('');
+      setShowPassword(false);
       setRegName('');
       setRegOrg('');
       setRegEmail('');
+      setRegPhone('');
       setRegPassword('');
       setRegConfirmPassword('');
       setActiveTab('signin');
@@ -127,20 +135,22 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
   };
 
   return (
-    <div className="vikas-hero-auth-container">
+    <div className={`vikas-hero-auth-container theme-${theme}`}>
       {/* Background Ambience & Bokeh Particles */}
       <div className="hero-bg-overlay">
-        <div className="bokeh-circle bokeh-1" />
-        <div className="bokeh-circle bokeh-2" />
-        <div className="bokeh-circle bokeh-3" />
+        {theme === 'dark' && (
+          <>
+            <div className="bokeh-circle bokeh-1" />
+            <div className="bokeh-circle bokeh-2" />
+            <div className="bokeh-circle bokeh-3" />
+          </>
+        )}
         <div className="grid-overlay-lines" />
       </div>
 
       <div className="hero-content-wrapper">
         {/* LEFT COLUMN: HERO HEADLINE & BRANDING */}
         <div className="hero-left-column">
-
-
           <h1 className="hero-headline animate-slide-up">
             Onboard to the <br />
             <span className="hero-headline-highlight">VIKAS Ecosystem</span> & <br />
@@ -239,7 +249,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                   </p>
                 </div>
 
-                <form onSubmit={handleSignInSubmit} className="auth-form" noValidate>
+                <form onSubmit={handleSignInSubmit} className="auth-form" noValidate autoComplete="off">
                   <div className="form-group">
                     <label className="form-label" htmlFor="login-email">
                       Registered Email Address <span className="text-required">*</span>
@@ -256,7 +266,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                           setEmail(e.target.value);
                           if (errorMessage) setErrorMessage('');
                         }}
-                        autoComplete="email"
+                        autoComplete="off"
                         required
                       />
                     </div>
@@ -280,7 +290,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                           setPassword(e.target.value);
                           if (errorMessage) setErrorMessage('');
                         }}
-                        autoComplete="current-password"
+                        autoComplete="off"
                         required
                       />
                       <button 
@@ -335,19 +345,42 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                 </div>
 
                 <form onSubmit={handleRegisterSubmit} className="auth-form" noValidate>
-                  <div className="form-group">
-                    <label className="form-label">
-                      Full Name <span className="text-required">*</span>
-                    </label>
-                    <div className="input-with-icon">
-                      <User size={16} className="input-icon" />
-                      <input 
-                        type="text"
-                        className="form-input"
-                        value={regName}
-                        onChange={(e) => setRegName(e.target.value)}
-                        required
-                      />
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="register-name">
+                        Full Name <span className="text-required">*</span>
+                      </label>
+                      <div className="input-with-icon">
+                        <User size={16} className="input-icon" />
+                        <input 
+                          id="register-name"
+                          type="text"
+                          className="form-input"
+                          value={regName}
+                          onChange={(e) => setRegName(e.target.value)}
+                          autoComplete="name"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="register-phone">
+                        Phone Number <span className="text-required">*</span>
+                      </label>
+                      <div className="input-with-icon">
+                        <Phone size={16} className="input-icon" />
+                        <input 
+                          id="register-phone"
+                          type="tel"
+                          className="form-input"
+                          placeholder="10-digit number"
+                          value={regPhone}
+                          onChange={(e) => setRegPhone(e.target.value)}
+                          autoComplete="tel"
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -434,7 +467,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                   <button 
                     type="submit" 
                     className="btn-auth-primary" 
-                    disabled={loading || !regName || !regOrg || !regEmail || !regPassword || !regConfirmPassword}
+                    disabled={loading || !regName || !regOrg || !regEmail || !regPhone || !regPassword || !regConfirmPassword}
                   >
                     {loading ? (
                       <span className="btn-loading-state">
@@ -476,7 +509,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 48px 40px;
+          padding: 24px 40px;
           background: #070c18;
           overflow-x: hidden;
         }
@@ -553,14 +586,14 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           margin: 0 auto;
           display: grid;
           grid-template-columns: 1.15fr 0.85fr;
-          gap: 56px;
+          gap: 32px;
           align-items: center;
         }
 
         @media (max-width: 1024px) {
           .hero-content-wrapper {
             grid-template-columns: 1fr;
-            gap: 40px;
+            gap: 24px;
             max-width: 720px;
           }
 
@@ -581,7 +614,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         .hero-left-column {
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 10px;
         }
 
         .hero-institution-badge {
@@ -624,7 +657,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           line-height: 1.12;
           color: #ffffff;
           letter-spacing: -0.8px;
-          margin: 4px 0;
+          margin: 0;
           font-family: 'Outfit', 'Inter', sans-serif;
         }
 
@@ -642,7 +675,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         /* Angled High-Tech Accent Banner */
         .hero-accent-banner {
           position: relative;
-          margin: 4px 0 8px 0;
+          margin: 0;
           width: fit-content;
         }
 
@@ -684,8 +717,8 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         .hero-pillars-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, max-content));
-          gap: 14px;
-          margin-top: 6px;
+          gap: 10px;
+          margin-top: 2px;
           align-items: stretch;
         }
 
@@ -707,7 +740,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           display: flex;
           align-items: flex-start;
           gap: 12px;
-          padding: 14px 12px;
+          padding: 11px 12px;
           border-radius: 12px;
           background: rgba(255, 255, 255, 0.035);
           border: 1px solid rgba(255, 255, 255, 0.08);
@@ -763,12 +796,12 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           background: rgba(13, 20, 36, 0.88);
           border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 20px;
-          padding: 28px 26px;
+          padding: 20px 22px;
           box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6), 0 0 35px rgba(217, 119, 6, 0.12);
           backdrop-filter: blur(20px);
           display: flex;
           flex-direction: column;
-          gap: 18px;
+          gap: 12px;
         }
 
         /* Tab Switcher */
@@ -807,6 +840,12 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           color: #e2e8f0;
         }
 
+        .auth-tab-content {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
         /* Auth Header */
         .auth-header-mini {
           text-align: left;
@@ -832,12 +871,12 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         .auth-form {
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 10px;
         }
 
         .form-row-2 {
           display: grid;
-          grid-template-columns: 1.2fr 0.8fr;
+          grid-template-columns: 1fr 1fr;
           gap: 10px;
         }
 
@@ -923,7 +962,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
 
         /* Buttons */
         .btn-auth-primary {
-          margin-top: 6px;
+          margin-top: 2px;
           width: 100%;
           padding: 12px;
           background: linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%);
@@ -1129,11 +1168,11 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           .vikas-hero-auth-container {
             min-height: auto;
             align-items: flex-start;
-            padding: 28px 16px 48px;
+            padding: 16px 16px 32px;
           }
 
           .hero-content-wrapper {
-            gap: 28px;
+            gap: 18px;
           }
 
           .hero-institution-badge {
@@ -1155,7 +1194,7 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
           }
 
           .auth-glass-card {
-            padding: 22px 18px;
+            padding: 18px 16px;
           }
 
           .hero-playbook-tagline {

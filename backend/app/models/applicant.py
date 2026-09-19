@@ -1,9 +1,13 @@
 import hashlib
+import json
 import secrets
 from enum import Enum
+from pathlib import Path
 from typing import Optional, Dict, List
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
+
+USERS_STORE_PATH = Path(__file__).resolve().parents[2] / "data" / "applicant_users.json"
 
 def hash_password(password: str) -> str:
     """
@@ -85,7 +89,11 @@ class ApplicantRepository:
         self._users_by_id: Dict[str, ApplicantUser] = {}
         self._users_by_email: Dict[str, str] = {} # email.lower() -> user_id
         self._users_by_token: Dict[str, str] = {} # token -> user_id
+        self._persist_enabled = False
         self._seed_initial_users()
+        self._load_persisted_users()
+        self._persist_enabled = True
+        self._persist_users()
 
     def _seed_initial_users(self):
         # 1. Primary Test Applicant: Aasrita Reddy (STARTUP applicant)
@@ -258,9 +266,9 @@ class ApplicantRepository:
         Persists directly to PostgreSQL database table 'users'.
         """
         email_clean = email.strip().lower()
-        if email_clean in self._users_by_email:
-            existing_user = self._users_by_email[email_clean]
-            if name and not existing_user.name:
+        existing_user = self.get_by_email(email_clean)
+        if existing_user:
+            if name and (not existing_user.name or existing_user.name == "Registered Applicant"):
                 existing_user.name = name.strip()
             if phone and not existing_user.phone:
                 existing_user.phone = phone.strip()
@@ -268,6 +276,8 @@ class ApplicantRepository:
                 existing_user.organization = organization.strip()
             if location and not existing_user.location:
                 existing_user.location = location.strip()
+            if password and not existing_user.hashed_password:
+                existing_user.hashed_password = hash_password(password)
             return self.save(existing_user)
 
         uid = user_id or f"usr_{secrets.token_hex(8)}"
@@ -414,7 +424,53 @@ class ApplicantRepository:
         self._users_by_email[user.email.lower()] = user.id
         if user.session_token:
             self._users_by_token[user.session_token] = user.id
+        self._persist_users()
         return user
+
+    def _persist_users(self) -> None:
+        if not getattr(self, "_persist_enabled", False):
+            return
+        try:
+            USERS_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            payload = []
+            for user in self._users_by_id.values():
+                row = user.model_dump()
+                row["session_token"] = None
+                payload.append(row)
+            USERS_STORE_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except Exception as e:
+            print(f"[User store] Could not persist users: {e}")
+
+    def _load_persisted_users(self) -> None:
+        try:
+            if not USERS_STORE_PATH.exists():
+                return
+            payload = json.loads(USERS_STORE_PATH.read_text(encoding="utf-8"))
+            if not isinstance(payload, list):
+                return
+            for row in payload:
+                email_clean = str(row.get("email") or "").strip().lower()
+                if not email_clean:
+                    continue
+                existing = self.get_by_email(email_clean)
+                if existing:
+                    if row.get("hashed_password"):
+                        existing.hashed_password = row["hashed_password"]
+                    if row.get("name") and (not existing.name or existing.name == "Registered Applicant"):
+                        existing.name = row["name"]
+                    if row.get("organization") and not existing.organization:
+                        existing.organization = row["organization"]
+                    if row.get("phone") and not existing.phone:
+                        existing.phone = row["phone"]
+                    self._users_by_id[existing.id] = existing
+                    continue
+                row["email"] = email_clean
+                row["session_token"] = None
+                user = ApplicantUser(**row)
+                self._users_by_id[user.id] = user
+                self._users_by_email[email_clean] = user.id
+        except Exception as e:
+            print(f"[User store] Could not load persisted users: {e}")
 
     def get_by_id(self, user_id: str) -> Optional[ApplicantUser]:
         return self._users_by_id.get(user_id)

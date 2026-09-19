@@ -242,7 +242,34 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('landing');
   const [featureSubTab, setFeatureSubTab] = useState('onboard');
   const [overviewKey, setOverviewKey] = useState(0);
-  const [highlightedVerticalTrack, setHighlightedVerticalTrack] = useState(null);
+  const [highlightedVerticalTrack, setHighlightedVerticalTrack] = useState(() => {
+    try {
+      return localStorage.getItem('VIKAS_ALIGNED_TRACK') || null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [portalTheme, setPortalTheme] = useState(() => {
+    try {
+      return localStorage.getItem('VIKAS_PORTAL_THEME') || 'bright';
+    } catch (e) {
+      return 'bright';
+    }
+  });
+
+  const togglePortalTheme = () => {
+    setPortalTheme((current) => {
+      const next = current === 'dark' ? 'bright' : 'dark';
+      try {
+        localStorage.setItem('VIKAS_PORTAL_THEME', next);
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', portalTheme);
+  }, [portalTheme]);
 
 
   // Role Guard: If activeTab becomes forbidden when persona changes, redirect safely to applicant dashboard
@@ -349,8 +376,11 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleTabChange = (tabId) => {
-    if (tabId === activeTab) return;
+  const handleTabChange = (tabId, extra) => {
+    if (extra?.alignedTrack) {
+      setHighlightedVerticalTrack(extra.alignedTrack);
+    }
+    if (tabId === activeTab && !extra?.alignedTrack) return;
 
     // Strict RBAC Navigation Guard: Applicants cannot enter internal workflow tabs
     if (isApplicant && (tabId === 'screening' || tabId === 'approval')) {
@@ -405,6 +435,14 @@ function AppContent() {
     } catch (e) {}
     return INITIAL_SEED_APPLICATIONS;
   });
+
+  useEffect(() => {
+    try {
+      if (highlightedVerticalTrack) {
+        localStorage.setItem('VIKAS_ALIGNED_TRACK', highlightedVerticalTrack);
+      }
+    } catch (e) {}
+  }, [highlightedVerticalTrack]);
 
   // Persist all user registrations across page reloads
   useEffect(() => {
@@ -639,11 +677,17 @@ function AppContent() {
       case 'landing':
         return (
           <LandingPage 
-            onNavigateToRegister={() => handleTabChange('entry')}
+            theme={portalTheme}
+            onToggleTheme={togglePortalTheme}
+            onNavigateToRegister={() => handleTabChange('login')}
             onNavigateToLogin={() => handleTabChange('login')}
             onNavigateToEntry={() => handleTabChange('entry')}
             onNavigateToOverview={() => handleTabChange('overview')}
             onNavigateToAdmin={() => handleTabChange('admin-login')}
+            onExploreTrack={(track) => {
+              setHighlightedVerticalTrack(track);
+              handleTabChange('overview');
+            }}
           />
         );
       case 'overview':
@@ -653,12 +697,13 @@ function AppContent() {
             applications={applications} 
             onNavigateToTab={(tab) => handleTabChange(tab)} 
             onAddApplication={handleAddNewApplication}
-            highlightedTrack={highlightedVerticalTrack || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup'}
+            highlightedTrack={highlightedVerticalTrack || currentUser?.assignedVertical || currentUser?.stakeholderType || 'Startup'}
           />
         );
       case 'login':
         return (
           <LoginPage 
+            theme={portalTheme}
             onNavigateToRegister={() => handleTabChange('entry')}
             onLoginSuccess={(user, userApps) => handleUserLoggedIn(user, userApps)}
             onNavigateToAdmin={() => handleTabChange('admin-login')}
@@ -668,6 +713,7 @@ function AppContent() {
       case 'admin-login':
         return (
           <AdminLoginPage 
+            theme={portalTheme}
             onNavigateToApplicantLogin={() => handleTabChange('login')}
             onNavigateToAdminDashboard={() => handleTabChange('admin')}
             onNavigateToLanding={() => handleTabChange('landing')}
@@ -694,6 +740,8 @@ function AppContent() {
             onSubmitApplication={handleAddNewApplication} 
             onNavigateToLogin={() => handleTabChange('login')}
             onNavigateToLanding={() => handleTabChange('landing')}
+            onNavigateToTab={(tab, extra) => handleTabChange(tab, extra)}
+            onAlignedTrackChange={setHighlightedVerticalTrack}
           />
         );
 
@@ -744,6 +792,7 @@ function AppContent() {
         if (!isAuthenticated) {
           return (
             <LoginPage 
+              theme={portalTheme}
               onNavigateToRegister={() => handleTabChange('entry')}
               onLoginSuccess={(user, userApps) => handleUserLoggedIn(user, userApps)}
             />
@@ -769,11 +818,13 @@ function AppContent() {
     }
   };
 
-  const isHeroDark = activeTab === 'landing' || activeTab === 'login' || activeTab === 'admin-login';
+  const isLanding = activeTab === 'landing';
+  const isAuthScreen = activeTab === 'login' || activeTab === 'admin-login';
+  const isDarkTheme = portalTheme === 'dark';
 
   return (
-    <div className="app-container">
-      <main className={`main-content ${isHeroDark ? 'main-content-dark' : ''}`}>
+    <div className={`app-container theme-${portalTheme}`}>
+      <main className={`main-content ${isDarkTheme ? 'main-content-dark' : ''} ${isLanding ? 'main-content-landing' : ''}`}>
         {activeTab !== 'landing' && (
           <Header 
             activeTab={activeTab} 
@@ -784,6 +835,7 @@ function AppContent() {
             notifications={notifications}
             onClearNotifications={handleClearNotifications}
             onNotificationClick={handleNotificationClick}
+            portalTheme={portalTheme}
           />
         )}
 
@@ -820,7 +872,7 @@ function AppContent() {
           </div>
         )}
 
-        <div className={`content-body ${isHeroDark ? 'content-body-hero' : ''}`}>
+        <div className={`content-body ${isAuthScreen ? 'content-body-auth' : ''} ${isAuthScreen && isDarkTheme ? 'content-body-hero' : ''} ${isLanding ? 'content-body-landing' : ''} ${!isLanding && !isAuthScreen && isDarkTheme ? 'content-body-dark' : ''}`}>
           {renderActiveMainTab()}
         </div>
 

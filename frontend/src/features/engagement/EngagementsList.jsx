@@ -39,15 +39,16 @@ export default function EngagementsList({
   const mapTrackToVerticalId = (track) => {
     if (!track) return 'STARTUP';
     const t = String(track).toUpperCase();
-    if (t.includes('STARTUP')) return 'STARTUP';
-    if (t.includes('STUDENT') || t.includes('RESEARCH') || t.includes('HRD')) return 'HRD';
-    if (t.includes('SCHOOL') || t.includes('OUTREACH') || t.includes('VIDYAGIS')) return 'SCHOOL';
-    if (t.includes('INSTITUT') || t.includes('LAB') || t.includes('SPIN')) return 'LAB_NET';
-    if (t.includes('INDUSTRY') || t.includes('GOVT') || t.includes('GOVERNMENT')) return 'INDUSTRY';
-    if (t.includes('EXPERT') || t.includes('MENTOR') || t.includes('ADVISORY')) return 'EXPERT';
+    if (t.includes('6.1')) return 'TECH_DEV';
+    if (t.includes('6.2') || t.includes('STARTUP')) return 'STARTUP';
+    if (t.includes('6.3') || t.includes('HRD') || t.includes('HUMAN RESOURCE') || t.includes('STUDENT') || t.includes('RESEARCH')) return 'HRD';
+    if (t.includes('6.4') || t.includes('SKILL')) return 'SKILL';
+    if (t.includes('6.5') || t.includes('COLLAB') || t.includes('MOU')) return 'COLLAB';
+    if (t.includes('6.6') || t.includes('SCHOOL') || t.includes('VIDYAGIS') || t.includes('OUTREACH')) return 'SCHOOL';
+    if (t.includes('6.7') || t.includes('SPIN') || t.includes('LAB_NET') || t.includes('INSTITUTION')) return 'LAB_NET';
+    if (t.includes('6.8') || t.includes('INDUSTRY') || t.includes('GOVERNMENT') || t.includes('GOVT')) return 'INDUSTRY';
+    if (t.includes('6.9') || t.includes('EXPERT') || t.includes('MENTOR') || t.includes('ADVISORY')) return 'EXPERT';
     if (t.includes('TECH') || t.includes('TDP') || t.includes('PROTOTYPE')) return 'TECH_DEV';
-    if (t.includes('SKILL')) return 'SKILL';
-    if (t.includes('COLLAB')) return 'COLLAB';
     return 'STARTUP';
   };
 
@@ -298,7 +299,7 @@ export default function EngagementsList({
               }}
             >
               <Sparkles size={14} className="sparkle-icon" />
-              <span>ALIGNED TO YOUR TRACK: {highlightedTrack?.toUpperCase() || 'STARTUP'}</span>
+              <span>ALIGNED TO YOUR TRACK: {preferenceVerticalObj.title.toUpperCase()}</span>
             </div>
             
             <h2 className="spotlight-title">

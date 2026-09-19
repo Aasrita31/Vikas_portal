@@ -36,7 +36,9 @@ export default function OnboardingForm({
   onDirtyChange, 
   onNavigateToLogin,
   onNavigateToDashboard,
-  onNavigateToLanding
+  onNavigateToLanding,
+  onNavigateToTab,
+  onAlignedTrackChange
 }) {
   const { currentUser, user, register, authFetch, loading: authLoading } = useAuth();
   const [formErrors, setFormErrors] = useState({});
@@ -312,11 +314,15 @@ export default function OnboardingForm({
 
   // Handle Vertical / Stakeholder Selection
   const handleSelectVertical = (verticalId) => {
+    const nextValue = formData.stakeholderType === verticalId ? '' : verticalId;
     setFormData(prev => ({
       ...prev,
-      stakeholderType: prev.stakeholderType === verticalId ? '' : verticalId,
+      stakeholderType: nextValue,
       otherStakeholderType: verticalId === 'Other' ? prev.otherStakeholderType : ''
     }));
+    if (nextValue && onAlignedTrackChange) {
+      onAlignedTrackChange(nextValue);
+    }
     if (formErrors.stakeholderType) {
       setFormErrors(prev => ({ ...prev, stakeholderType: null }));
     }
@@ -430,13 +436,14 @@ export default function OnboardingForm({
     }
 
     setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) {
-      const firstErrorKey = Object.keys(formErrors)[0];
+    const currentErrors = validateForm();
+    if (Object.keys(currentErrors).length > 0) {
+      const firstErrorKey = Object.keys(currentErrors)[0];
       const errorElement = document.getElementById(`field-${firstErrorKey}`);
       if (errorElement) {
         errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -620,7 +627,11 @@ export default function OnboardingForm({
         onSubmitApplication(registeredApp);
       }
 
-      setSubmittedData(registeredApp);
+      if (onNavigateToTab) {
+        onNavigateToTab('overview');
+      } else {
+        setSubmittedData(registeredApp);
+      }
     } catch (err) {
       setFormErrors({ api: err.message || 'Submission failed. Please check inputs.' });
       const apiErrEl = document.getElementById('field-name');
@@ -796,6 +807,63 @@ export default function OnboardingForm({
               </div>
             </div>
 
+            {/* Verticals Mapping summary */}
+            <div className="receipt-summary-block" style={{ gridColumn: '1 / -1' }}>
+              <div className="receipt-block-header">
+                <Layers size={15} className="header-icon-amber" />
+                <span>VIKAS Verticals Mapping</span>
+              </div>
+              <div className="receipt-block-content" style={{ marginTop: '15px' }}>
+                <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '15px' }}>
+                  Based on your application, you have been mapped to the following operational verticals:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
+                  {[
+                    '6.1 Technology Development',
+                    '6.2 Startups & Business Enablement',
+                    '6.3 Human Resource Development',
+                    '6.4 Skill Development',
+                    '6.5 Academic Collaborations & MoUs',
+                    '6.6 Schools & Academic Outreach (VidyaGIS)',
+                    '6.7 Institutions & Labs Network (SPIN Lab)',
+                    '6.8 Industry & Government Interface',
+                    '6.9 Experts & Advisory Network'
+                  ].map(vertical => {
+                    const isAssigned = submittedData.assignedVerticals?.includes(vertical) || submittedData.assignedVertical === vertical;
+                    const isPrimary = submittedData.assignedVertical === vertical;
+                    return (
+                      <div 
+                        key={vertical} 
+                        style={{
+                          padding: '10px 14px',
+                          borderRadius: '8px',
+                          border: isAssigned ? '1px solid #f59e0b' : '1px solid #e2e8f0',
+                          backgroundColor: isAssigned ? '#fffbeb' : '#f8fafc',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          opacity: isAssigned ? 1 : 0.6
+                        }}
+                      >
+                        <span style={{ 
+                          fontSize: '13px', 
+                          fontWeight: isAssigned ? '600' : '400',
+                          color: isAssigned ? '#78350f' : '#64748b'
+                        }}>
+                          {vertical}
+                        </span>
+                        {isPrimary ? (
+                          <span className="badge badge-amber" style={{ fontSize: '10px', padding: '2px 6px' }}>Primary</span>
+                        ) : isAssigned ? (
+                          <span className="badge badge-blue" style={{ fontSize: '10px', padding: '2px 6px' }}>Secondary</span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
             {/* Section 5 summary */}
             <div className="receipt-summary-block">
               <div className="receipt-block-header">
@@ -920,7 +988,7 @@ export default function OnboardingForm({
         <form onSubmit={handleSubmit} className="onboarding-main-form" noValidate>
           {/* Header Banner */}
           <div className="card form-masthead">
-            <h1 className="masthead-title">VIKAS Ecosystem Proposal & Onboarding Form</h1>
+            <h1 className="masthead-title">User Data Capture</h1>
             <p className="masthead-desc">
               National single-window intake & proposal dossier submission for startups, researchers, institutions, industry, schools, and domain experts.
             </p>
@@ -1740,9 +1808,24 @@ export default function OnboardingForm({
 
           {/* Form Action Buttons */}
           <div className="form-submit-footer">
-            <button type="submit" className="btn btn-primary btn-submit-large">
+            <button
+              type="button"
+              className="btn btn-primary btn-submit-large"
+              onClick={() => {
+                if (!formData.stakeholderType) {
+                  setFormErrors(prev => ({
+                    ...prev,
+                    stakeholderType: 'Please select an Engagement Track / VIKAS Vertical in Section 3.'
+                  }));
+                  document.getElementById('field-dynamicDetails')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  return;
+                }
+                if (onAlignedTrackChange) onAlignedTrackChange(formData.stakeholderType);
+                onNavigateToTab('overview', { alignedTrack: formData.stakeholderType });
+              }}
+            >
               <Layers size={18} />
-              Submit Onboarding Form & Generate File Number
+              Way to our verticals
             </button>
             <button type="button" className="btn btn-secondary" onClick={resetForm}>
               <RefreshCw size={16} />
@@ -1755,20 +1838,19 @@ export default function OnboardingForm({
       {/* COMPREHENSIVE STYLING - CRISP, BRIGHT, HARMONIOUS THEME */}
       <style>{`
         .vikas-onboarding-wrapper {
-          max-width: 920px;
+          max-width: 1080px;
           margin: 0 auto;
-          padding-bottom: 60px;
+          padding-bottom: 48px;
         }
 
-        /* Masthead - Clean light gradient with rich amber border */
+        /* Masthead - matches landing white cards + gold wash */
         .form-masthead {
-          padding: 32px 36px;
-          margin-bottom: 24px;
-          background: linear-gradient(135deg, #ffffff 0%, #f8fafc 65%, #fef3c7 100%);
+          padding: 28px 32px;
+          margin-bottom: 18px;
+          background: linear-gradient(180deg, #ffffff 0%, #fffdf8 58%, #fff7ed 100%);
           border: 1px solid #e2e8f0;
-          border-left: 5px solid #d97706;
-          border-radius: 16px;
-          box-shadow: 0 4px 16px -2px rgba(217, 119, 6, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+          border-radius: 24px;
+          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
         }
 
         .masthead-badge-row {
@@ -1812,18 +1894,19 @@ export default function OnboardingForm({
         }
 
         .masthead-title {
-          font-size: 34px;
+          font-size: clamp(28px, 3.2vw, 40px);
           font-weight: 800;
           color: #0f172a;
-          letter-spacing: -0.6px;
-          line-height: 1.25;
-          margin-bottom: 10px;
+          letter-spacing: -0.03em;
+          line-height: 1.2;
+          margin-bottom: 8px;
         }
 
         .masthead-desc {
-          font-size: 16.5px;
-          color: #334155;
-          line-height: 1.6;
+          font-size: 16px;
+          color: #475569;
+          line-height: 1.65;
+          max-width: 720px;
         }
 
         /* Quicknav Stepper */
@@ -1879,18 +1962,18 @@ export default function OnboardingForm({
 
         /* Section Cards */
         .section-card {
-          margin-bottom: 24px;
-          padding: 28px 32px;
+          margin-bottom: 18px;
+          padding: 24px 28px;
           background-color: #ffffff;
           border: 1px solid #e2e8f0;
-          border-radius: 16px;
-          box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
+          border-radius: 24px;
+          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
           transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
         }
 
         .section-card:hover {
-          border-color: #cbd5e1;
-          box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.07);
+          border-color: #fde68a;
+          box-shadow: 0 16px 32px rgba(217, 119, 6, 0.08);
         }
 
         .section-card-header {
@@ -1953,10 +2036,10 @@ export default function OnboardingForm({
           padding: 12px 20px;
           background: #ffffff;
           border: 1px solid #e2e8f0;
-          border-left: 4px solid #d97706;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          border-radius: 16px;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
           flex-wrap: wrap;
+          margin-bottom: 16px;
         }
 
         .strip-item {
@@ -2837,6 +2920,51 @@ export default function OnboardingForm({
           color: #059669;
           font-weight: 600;
           margin-top: 2px;
+        }
+
+        html[data-theme="dark"] .form-masthead {
+          background: linear-gradient(180deg, rgba(17, 24, 39, 0.96) 0%, rgba(15, 23, 42, 0.92) 55%, rgba(120, 53, 15, 0.22) 100%);
+          border-color: rgba(148, 163, 184, 0.16);
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        html[data-theme="dark"] .masthead-title,
+        html[data-theme="dark"] .strip-val,
+        html[data-theme="dark"] .section-header-text h3 {
+          color: #f8fafc;
+        }
+
+        html[data-theme="dark"] .masthead-desc,
+        html[data-theme="dark"] .strip-lbl,
+        html[data-theme="dark"] .section-header-text p {
+          color: #94a3b8;
+        }
+
+        html[data-theme="dark"] .section-card,
+        html[data-theme="dark"] .applicant-profile-strip {
+          background: linear-gradient(180deg, rgba(17, 24, 39, 0.94) 0%, rgba(8, 12, 22, 0.96) 100%);
+          border-color: rgba(148, 163, 184, 0.16);
+          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        }
+
+        html[data-theme="dark"] .section-card:hover {
+          border-color: rgba(245, 158, 11, 0.4);
+          box-shadow: 0 18px 40px rgba(245, 158, 11, 0.1);
+        }
+
+        html[data-theme="dark"] .form-control {
+          background-color: rgba(15, 23, 42, 0.85);
+          border-color: rgba(148, 163, 184, 0.28);
+          color: #f8fafc;
+        }
+
+        html[data-theme="dark"] .form-control:focus {
+          border-color: #f59e0b;
+          background-color: rgba(15, 23, 42, 0.95);
+        }
+
+        html[data-theme="dark"] .strip-divider {
+          background: rgba(148, 163, 184, 0.35);
         }
       `}</style>
     </div>

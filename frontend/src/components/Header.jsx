@@ -34,7 +34,8 @@ export default function Header({
   pendingApprovalCount = 0,
   notifications = [],
   onClearNotifications,
-  onNotificationClick
+  onNotificationClick,
+  portalTheme = 'bright'
 }) {
   const { currentUser, currentRole, isAuthenticated, logout, isApplicant, isAdmin } = useAuth();
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
@@ -130,13 +131,14 @@ export default function Header({
   );
   const unreadCount = approvalNotifications.filter(n => !n.read).length;
 
-  const isDarkMode = activeTab === 'landing' || activeTab === 'login' || activeTab === 'admin-login';
+  const isAuthScreen = activeTab === 'login' || activeTab === 'admin-login';
+  const isDarkMode = portalTheme === 'dark';
 
   return (
-    <header className={`navbar-header-grid ${isDarkMode ? 'navbar-theme-dark navbar-login' : 'navbar-theme-light'}`}>
+    <header className={`navbar-header-grid ${isDarkMode ? 'navbar-theme-dark' : 'navbar-theme-light'} ${isAuthScreen ? 'navbar-login' : ''}`}>
       {/* Column 1: Left Institutional Emblem & User Profile */}
       <div className="navbar-controls-left" ref={menusRef}>
-        {isAuthenticated && currentUser ? (
+        {isAuthenticated && currentUser && !isAuthScreen ? (
           /* Authenticated User Profile Dropdown */
           <div className="user-profile-wrapper">
             <button 
@@ -226,8 +228,8 @@ export default function Header({
               </div>
             )}
           </div>
-        ) : (
-          /* Unauthenticated Institutional Hub Brand Mark with Back Action */
+        ) : !isAuthScreen ? (
+          /* Unauthenticated Institutional Hub Brand Mark */
           <div className="header-national-hub-emblem animate-fade-in" onClick={() => setActiveTab('landing')} style={{ cursor: 'pointer' }}>
             <div className="hub-emblem-badge">
               <span className="badge-dot-live" />
@@ -237,18 +239,20 @@ export default function Header({
               <span className="hub-title-sm">Technology Innovation Hub</span>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* Explicit Back to VIKAS Home / Landing Page Button */}
-        <button 
-          type="button" 
-          className="btn-header-back-home animate-fade-in"
-          onClick={() => setActiveTab('landing')}
-          title="Return to VIKAS Landing Page"
-        >
-          <ArrowLeft size={15} />
-          <span>Back to Home</span>
-        </button>
+        {/* Back arrow to VIKAS landing */}
+        {isAuthScreen && (
+          <button 
+            type="button" 
+            className="btn-header-back-home btn-header-back-icon"
+            onClick={() => setActiveTab('landing')}
+            title="Back to Home"
+            aria-label="Back to Home"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        )}
 
         {/* Notifications Button & Dropdown */}
         {isAuthenticated && activeTab !== 'login' && activeTab !== 'admin-login' && (
@@ -337,7 +341,7 @@ export default function Header({
 
       {/* Column 3: Right Action Area with Admin Dashboard Button & Nav/Logo */}
       <div className="navbar-right-action-wrapper">
-        {isAdmin && (
+        {isAdmin && !isAuthScreen && (
           <button
             type="button"
             onClick={() => {
@@ -355,7 +359,7 @@ export default function Header({
           </button>
         )}
 
-        {isAuthenticated && (
+        {isAuthenticated && !isAuthScreen && (
           <nav className="navbar-links-right">
             {mainNavs.map((nav) => {
               const isActive = activeTab === nav.id;
@@ -550,6 +554,39 @@ export default function Header({
           border-color: #d97706;
           color: #ffffff;
           box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
+        }
+
+        .btn-header-back-icon {
+          width: 38px;
+          height: 38px;
+          padding: 0;
+          justify-content: center;
+        }
+
+        .btn-header-theme-toggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          border-radius: 9999px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #1e3a5f;
+          transition: all 0.2s ease;
+        }
+
+        .navbar-theme-dark .btn-header-theme-toggle {
+          border-color: rgba(245, 158, 11, 0.35);
+          background: rgba(245, 158, 11, 0.08);
+          color: #fbbf24;
+        }
+
+        .btn-header-theme-toggle:hover {
+          border-color: #f59e0b;
+          transform: translateY(-1px);
         }
 
         /* Center Brand */

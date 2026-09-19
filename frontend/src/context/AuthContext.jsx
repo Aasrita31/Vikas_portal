@@ -120,7 +120,11 @@ export function AuthProvider({ children }) {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.detail || 'Authentication failed. Please check your credentials.');
+        const detail = data.detail;
+        const message = Array.isArray(detail)
+          ? detail.map((item) => item.msg || item).join(' ')
+          : (detail || 'Authentication failed. Please check your credentials.');
+        throw new Error(message);
       }
 
       const newSession = {

@@ -9,7 +9,7 @@ import random
 import secrets
 from app.schemas.project import TDPProjectResponse
 from app.core.security import get_current_user, require_roles, UserContext, SYSTEM_PERSONAS
-from app.models.applicant import applicant_repo, ApplicantUser, SystemRole, StakeholderType
+from app.models.applicant import applicant_repo, ApplicantUser, SystemRole, StakeholderType, hash_password, verify_password
 from app.models.application import onboarding_app_repo, OnboardingApplicationRecord, map_stakeholder_to_verticals
 from app.schemas.onboarding import (
     ApplicantResponse,
@@ -37,6 +37,78 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+
+@app.post("/api/auth/register", response_model=AuthResponse)
+def register_user(payload: UserRegisterRequest):
+    try:
+        sh_type = StakeholderType[payload.stakeholder_type.upper()] if payload.stakeholder_type else StakeholderType.STARTUP
+    except Exception:
+        sh_type = StakeholderType.STARTUP
+
+    try:
+        role_type = SystemRole[payload.role.upper()] if payload.role else SystemRole.APPLICANT
+    except Exception:
+        role_type = SystemRole.APPLICANT
+
+    existing = applicant_repo.get_by_email(payload.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="User with this email already exists")
+
+    new_user = applicant_repo.create_user(
+        name=payload.name,
+        email=payload.email,
+        password=payload.password,
+        phone=payload.phone,
+        organization=payload.organization,
+        location=payload.location,
+        stakeholder_type=sh_type,
+        role=role_type
+    )
+
+    user_resp = ApplicantResponse(
+        id=new_user.id,
+        name=new_user.name,
+        email=new_user.email,
+        phone=new_user.phone,
+        organization=new_user.organization,
+        location=new_user.location,
+        stakeholder_type=new_user.stakeholder_type.value if hasattr(new_user.stakeholder_type, "value") else str(new_user.stakeholder_type),
+        role=new_user.role.value if hasattr(new_user.role, "value") else str(new_user.role),
+        is_active=new_user.is_active,
+        is_verified=new_user.is_verified,
+        created_at=new_user.created_at,
+        updated_at=new_user.updated_at
+    )
+
+    return AuthResponse(token=new_user.session_token or "dev_token", user=user_resp, applications=[])
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+def login_user(payload: LoginRequest):
+    user = applicant_repo.authenticate(payload.email, payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    user_resp = ApplicantResponse(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        phone=user.phone,
+        organization=user.organization,
+        location=user.location,
+        stakeholder_type=user.stakeholder_type.value if hasattr(user.stakeholder_type, "value") else str(user.stakeholder_type),
+        role=user.role.value if hasattr(user.role, "value") else str(user.role),
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        created_at=user.created_at,
+        updated_at=user.updated_at
+    )
+    
+    user_apps = []
+    for app_record in onboarding_app_repo._apps_by_id.values():
+        if app_record.user_id == user.id or app_record.email.lower() == user.email.lower():
+            user_apps.append(app_record)
+            
+    return AuthResponse(token=user.session_token or "dev_token", user=user_resp, applications=user_apps)
 
 TDP_PROJECTS_DATABASE: List[dict] = [
     {
@@ -332,6 +404,17 @@ def register_applicant(payload: UserRegisterRequest):
 
     if existing:
         target_user = existing
+        if payload.password:
+            if existing.hashed_password and not (
+                verify_password(payload.password, existing.hashed_password)
+                or verify_password(payload.password.strip(), existing.hashed_password)
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="An account with this email already exists. Please sign in with your existing password."
+                )
+            if not existing.hashed_password:
+                existing.hashed_password = hash_password(payload.password)
         # Update profile coordinates if newly provided
         if payload.name and (not target_user.name or target_user.name == "Registered Applicant"):
             target_user.name = payload.name.strip()
@@ -365,55 +448,6 @@ def register_applicant(payload: UserRegisterRequest):
         authenticated_user = applicant_repo.authenticate(email_clean, payload.password or "Password@123")
         token = authenticated_user.session_token if authenticated_user else f"vikas_{secrets.token_urlsafe(32)}"
 
-    # 2. Automated Vertical Mapping (System handles internal routing)
-    mapping = map_stakeholder_to_verticals(
-        stakeholder_type=payload.stakeholder_type or "STARTUP",
-        domains=payload.domains,
-        intent=payload.intent_of_engagement
-    )
-
-    # 3. Create linked Onboarding Application record (new file number generated for dual/multiple submissions)
-    current_year = datetime.now().year
-    random_suffix = random.randint(100, 999)
-    file_number = f"IITTNIF-{current_year}-{random_suffix}"
-    app_id = f"app_onboard_{current_year}_{random_suffix}"
-    submission_time = datetime.now().strftime("%d/%m/%Y, %H:%M:%S")
-    submission_date = datetime.now().strftime("%d/%m/%Y")
-
-    is_strat = st_enum in [StakeholderType.GOVERNMENT, StakeholderType.INDUSTRY]
-    app_record = OnboardingApplicationRecord(
-        id=app_id,
-        file_number=file_number,
-        user_id=target_user.id,
-        applicant_name=target_user.name,
-        email=target_user.email,
-        phone=target_user.phone,
-        organization=target_user.organization or "Applicant Organization",
-        location=target_user.location or "India",
-        stakeholder_type=payload.stakeholder_type or "STARTUP",
-        domains=payload.domains or [],
-        intent_of_engagement=payload.intent_of_engagement or "Ecosystem Participation",
-        dynamic_inputs=payload.dynamic_inputs or {},
-        problem_statement=payload.problem_statement or "VIKAS Ecosystem Registration & Participation",
-        status="pending_screening",
-        approval_authority="pd" if is_strat else "pillar_lead",
-        assigned_vertical=mapping["primary_vertical"],
-        assigned_verticals=mapping["assigned_verticals"],
-        submission_date=submission_date,
-        last_updated=submission_time,
-        is_strategic=is_strat,
-        history=[
-            {
-                "date": submission_time,
-                "action": "Proposal Dossier Submitted",
-                "user": f"{target_user.name} (Applicant)",
-                "details": f"Registered proposal under {payload.stakeholder_type}. Auto-mapped to vertical: {mapping['primary_vertical']}. Awaiting initial operations screening."
-            }
-        ]
-    )
-
-    saved_app = onboarding_app_repo.save(app_record)
-
     user_resp = ApplicantResponse(
         id=target_user.id,
         name=target_user.name,
@@ -429,19 +463,15 @@ def register_applicant(payload: UserRegisterRequest):
         updated_at=target_user.updated_at
     )
 
-    app_resp = OnboardingApplicationResponse(**saved_app.dict())
-
     user_apps = onboarding_app_repo.get_by_user_id(target_user.id)
-    if not user_apps:
+    if not user_apps and target_user.email:
         user_apps = [a for a in onboarding_app_repo.list_all() if a.email.lower() == target_user.email.lower()]
-    if not user_apps:
-        user_apps = [saved_app]
 
     return AuthResponse(
         token=token,
         user=user_resp,
-        application=app_resp,
-        applications=[OnboardingApplicationResponse(**a.dict()) for a in user_apps]
+        application=None,
+        applications=[OnboardingApplicationResponse(**a.dict()) for a in (user_apps or [])]
     )
 
 @app.post("/api/v1/auth/login", response_model=AuthResponse)
@@ -451,11 +481,17 @@ def login_user(payload: LoginRequest):
     Returns user profile, active session token, and user's applications.
     """
     email_clean = payload.email.strip().lower()
+    known_user = applicant_repo.get_by_email(email_clean)
     user = applicant_repo.authenticate(email_clean, payload.password)
     if not user:
+        if not known_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No account found for this email. Please register first, then sign in."
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password. Please verify your credentials."
+            detail="Incorrect password. Please try again."
         )
 
     user_resp = ApplicantResponse(
