@@ -1,631 +1,673 @@
-import React from 'react';
-import { 
-  Building2, 
-  TrendingUp, 
-  Network, 
-  Cpu, 
-  GraduationCap, 
-  Award, 
-  Target, 
-  Flag, 
-  ShieldCheck, 
-  FileText, 
-  CheckCircle, 
-  FileSpreadsheet, 
-  Layers, 
-  Sparkles,
-  Link
+import React, { useMemo, useState } from 'react';
+import {
+  Activity,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Layers,
+  Search,
+  XCircle,
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
-
 import { useAuth } from '../../context/AuthContext';
 
+const GENERIC_VERTICAL_LABELS = new Set([
+  'startup',
+  'startups',
+  'general stakeholder',
+  'general',
+  'other'
+]);
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const VERTICAL_ORDER = [
+  '6.1 Technology Development',
+  '6.2 Startups & Business Enablement',
+  '6.3 Human Resource Development',
+  '6.4 Skill Development',
+  '6.5 Academic Collaborations & MoUs',
+  '6.6 Schools & Academic Outreach (VidyaGIS)',
+  '6.7 Institutions & Labs Network (SPIN Lab)',
+  '6.8 Industry & Government Interface',
+  '6.9 Experts & Advisory Network'
+];
+
+function formatDisplayDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]} ${MONTH_SHORT[Number(iso[2]) - 1]} ${iso[1]}`;
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmy) return `${dmy[1].padStart(2, '0')} ${MONTH_SHORT[Number(dmy[2]) - 1] || dmy[2]} ${dmy[3]}`;
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  return raw;
+}
+
+function formatDisplayTime(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!match) return raw;
+  let hour = Number(match[1]);
+  const minute = match[2];
+  const meridiem = (match[4] || '').toLowerCase();
+  if (meridiem) return `${hour}:${minute} ${meridiem.toUpperCase()}`;
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  return `${hour % 12 || 12}:${minute} ${suffix}`;
+}
+
+function formatMonitorDateTime(app) {
+  const candidates = [
+    app?.history?.[0]?.date,
+    app?.submissionDateTime,
+    app?.submission_date_time,
+    app?.lastUpdated,
+    app?.createdAt,
+    app?.created_at,
+    app?.submissionDate
+  ].filter(Boolean);
+  const raw = String(candidates[0] || '').trim();
+  if (!raw) return { date: '—', time: app?.submissionTime || '—' };
+  if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return {
+        date: parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        time: parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      };
+    }
+  }
+  if (raw.includes(',')) {
+    const [datePart, ...timeParts] = raw.split(',');
+    return { date: formatDisplayDate(datePart), time: formatDisplayTime(timeParts.join(',')) };
+  }
+  return { date: formatDisplayDate(raw), time: formatDisplayTime(app?.submissionTime || '') };
+}
+
+function getApplicationVerticals(app) {
+  const raw = [
+    ...(Array.isArray(app?.assignedVerticals) ? app.assignedVerticals : []),
+    ...(Array.isArray(app?.assigned_verticals) ? app.assigned_verticals : []),
+    app?.assignedVertical,
+    app?.assigned_vertical
+  ];
+  const seen = new Set();
+  const cleaned = [];
+  raw.forEach((item) => {
+    const label = String(item || '').trim();
+    if (!label) return;
+    const key = label.toLowerCase();
+    if (seen.has(key) || GENERIC_VERTICAL_LABELS.has(key)) return;
+    seen.add(key);
+    cleaned.push(label);
+  });
+  if (cleaned.length > 0) return cleaned;
+  return ['6.2 Startups & Business Enablement'];
+}
+
+function isAutoRegisterStub(app) {
+  const title = String(app?.name || app?.problemStatement || '').toLowerCase();
+  const intent = String(Array.isArray(app?.intentOfEngagement) ? app.intentOfEngagement.join(' ') : (app?.intentOfEngagement || '')).toLowerCase();
+  return title.includes('ecosystem registration') || intent.includes('vikas portal incubation');
+}
+
+function getDashboardStatus(app) {
+  const status = String(app?.status || '').toLowerCase();
+  if (['approved', 'engagement', 'completed'].includes(status)) {
+    return { key: 'approved', approval: 'Approved', screening: 'Completed', monthly: 'Active' };
+  }
+  if (status === 'rejected') {
+    return { key: 'rejected', approval: 'Declined', screening: 'Declined', monthly: 'N/A' };
+  }
+  const screeningPending = ['pending_screening', 'under_screening'].includes(status);
+  return {
+    key: 'pending',
+    approval: 'Pending',
+    screening: screeningPending ? 'Pending' : 'Completed',
+    monthly: 'Pending'
+  };
+}
+
 export default function Dashboard({ applications = [], onNavigateToTab }) {
-  const { currentUser, currentRole, isApplicant } = useAuth();
+  const { currentRole } = useAuth();
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // The 5 Expected Outcomes defined in the official VIKAS specification
-  const expectedOutcomes = [
-    {
-      id: 1,
-      title: 'Increased Startup Engagement & Revenue Generation',
-      icon: Building2,
-      color: '#d97706', // amber gold
-      points: [
-        'Structured startup onboarding and incubation-free enablement',
-        'Direct project allocation and commercial deployment support',
-        'Industry revenue generation and market access channels'
-      ]
-    },
-    {
-      id: 2,
-      title: 'Strong Academia-Industry-Government Linkage',
-      icon: Network,
-      color: '#f43f5e', // rose
-      points: [
-        'Collaborative MoUs and strategic bilateral alliances',
-        'Consultancy and public pilot deployments with govt bodies',
-        'Solving real-world industry problem statements'
-      ]
-    },
-    {
-      id: 3,
-      title: 'Enhanced Technology Development & Deployment',
-      icon: Cpu,
-      color: '#10b981', // emerald green
-      points: [
-        'TDP prototype translation from TRL 2–6 to deployment',
-        'Active lab integration (PNT, Geo-Intel, Autonomous Robotics)',
-        'Industry-driven indigenized R&D and IP generation'
-      ]
-    },
-    {
-      id: 4,
-      title: 'Skilled Workforce Aligned with National Priorities',
-      icon: GraduationCap,
-      color: '#3b82f6', // blue
-      points: [
-        'Chanakya post-doctoral and faculty research fellowships',
-        'Government and industry technical upskilling certifications',
-        'School-level spatial learning and academic outreach'
-      ]
-    },
-    {
-      id: 5,
-      title: 'National-Level Visibility for TIH Initiatives',
-      icon: Award,
-      color: '#8b5cf6', // purple
-      points: [
-        'Central flagship single-window gateway for NM-ICPS',
-        'Standardized transparent SOP routing and digital audit trail',
-        'Senior advisory network and expert review panels'
-      ]
-    }
-  ];
+  const files = useMemo(
+    () => (Array.isArray(applications) ? applications.filter((app) => !isAutoRegisterStub(app)) : []),
+    [applications]
+  );
 
-  const missions = [
-    'Provide a single-window interface for all stakeholders',
-    'Enable structured onboarding and intelligent routing',
-    'Facilitate technology translation (TRL 2–6 → deployment)',
-    'Generate business and deployment opportunities',
-    'Build a national talent and expert network'
-  ];
+  const rows = useMemo(() => {
+    return files.flatMap((app) => {
+      const { date, time } = formatMonitorDateTime(app);
+      const dashboard = getDashboardStatus(app);
+      const name = app.contactPerson || app.applicantName || app.name || 'Applicant';
+      return getApplicationVerticals(app).map((vertical) => ({
+        key: `${app.fileNumber || app.id}-${vertical}`,
+        app,
+        name,
+        email: app.email || '—',
+        organization: app.organization || '—',
+        fileNumber: app.fileNumber || '—',
+        vertical,
+        date,
+        time,
+        dashboard
+      }));
+    });
+  }, [files]);
 
-  const authorityStructure = [
-    {
-      role: 'Project Director (PD)',
-      authority: 'Final strategic approval authority. Controls routing for high-value engagements. Approves priority programs, partnerships, and expert onboarding.'
-    },
-    {
-      role: 'Operational Anchor',
-      authority: 'Startups & Entrepreneurship Pillar. Responsible for platform operations, onboarding coordination, and routing.'
-    },
-    {
-      role: 'Execution Support Pillars',
-      authority: 'Technology & Innovation; HRD; Collaborations & Business Development; Administration; IP, Knowledge & Media Governance.'
-    }
-  ];
+  const filteredRows = rows.filter((row) => {
+    const haystack = `${row.name} ${row.email} ${row.organization} ${row.fileNumber} ${row.vertical}`.toLowerCase();
+    if (!haystack.includes(query.trim().toLowerCase())) return false;
+    if (statusFilter === 'PENDING') return row.dashboard.key === 'pending';
+    if (statusFilter === 'APPROVED') return row.dashboard.key === 'approved';
+    if (statusFilter === 'REJECTED') return row.dashboard.key === 'rejected';
+    return true;
+  });
 
-  const routingRules = [
-    { type: 'General onboarding', authority: 'Automated / Operations' },
-    { type: 'Program participation', authority: 'Pillar Lead' },
-    { type: 'Startup project allocation', authority: 'Startups Pillar + PD (if strategic)' },
-    { type: 'Industry/Govt engagement', authority: 'PD' },
-    { type: 'Expert onboarding (senior)', authority: 'PD' },
-    { type: 'MoUs / strategic collaborations', authority: 'PD' }
-  ];
+  const kpis = {
+    total: rows.length,
+    users: new Set(files.map((app) => String(app.email || app.fileNumber).toLowerCase())).size,
+    screeningPending: files.filter((app) => ['pending_screening', 'under_screening'].includes(String(app.status || '').toLowerCase())).length,
+    approvalPending: rows.filter((row) => row.dashboard.key === 'pending').length,
+    approved: rows.filter((row) => row.dashboard.key === 'approved').length,
+    declined: rows.filter((row) => row.dashboard.key === 'rejected').length
+  };
 
-  // Actual recent activities from state
-  const recentActivities = applications
-    .flatMap(app => (app.history || []).map(h => ({ ...h, fileNumber: app.fileNumber })))
+  const verticalSummary = VERTICAL_ORDER.map((vertical) => {
+    const items = rows.filter((row) => row.vertical === vertical);
+    return {
+      vertical,
+      total: items.length,
+      pending: items.filter((row) => row.dashboard.key === 'pending').length,
+      approved: items.filter((row) => row.dashboard.key === 'approved').length
+    };
+  }).filter((item) => item.total > 0);
+
+  const extraVerticals = rows
+    .map((row) => row.vertical)
+    .filter((vertical) => !VERTICAL_ORDER.includes(vertical));
+  [...new Set(extraVerticals)].forEach((vertical) => {
+    const items = rows.filter((row) => row.vertical === vertical);
+    verticalSummary.push({
+      vertical,
+      total: items.length,
+      pending: items.filter((row) => row.dashboard.key === 'pending').length,
+      approved: items.filter((row) => row.dashboard.key === 'approved').length
+    });
+  });
+
+  const recentActivities = files
+    .flatMap((app) => (app.history || []).map((entry) => ({ ...entry, fileNumber: app.fileNumber, name: app.contactPerson || app.name })))
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 5);
+    .slice(0, 6);
 
   return (
-    <div className="outcomes-dashboard animate-fade-in">
-      {/* Role-Governed Monitoring Header Banner */}
-      <div className="card role-monitoring-banner mb-20" style={{ marginBottom: '20px', padding: '16px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-sm)', background: 'rgba(var(--color-accent-rgb), 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-              {currentUser.avatarBadge || '📊'}
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="font-bold text-accent" style={{ fontSize: '14px' }}>{currentUser.roleLabel || currentRole.toUpperCase()}</span>
-                <span className="badge badge-secondary" style={{ fontSize: '11px' }}>Internal Monitoring Scope</span>
-              </div>
-              <p style={{ margin: '2px 0 0 0', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                {currentRole === 'operations' && 'Operations Intake SLA: Total Applications registered, active screening queue throughput, and vertical routing metrics.'}
-                {currentRole === 'pillar_lead' && `Vertical Monitoring: Portfolio oversight for ${currentUser.assignedVertical || 'assigned vertical'}, delegated project milestones, and outcome deliverables.`}
-                {currentRole === 'pd' && 'Directorate Governance: Institutional compliance across all 9 verticals, strategic project health, and DST NM-ICPS impact milestones.'}
-                {currentRole === 'execution' && 'Program Execution: Active TDP contracts, milestone completion velocities, and mentor verification turnaround.'}
-                {currentRole === 'admin' && 'Central Administration: Full audit trail, authority matrix compliance, and digital signature records.'}
-                {isApplicant && 'Applicant View: External stakeholder read-only summary of institutional outcomes and strategic mission indicators.'}
-              </p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Active Applications</span>
-              <strong className="font-mono text-accent" style={{ fontSize: '16px' }}>{applications.length}</strong>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Approved Stakeholders</span>
-              <strong className="font-mono text-success" style={{ fontSize: '16px' }}>{applications.filter(a => a.status === 'approved').length}</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 1. Expected Outcomes Section */}
-      <div className="section-block">
-        <div className="section-header-row">
-          <div className="section-title-wrap">
-            <Sparkles size={20} className="text-accent" />
-            <h2>Expected Outcomes</h2>
-          </div>
-          <span className="section-tagline">Core strategic deliverables aligned with NM-ICPS national mission priorities</span>
-        </div>
-
-        <div className="outcomes-grid">
-          {expectedOutcomes.map((item) => {
-            const IconComponent = item.icon;
-            return (
-              <div 
-                key={item.id} 
-                className="card outcome-card"
-                style={{ borderTop: `4px solid ${item.color}` }}
-              >
-                <div className="outcome-card-header">
-                  <div 
-                    className="outcome-icon-box"
-                    style={{ 
-                      backgroundColor: `${item.color}10`, 
-                      border: `1px solid ${item.color}25`,
-                      color: item.color 
-                    }}
-                  >
-                    <IconComponent size={22} />
-                  </div>
-                  <h3>{item.title}</h3>
-                </div>
-
-                <ul className="outcome-points-list">
-                  {item.points.map((pt, idx) => (
-                    <li key={idx}>
-                      <span className="point-bullet" style={{ backgroundColor: item.color }}></span>
-                      <span>{pt}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 2. Vision & Mission Grid */}
-      <div className="grid-cols-2 mt-24">
-        <div className="card vision-card">
-          <div className="card-title-icon">
-            <Target size={20} className="text-accent" />
-            <h3>Vision</h3>
-          </div>
-          <p className="vision-text">
-            "To establish VIKAS as a national-scale engagement platform that connects talent, technology, and opportunities to accelerate innovation, deployment, and measurable impact."
+    <div className="monitor-page animate-fade-in">
+      <header className="monitor-hero">
+        <div>
+          <p className="monitor-kicker">
+            <Activity size={15} />
+            Monitoring
+          </p>
+          <h1>Application status across verticals</h1>
+          <p className="monitor-lead">
+            Live screening, approval, and monthly reporting for every submitted record.
           </p>
         </div>
+        <span className="monitor-role-chip">{String(currentRole || 'admin').replace('_', ' ')}</span>
+      </header>
 
-        <div className="card mission-card">
-          <div className="card-title-icon">
-            <Flag size={20} className="text-info" />
-            <h3>Mission</h3>
-          </div>
-          <ul className="mission-list">
-            {missions.map((m, i) => (
-              <li key={i}>
-                <CheckCircle size={14} className="text-success flex-shrink-0" />
-                <span>{m}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      <section className="monitor-kpis">
+        <article className="monitor-kpi">
+          <span>Records</span>
+          <strong>{kpis.total}</strong>
+          <small><FileText size={13} /> {kpis.users} users</small>
+        </article>
+        <article className="monitor-kpi">
+          <span>Screening pending</span>
+          <strong>{kpis.screeningPending}</strong>
+          <small><Clock size={13} /> Intake queue</small>
+        </article>
+        <article className="monitor-kpi warn">
+          <span>Approval pending</span>
+          <strong>{kpis.approvalPending}</strong>
+          <small><Clock size={13} /> Awaiting OK</small>
+        </article>
+        <article className="monitor-kpi good">
+          <span>Approved</span>
+          <strong>{kpis.approved}</strong>
+          <small><CheckCircle2 size={13} /> On dashboards</small>
+        </article>
+        <article className="monitor-kpi bad">
+          <span>Declined</span>
+          <strong>{kpis.declined}</strong>
+          <small><XCircle size={13} /> Closed files</small>
+        </article>
+      </section>
 
-      {/* 3. Governance Framework & Decision Routing Matrix */}
-      <div className="dashboard-double-row-grid mt-24">
-        {/* Left Column: Governance Framework */}
-        <div className="card governance-card">
-          <div className="card-title-icon">
-            <Award size={18} className="text-accent" />
-            <h4>Governance Framework & Authority Structure</h4>
+      <section className="monitor-split">
+        <div className="monitor-card">
+          <div className="monitor-card-head">
+            <h2><Layers size={16} /> Vertical load</h2>
           </div>
-          <div className="governance-blocks-stack mt-16">
-            {authorityStructure.map((item, i) => (
-              <div key={i} className="gov-block-mini">
-                <h5>{item.role}</h5>
-                <p>{item.authority}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right Column: Decision Routing Matrix */}
-        <div className="card routing-matrix-card">
-          <div className="card-title-icon">
-            <FileText size={18} className="text-info" />
-            <h4>Decision Routing Matrix</h4>
-          </div>
-          <div className="table-container mt-16">
-            <table className="custom-table smaller-table">
+          {verticalSummary.length === 0 ? (
+            <p className="monitor-empty">No vertical records yet.</p>
+          ) : (
+            <table className="monitor-mini-table">
               <thead>
                 <tr>
-                  <th>Case / Onboarding Type</th>
-                  <th>Required Approval Authority</th>
+                  <th>Vertical</th>
+                  <th>Total</th>
+                  <th>Pending</th>
+                  <th>Approved</th>
                 </tr>
               </thead>
               <tbody>
-                {routingRules.map((rule, i) => (
-                  <tr key={i}>
-                    <td className="font-bold">{rule.type}</td>
-                    <td>
-                      <span className={`badge ${
-                        rule.authority.includes('PD') ? 'badge-danger' : 
-                        rule.authority.includes('Pillar') ? 'badge-warning' : 'badge-success'
-                      }`}>
-                        {rule.authority}
-                      </span>
-                    </td>
+                {verticalSummary.map((item) => (
+                  <tr key={item.vertical}>
+                    <td>{item.vertical}</td>
+                    <td>{item.total}</td>
+                    <td>{item.pending}</td>
+                    <td>{item.approved}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          )}
         </div>
-      </div>
 
-      {/* 4. Live Audit Logs Trace */}
-      {recentActivities.length > 0 && (
-        <div className="card activity-card mt-24">
-          <div className="activity-header-row">
-            <div className="card-title-icon no-margin">
-              <FileSpreadsheet size={18} className="text-info" />
-              <h4>Live File Activity & Audit Trace</h4>
-            </div>
-            <span className="audit-policy-tag">SOP 7.2 Compliant • Non-tamperable digital ledger</span>
+        <div className="monitor-card">
+          <div className="monitor-card-head">
+            <h2><ShieldCheck size={16} /> Recent activity</h2>
           </div>
-
-          <div className="activity-timeline mt-16">
-            {recentActivities.map((act, i) => (
-              <div key={i} className="timeline-item">
-                <div className="timeline-badge-bg">
-                  <ShieldCheck size={14} className="text-accent" />
-                </div>
-                <div className="timeline-content">
-                  <div className="timeline-meta">
-                    <span className="timeline-file font-mono">{act.fileNumber}</span>
-                    <span className="timeline-date">{act.date}</span>
+          {recentActivities.length === 0 ? (
+            <p className="monitor-empty">No activity logged yet.</p>
+          ) : (
+            <ul className="monitor-activity">
+              {recentActivities.map((item, index) => (
+                <li key={`${item.fileNumber}-${index}`}>
+                  <div>
+                    <strong>{item.action || 'Update'}</strong>
+                    <span>{item.fileNumber} · {item.name || 'Applicant'}</span>
                   </div>
-                  <strong className="timeline-action">{act.action}</strong>
-                  <p className="timeline-desc">{act.details}</p>
-                </div>
-              </div>
-            ))}
+                  <em>{item.date}</em>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="monitor-card">
+        <div className="monitor-toolbar">
+          <div>
+            <h2>Onboarding monitor</h2>
+            <p>Same screening, approval, and monthly reporting status shown on each user dashboard.</p>
+          </div>
+          <div className="monitor-toolbar-controls">
+            <label className="monitor-search">
+              <Search size={14} />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search user, file or vertical"
+              />
+            </label>
+            <div className="monitor-pills">
+              {[
+                { id: 'ALL', label: 'All' },
+                { id: 'PENDING', label: `Pending (${kpis.approvalPending})` },
+                { id: 'APPROVED', label: `Approved (${kpis.approved})` },
+                { id: 'REJECTED', label: `Declined (${kpis.declined})` }
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  className={statusFilter === pill.id ? 'active' : ''}
+                  onClick={() => setStatusFilter(pill.id)}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      )}
+
+        <div className="monitor-table-wrap">
+          <table className="monitor-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Vertical</th>
+                <th>Registered</th>
+                <th>Screening</th>
+                <th>Approval</th>
+                <th>Monthly reporting</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="monitor-empty-cell">No records match this view.</td>
+                </tr>
+              )}
+              {filteredRows.map((row) => (
+                <tr key={row.key} className={`row-${row.dashboard.key}`}>
+                  <td>
+                    <strong>{row.name}</strong>
+                    <span>{row.email}</span>
+                    <em>{row.fileNumber}</em>
+                  </td>
+                  <td><span className="vertical-pill">{row.vertical}</span></td>
+                  <td>
+                    <strong className="date-line"><Calendar size={12} /> {row.date}</strong>
+                    <span>{row.time}</span>
+                  </td>
+                  <td><span className={`chip ${row.dashboard.screening === 'Completed' ? 'good' : row.dashboard.screening === 'Declined' ? 'bad' : 'warn'}`}>{row.dashboard.screening}</span></td>
+                  <td><span className={`chip ${row.dashboard.key}`}>{row.dashboard.approval}</span></td>
+                  <td><span className={`chip ${row.dashboard.monthly === 'Active' ? 'approved' : row.dashboard.monthly === 'N/A' ? 'rejected' : 'pending'}`}>{row.dashboard.monthly}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <style>{`
-        .outcomes-dashboard {
-          width: 100%;
-          max-width: 1240px;
-          margin: 0 auto;
-          padding: 8px 16px 48px;
+        .monitor-page {
           display: flex;
           flex-direction: column;
+          gap: 18px;
+          padding-bottom: 28px;
         }
 
-        /* Section Header */
-        .section-header-row {
-          margin-bottom: 20px;
+        .monitor-hero {
           display: flex;
-          flex-direction: column;
-          gap: 4px;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          padding: 22px 24px;
+          border-radius: 16px;
+          background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+          color: #f8fafc;
         }
 
-        .section-title-wrap {
-          display: flex;
+        .monitor-kicker {
+          display: inline-flex;
           align-items: center;
-          gap: 8px;
-        }
-
-        .section-title-wrap h2 {
-          font-size: 20px;
+          gap: 6px;
+          margin: 0 0 8px;
+          font-size: 11px;
           font-weight: 800;
-          color: var(--text-primary);
-          letter-spacing: -0.3px;
+          letter-spacing: 0.6px;
+          text-transform: uppercase;
+          color: #fde68a;
         }
 
-        .section-tagline {
-          font-size: 13px;
-          color: var(--text-secondary);
+        .monitor-hero h1 {
+          margin: 0 0 6px;
+          font-size: 24px;
+          font-weight: 800;
         }
 
-        /* 5 Outcomes Responsive Grid */
-        .outcomes-grid {
+        .monitor-lead {
+          margin: 0;
+          color: #cbd5e1;
+          font-size: 13.5px;
+        }
+
+        .monitor-role-chip {
+          text-transform: uppercase;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.4px;
+          background: rgba(245, 158, 11, 0.16);
+          color: #fbbf24;
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          border-radius: 999px;
+          padding: 6px 10px;
+        }
+
+        .monitor-kpis {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-          gap: 20px;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 12px;
         }
 
-        .outcome-card {
-          padding: 24px;
-          background-color: var(--bg-surface);
+        .monitor-kpi {
+          background: #fff;
+          border: 1px solid #e2e8f0;
           border-radius: 14px;
-          display: flex;
-          flex-direction: column;
-          box-shadow: var(--shadow-sm);
-          transition: all var(--transition-normal);
+          padding: 14px 16px;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
         }
 
-        .outcome-card:hover {
-          transform: translateY(-3px);
-          box-shadow: var(--shadow-md);
-          border-color: var(--border-color-active);
-        }
-
-        .outcome-card-header {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          margin-bottom: 16px;
-        }
-
-        .outcome-icon-box {
-          width: 44px;
-          height: 44px;
-          border-radius: 10px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .outcome-card-header h3 {
-          font-size: 15px;
+        .monitor-kpi span {
+          display: block;
+          font-size: 11px;
           font-weight: 700;
-          color: var(--text-primary);
-          line-height: 1.35;
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+          color: #64748b;
         }
 
-        .outcome-points-list {
-          list-style: none;
-          padding: 0;
+        .monitor-kpi strong {
+          display: block;
+          margin: 6px 0 4px;
+          font-size: 26px;
+          color: #0f172a;
+        }
+
+        .monitor-kpi small {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .monitor-kpi.warn strong { color: #b45309; }
+        .monitor-kpi.good strong { color: #047857; }
+        .monitor-kpi.bad strong { color: #b91c1c; }
+
+        .monitor-split {
+          display: grid;
+          grid-template-columns: 1.15fr 0.85fr;
+          gap: 14px;
+        }
+
+        .monitor-card {
+          background: #fff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 18px;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+        }
+
+        .monitor-card-head h2,
+        .monitor-toolbar h2 {
           margin: 0;
           display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .outcome-points-list li {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          font-size: 13px;
-          color: var(--text-secondary);
-          line-height: 1.45;
-        }
-
-        .point-bullet {
-          width: 6px;
-          height: 6px;
-          border-radius: var(--radius-full);
-          margin-top: 6px;
-          flex-shrink: 0;
-        }
-
-        /* Vision and Mission layout */
-        .mt-24 {
-          margin-top: 24px;
-        }
-
-        .card-title-icon {
-          display: flex;
           align-items: center;
           gap: 8px;
-          border-bottom: 1px solid var(--border-color);
-          padding-bottom: 10px;
-          margin-bottom: 12px;
-          width: 100%;
+          font-size: 16px;
+          color: #0f172a;
         }
 
-        .card-title-icon.no-margin {
-          border-bottom: none;
-          padding-bottom: 0;
-          margin-bottom: 0;
-          width: auto;
-        }
-
-        .card-title-icon h3, .card-title-icon h4 {
-          font-size: 15px;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-
-        .vision-text {
-          font-size: 13.5px;
-          line-height: 1.6;
-          font-style: italic;
-          color: var(--text-secondary);
-          padding: 4px 0;
-        }
-
-        .mission-list {
-          list-style: none;
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-          padding: 0;
-        }
-
-        .mission-list li {
-          display: flex;
-          gap: 8px;
-          align-items: flex-start;
-          font-size: 13px;
-          color: var(--text-secondary);
-        }
-
-        .flex-shrink-0 {
-          flex-shrink: 0;
-        }
-
-        /* Double Column Grids */
-        .dashboard-double-row-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-        }
-
-        @media (max-width: 900px) {
-          .dashboard-double-row-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        .mt-16 {
-          margin-top: 16px;
-        }
-
-        .governance-blocks-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .gov-block-mini {
-          background-color: var(--bg-primary);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-md);
-          padding: 12px 14px;
-        }
-
-        .gov-block-mini h5 {
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--color-accent);
-          margin-bottom: 4px;
-        }
-
-        .gov-block-mini p {
-          font-size: 12px;
-          color: var(--text-secondary);
-          line-height: 1.4;
-        }
-
-        /* Smaller tables for routing */
-        .smaller-table th, .smaller-table td {
-          padding: 10px 12px;
-          font-size: 12.5px;
-        }
-
-        /* Audit Timeline */
-        .activity-header-row {
+        .monitor-toolbar {
           display: flex;
           justify-content: space-between;
-          align-items: center;
+          gap: 16px;
+          margin-bottom: 14px;
           flex-wrap: wrap;
-          gap: 10px;
         }
 
-        .audit-policy-tag {
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--color-success);
-          background-color: rgba(16, 185, 129, 0.08);
-          padding: 4px 10px;
-          border-radius: var(--radius-full);
-          border: 1px solid rgba(16, 185, 129, 0.2);
+        .monitor-toolbar p {
+          margin: 4px 0 0;
+          color: #64748b;
+          font-size: 13px;
         }
 
-        .activity-timeline {
+        .monitor-toolbar-controls {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          align-items: flex-end;
+          gap: 8px;
         }
 
-        .timeline-item {
-          display: flex;
-          gap: 10px;
-          position: relative;
-        }
-
-        .timeline-item:not(:last-child):before {
-          content: "";
-          position: absolute;
-          left: 13px;
-          top: 26px;
-          bottom: -12px;
-          width: 1px;
-          background-color: var(--border-color);
-        }
-
-        .timeline-badge-bg {
-          width: 26px;
-          height: 26px;
-          border-radius: var(--radius-full);
-          background-color: var(--bg-primary);
-          border: 1px solid var(--border-color);
+        .monitor-search {
           display: flex;
           align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          z-index: 1;
+          gap: 8px;
+          min-width: 260px;
+          border: 1px solid #cbd5e1;
+          border-radius: 10px;
+          padding: 7px 10px;
+          background: #f8fafc;
+          color: #64748b;
         }
 
-        .timeline-content {
-          flex: 1;
-          background-color: var(--bg-primary);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-md);
-          padding: 8px 14px;
+        .monitor-search input {
+          border: none;
+          outline: none;
+          width: 100%;
+          background: transparent;
+          font-size: 13px;
+          color: #0f172a;
         }
 
-        .timeline-meta {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 2px;
-        }
-
-        .timeline-file {
-          font-size: 11px;
-          color: var(--color-accent);
-          font-weight: 600;
-        }
-
-        .timeline-date {
-          font-size: 10px;
-          color: var(--text-muted);
-        }
-
-        .timeline-action {
+        .monitor-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+        .monitor-pills button {
+          border: 1px solid #cbd5e1;
+          background: #fff;
+          color: #475569;
+          border-radius: 999px;
+          padding: 5px 10px;
           font-size: 12px;
-          color: var(--text-primary);
+          font-weight: 700;
+          cursor: pointer;
+        }
+        .monitor-pills button.active {
+          background: #0f172a;
+          color: #fff;
+          border-color: #0f172a;
+        }
+
+        .monitor-mini-table,
+        .monitor-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .monitor-mini-table th,
+        .monitor-table th {
+          text-align: left;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.35px;
+          color: #64748b;
+          padding: 10px 12px;
+          background: #f8fafc;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .monitor-mini-table td,
+        .monitor-table td {
+          padding: 12px;
+          border-bottom: 1px solid #f1f5f9;
+          font-size: 13px;
+          color: #1e293b;
+          vertical-align: top;
+        }
+
+        .monitor-table-wrap {
+          overflow-x: auto;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+        }
+
+        .monitor-table { min-width: 860px; }
+
+        .monitor-table td strong,
+        .monitor-table td span,
+        .monitor-table td em {
           display: block;
         }
 
-        .timeline-desc {
+        .monitor-table td span { color: #64748b; font-size: 12px; }
+        .monitor-table td em { color: #94a3b8; font-size: 11px; font-style: normal; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+        .date-line {
+          display: inline-flex !important;
+          align-items: center;
+          gap: 5px;
+          color: #0f172a !important;
+        }
+
+        .vertical-pill {
+          display: inline-flex !important;
+          width: fit-content;
+          background: #eff6ff;
+          color: #1d4ed8 !important;
+          border-radius: 999px;
+          padding: 4px 8px;
+          font-size: 11px !important;
+          font-weight: 700;
+        }
+
+        .chip {
+          display: inline-flex;
+          border-radius: 999px;
+          padding: 4px 9px;
           font-size: 11px;
-          color: var(--text-secondary);
-          margin-top: 2px;
-          line-height: 1.35;
+          font-weight: 800;
         }
 
-        .font-mono {
-          font-family: 'Courier New', Courier, monospace;
+        .chip.pending, .chip.warn { background: #fffbeb; color: #b45309; }
+        .chip.approved, .chip.good { background: #ecfdf5; color: #047857; }
+        .chip.rejected, .chip.bad { background: #fef2f2; color: #b91c1c; }
+
+        .monitor-activity {
+          list-style: none;
+          margin: 12px 0 0;
+          padding: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
         }
 
-        .font-bold {
-          font-weight: 600;
+        .monitor-activity li {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          padding: 10px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          background: #f8fafc;
+        }
+
+        .monitor-activity strong, .monitor-activity span { display: block; }
+        .monitor-activity span { color: #64748b; font-size: 12px; }
+        .monitor-activity em { font-style: normal; color: #94a3b8; font-size: 11px; white-space: nowrap; }
+
+        .monitor-empty, .monitor-empty-cell {
+          text-align: center;
+          color: #64748b;
+          padding: 24px 12px;
+        }
+
+        @media (max-width: 1100px) {
+          .monitor-kpis { grid-template-columns: repeat(2, 1fr); }
+          .monitor-split { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>

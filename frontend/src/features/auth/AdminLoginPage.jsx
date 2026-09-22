@@ -17,28 +17,29 @@ import {
   Layers,
   Cpu,
   Award,
-  ArrowLeft,
-  LayoutDashboard
+  ArrowLeft
 } from 'lucide-react';
-import { useAuth, ROLES } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
+
+const ADMIN_PANEL_ROLES = new Set(['admin', 'pd', 'project_director']);
 
 export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateToAdminDashboard, onAdminLoginSuccess, onNavigateToLanding, theme = 'bright' }) {
-  const { login, register, loading } = useAuth();
+  const { login, register, logout, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('signin'); // 'signin' | 'register'
   
-  // Admin Sign In State
-  const [email, setEmail] = useState('admin@iittnif.in');
-  const [password, setPassword] = useState('admin123');
+  // Admin Sign In State — credentials must come from the database, not a prefilled demo
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   // Admin Register State
   const [adminName, setAdminName] = useState('');
-  const [adminDept, setAdminDept] = useState('IITTNiF Central Administration');
+  const [adminDept, setAdminDept] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
-  const [adminPasscode, setAdminPasscode] = useState('VIKAS-ADMIN-2026');
+  const [adminPasscode, setAdminPasscode] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showAdminPassword, setShowAdminPassword] = useState(false);
 
@@ -67,14 +68,20 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
 
     try {
       const res = await login(email.trim(), password);
-      setSuccessMessage('Administrator authenticated successfully! Loading Admin Dashboard...');
+      const role = String(res?.user?.role || '').toLowerCase();
+      if (!ADMIN_PANEL_ROLES.has(role)) {
+        logout();
+        setErrorMessage('Access denied. Only Administrator or Project Director credentials stored in the database can open the Admin Panel.');
+        return;
+      }
+      setSuccessMessage('Officer authenticated. Opening Admin Panel...');
       setTimeout(() => {
         if (onAdminLoginSuccess) {
           onAdminLoginSuccess(res.user, res.applications);
         } else if (onNavigateToAdminDashboard) {
           onNavigateToAdminDashboard();
         }
-      }, 500);
+      }, 400);
     } catch (err) {
       setErrorMessage(err.message || 'Administrator authentication failed. Please verify credentials.');
     }
@@ -94,7 +101,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
       return;
     }
     if (adminPasscode.trim() !== 'VIKAS-ADMIN-2026' && adminPasscode.trim() !== 'admin123') {
-      setErrorMessage('Invalid Admin Security Passcode. Default security key is VIKAS-ADMIN-2026.');
+      setErrorMessage('Invalid security passcode. Please enter the Admin Panel passcode.');
       return;
     }
     if (!adminPassword.trim() || adminPassword.length < 6) {
@@ -105,14 +112,14 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
     try {
       await register({
         name: adminName.trim(),
-        organization: adminDept.trim() || 'IITTNiF Central Administration',
+        organization: adminDept.trim() || 'IITTNiF',
         email: adminEmail.trim().toLowerCase(),
-        phone: adminPhone.trim() || '+91 98765 00006',
+        phone: adminPhone.trim() || '',
         password: adminPassword,
         role: 'ADMIN',
         stakeholder_type: 'OTHER',
-        domains: ['Spatial Intelligence', 'Cyber-Physical Systems', 'Executive Governance'],
-        intent_of_engagement: 'Central Administration & Governance'
+        domains: ['Spatial Intelligence', 'Cyber-Physical Systems'],
+        intent_of_engagement: 'Admin Panel access'
       });
 
       setEmail(adminEmail.trim().toLowerCase());
@@ -156,39 +163,35 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
           <div className="hero-institution-badge animate-fade-in">
             <span className="badge-pulse" style={{ backgroundColor: '#ef4444', boxShadow: '0 0 10px #ef4444' }} />
             <span className="badge-text">
-              DST NM-ICPS • EXECUTIVE GOVERNANCE & CENTRAL ADMINISTRATION
+              DST NM-ICPS • IITTNiF
             </span>
           </div>
 
           <h1 className="hero-headline animate-slide-up">
-            Central Governance & <br />
-            <span className="hero-headline-highlight">Executive Administration</span> & <br />
-            <span className="hero-headline-sub">Authority Matrix Control</span>
+            VIKAS <span className="hero-headline-highlight">Admin Panel</span>
           </h1>
 
-          {/* Angled Accent High-Tech Banner */}
           <div className="hero-accent-banner animate-slide-up delay-1">
             <div className="accent-banner-shape" style={{ background: 'linear-gradient(115deg, #d97706 0%, #b45309 35%, #991b1b 70%, #7f1d1d 100%)' }}>
-              <span className="accent-banner-title">VIKAS ADMIN PORTAL</span>
+              <span className="accent-banner-title">OFFICER ACCESS</span>
               <span className="accent-banner-subtitle">
-                Apex Governance, Authority Matrix & Compliance Management
+                User status, approvals and audit records
               </span>
             </div>
           </div>
 
           <p className="hero-playbook-tagline animate-slide-up delay-2">
-            Centralized Intake Monitoring • Authority Matrix E-Sign • National Audit Trail
+            Review applicant dashboards • Approve with OK • Track decisions
           </p>
 
-          {/* Key Pillars / Value Props */}
           <div className="hero-pillars-grid animate-slide-up delay-3">
             <div className="pillar-item">
               <div className="pillar-icon-box" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', color: '#f59e0b' }}>
                 <ShieldCheck size={18} />
               </div>
               <div className="pillar-text-wrap">
-                <h4 className="pillar-title">9 Verticals Oversight</h4>
-                <p className="pillar-desc">Portfolio governance & multi-pillar coordination</p>
+                <h4 className="pillar-title">User status</h4>
+                <p className="pillar-desc">See every applicant dashboard record</p>
               </div>
             </div>
 
@@ -197,8 +200,8 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                 <Key size={18} />
               </div>
               <div className="pillar-text-wrap">
-                <h4 className="pillar-title">Authority Matrix & E-Sign</h4>
-                <p className="pillar-desc">Strategic file routing & executive sign-off</p>
+                <h4 className="pillar-title">Approvals</h4>
+                <p className="pillar-desc">Type ok to approve a user’s status</p>
               </div>
             </div>
 
@@ -207,8 +210,8 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                 <Award size={18} />
               </div>
               <div className="pillar-text-wrap">
-                <h4 className="pillar-title">Audit Trail & Compliance</h4>
-                <p className="pillar-desc">Immutable tamper-proof digital log records</p>
+                <h4 className="pillar-title">Audit trail</h4>
+                <p className="pillar-desc">Keep a signed record of decisions</p>
               </div>
             </div>
           </div>
@@ -222,14 +225,6 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
               style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600, background: 'rgba(255,255,255,0.06)', padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.12)' }}
             >
               <ArrowLeft size={16} /> Return to Applicant Portal
-            </button>
-            <button 
-              type="button" 
-              className="btn-link-switch flex items-center gap-2"
-              onClick={onNavigateToAdminDashboard}
-              style={{ color: '#f59e0b', fontSize: '13px', fontWeight: 700, background: 'rgba(217,119,6,0.12)', padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(217,119,6,0.3)' }}
-            >
-              <LayoutDashboard size={16} /> Direct Admin Dashboard
             </button>
           </div>
         </div>
@@ -287,7 +282,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                     <Shield size={20} className="text-amber-500" /> Administrator Sign In
                   </h3>
                   <p className="auth-card-subtitle">
-                    Enter official administrator credentials to access the governance panel
+                    Enter Administrator or Project Director credentials stored in the database. Other accounts cannot open this panel.
                   </p>
                 </div>
 
@@ -326,7 +321,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                         id="admin-login-password"
                         type={showPassword ? 'text' : 'password'}
                         className="form-input"
-                        placeholder="Enter password (default: admin123)"
+                        placeholder="Enter administrator password"
                         value={password}
                         onChange={(e) => {
                           setPassword(e.target.value);
@@ -364,10 +359,9 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                   </button>
                 </form>
 
-                {/* Quick Persona Demo Selector */}
                 <div className="demo-personas-section">
                   <div className="demo-label">
-                    <span>Quick Admin Sign-In:</span>
+                    <span>Database officer accounts:</span>
                   </div>
                   <div className="demo-pills-row">
                     <button 
@@ -376,7 +370,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                       onClick={() => handleQuickFill('admin@iittnif.in', 'admin123')}
                       title="Master System Administrator"
                     >
-                      ⚙️ Master Admin
+                      Administrator
                     </button>
                     <button 
                       type="button" 
@@ -384,15 +378,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                       onClick={() => handleQuickFill('director@iittnif.in', 'admin123')}
                       title="Project Director"
                     >
-                      ⭐ Project Director
-                    </button>
-                    <button 
-                      type="button" 
-                      className="demo-pill"
-                      onClick={() => handleQuickFill('ops@iittnif.in', 'admin123')}
-                      title="Operations & Screening"
-                    >
-                      🛡️ Ops Lead
+                      Project Director
                     </button>
                   </div>
                 </div>
@@ -417,7 +403,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                     <Key size={20} className="text-amber-500" /> Register Administrator
                   </h3>
                   <p className="auth-card-subtitle">
-                    Provision new administrative credentials with full portal governance rights
+                    Create an administrator account to open the Admin Panel
                   </p>
                 </div>
 
@@ -431,7 +417,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                       <input 
                         type="text"
                         className="form-input"
-                        placeholder="e.g. Dr. A. K. Sharma"
+                        placeholder="Full name"
                         value={adminName}
                         onChange={(e) => setAdminName(e.target.value)}
                         required
@@ -448,7 +434,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                       <input 
                         type="text"
                         className="form-input"
-                        placeholder="IITTNiF Central Administration"
+                        placeholder="Department or designation"
                         value={adminDept}
                         onChange={(e) => setAdminDept(e.target.value)}
                         required
@@ -483,7 +469,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                         <input 
                           type="text"
                           className="form-input font-mono"
-                          placeholder="VIKAS-ADMIN-2026"
+                          placeholder="Enter security passcode"
                           value={adminPasscode}
                           onChange={(e) => setAdminPasscode(e.target.value)}
                           required
@@ -519,12 +505,12 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
                   <button 
                     type="submit" 
                     className="btn-auth-primary" 
-                    disabled={loading || !adminName || !adminEmail || !adminPassword}
+                    disabled={loading || !adminName || !adminDept || !adminEmail || !adminPasscode || !adminPassword}
                     style={{ background: 'linear-gradient(135deg, #d97706 0%, #b45309 50%, #991b1b 100%)' }}
                   >
                     {loading ? (
                       <span className="btn-loading-state">
-                        <span className="spinner-sm" /> Provisioning Admin...
+                        <span className="spinner-sm" /> Creating account...
                       </span>
                     ) : (
                       <span className="btn-label-state">
@@ -693,6 +679,7 @@ export default function AdminLoginPage({ onNavigateToApplicantLogin, onNavigateT
           letter-spacing: -0.6px;
           margin: 0;
           font-family: 'Outfit', 'Inter', sans-serif;
+          white-space: nowrap;
         }
 
         .hero-headline-highlight {

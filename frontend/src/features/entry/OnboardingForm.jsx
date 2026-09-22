@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   CheckCircle, 
   RefreshCw, 
@@ -30,6 +30,12 @@ import {
   Cpu
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import {
+  getBlankProposalForm,
+  loadProposalFormSession,
+  saveProposalFormSession,
+  clearProposalFormSession
+} from './proposalFormSession';
 
 export default function OnboardingForm({ 
   onSubmitApplication, 
@@ -38,94 +44,33 @@ export default function OnboardingForm({
   onNavigateToDashboard,
   onNavigateToLanding,
   onNavigateToTab,
-  onAlignedTrackChange
+  onAlignedTrackChange,
+  onRegisterLeaveHandler
 }) {
   const { currentUser, user, register, authFetch, loading: authLoading } = useAuth();
   const [formErrors, setFormErrors] = useState({});
 
-  // 5-Section Form State (Starts clean and synced with authenticated account)
-  const [formData, setFormData] = useState({
-    // Profile coordinates inherited from login / auth session
-    name: currentUser?.name || '',
-    organization: currentUser?.organization || '',
-    email: currentUser?.email || '',
-    phone: currentUser?.phone || '',
-    location: currentUser?.location || '',
-    password: '',
-    confirmPassword: '',
+  const sessionSnap = loadProposalFormSession(currentUser?.id);
+  const submittedFileRef = useRef(sessionSnap?.submittedFileNumber || null);
 
-    // Stakeholder Track / VIKAS Vertical
-    stakeholderType: '',
-    otherStakeholderType: '',
-
-    // Section 1: Domain Selection (Multiple choice - initially empty)
-    domains: [],
-    otherDomain: '',
-
-    // Section 2: Intent of Engagement (Single choice, initially unselected)
-    intentOfEngagement: '',
-    otherIntent: '',
-
-    // Section 3: Detailed Inputs (Dynamic based on 9 VIKAS Verticals)
-    // 6.1 Technology Development
-    techStage: 'TRL 3 - Proof of Concept',
-    techDomain: '',
-    techTargetTrl: 'TRL 6 - Field Prototype Demonstration',
-    techLabRequirements: '',
-    techMilestones: '',
-
-    // 6.2 Startups & Business Enablement
-    startupStage: 'Prototype',
-    startupDomain: '',
-    startupTeamSize: '1 - 5',
-    startupPreviousWork: '',
-
-    // 6.3 Human Resource Development
-    studentProgram: 'Chanakya Ph.D. Fellow',
-    studentDepartment: '',
-    studentResearchArea: '',
-
-    // 6.4 Skill Development
-    skillTargetAudience: 'Engineering Students & Faculty',
-    skillDomain: 'GIS & Spatial Analytics',
-    skillTrainingFormat: 'Hands-on Bootcamp (3-5 Days)',
-    skillCohortSize: '50 - 100 Participants',
-
-    // 6.5 Academic Collaborations & MoUs
-    collabPartnerName: '',
-    collabMode: 'Joint R&D Project',
-    collabCoordinator: '',
-    collabExpectedOutcome: '',
-
-    // 6.6 Schools & Academic Outreach (VidyaGIS)
-    schoolCurriculum: 'CBSE',
-    schoolInterest: 'VidyaGIS & Spatial Intelligence Lab Setup',
-    schoolStudentCount: '100 - 500 Students',
-
-    // 6.7 Institutions & Labs Network (SPIN Lab)
-    institutionType: 'University',
-    institutionInterest: ['SPIN Lab Setup', 'Faculty Upskilling'],
-
-    // 6.8 Industry & Government Interface
-    industryDepartment: '',
-    industryEngagementMode: 'Collaborative R&D / Tech Transfer',
-    industryProblemStatementScope: '',
-
-    // 6.9 Experts & Advisory Network
-    expertAreaOfExpertise: '',
-    expertExperience: '',
-    expertAffiliation: '',
-    expertWillingness: ['Mentor', 'Advisory Panel'],
-
-    // Section 4: Problem Statement / Interest
-    problemStatement: '',
-
-    // Section 5: Consent
-    agreeToTerms: false,
-    acknowledgeNonIncubation: false
+  const [formData, setFormData] = useState(() => {
+    const blank = getBlankProposalForm(currentUser || {});
+    if (sessionSnap?.formData) {
+      return {
+        ...blank,
+        ...sessionSnap.formData,
+        password: '',
+        confirmPassword: ''
+      };
+    }
+    return blank;
   });
 
   const [submittedData, setSubmittedData] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const committedRef = useRef(Boolean(sessionSnap?.submittedFileNumber));
+  const submitRef = useRef(null);
+  const [alreadySubmittedFile, setAlreadySubmittedFile] = useState(sessionSnap?.submittedFileNumber || null);
 
   // Sync profile details if currentUser loads or updates
   React.useEffect(() => {
@@ -140,6 +85,11 @@ export default function OnboardingForm({
       }));
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    saveProposalFormSession(currentUser.id, formData, submittedFileRef.current);
+  }, [formData, currentUser?.id]);
 
   // Dynamic Vertical Auto-Mapping Rule Engine preview
   const getMappedVerticals = () => {
@@ -407,6 +357,10 @@ export default function OnboardingForm({
   const validateForm = () => {
     const errors = {};
 
+    if (!formData.stakeholderType) {
+      errors.stakeholderType = 'Please select an Engagement Track / VIKAS Vertical in Section 3.';
+    }
+
     // Section 1: Domain Selection
     if (formData.domains.length === 0) {
       errors.domains = 'Please select at least one technology domain in Section 1';
@@ -439,16 +393,28 @@ export default function OnboardingForm({
     return errors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const scrollToFirstError = (errors) => {
+    const firstErrorKey = Object.keys(errors)[0];
+    const fieldId = firstErrorKey === 'stakeholderType' ? 'field-dynamicDetails' : `field-${firstErrorKey}`;
+    const errorElement = document.getElementById(fieldId) || document.getElementById(`field-${firstErrorKey}`);
+    if (errorElement) {
+      errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
+  const submitOnboarding = async ({ skipNavigate = false, showErrors = true } = {}) => {
+    if (committedRef.current || submittedFileRef.current) {
+      if (!skipNavigate && onNavigateToTab) {
+        onNavigateToTab('overview', { alignedTrack: formData.stakeholderType });
+      }
+      return true;
+    }
+    if (isSubmitting) return false;
+
     const currentErrors = validateForm();
     if (Object.keys(currentErrors).length > 0) {
-      const firstErrorKey = Object.keys(currentErrors)[0];
-      const errorElement = document.getElementById(`field-${firstErrorKey}`);
-      if (errorElement) {
-        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      return;
+      if (showErrors) scrollToFirstError(currentErrors);
+      return false;
     }
 
     const fileNumber = generateFileNumber(formData.stakeholderType);
@@ -538,8 +504,12 @@ export default function OnboardingForm({
     }
 
     const mapped = getMappedVerticals();
+    const submittedAt = new Date();
+    const submissionDate = submittedAt.toLocaleDateString('en-GB');
+    const submissionTime = submittedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const submissionDateTime = submittedAt.toLocaleString('en-GB');
 
-    // Call real backend registration
+    setIsSubmitting(true);
     try {
       let registeredApp = null;
 
@@ -564,11 +534,13 @@ export default function OnboardingForm({
           status: 'pending_screening',
           assignedVertical: mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement',
           assignedVerticals: [mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
-          submissionDate: new Date().toLocaleDateString('en-GB'),
+          submissionDate,
+          submissionTime,
+          submissionDateTime,
           isStrategic: (formData.stakeholderType || '').includes('6.8') || (formData.stakeholderType || '').includes('Industry') || (formData.stakeholderType || '').includes('Government'),
           history: [
             {
-              date: new Date().toLocaleString('en-GB'),
+              date: submissionDateTime,
               action: 'Proposal Dossier Submitted',
               user: `${formData.name} (Applicant)`,
               details: `Submitted proposal under ${formData.stakeholderType || mapped?.primary}. Assigned vertical: ${mapped?.primary}. Awaiting initial operations screening.`
@@ -610,11 +582,13 @@ export default function OnboardingForm({
           status: 'pending_screening',
           assignedVertical: mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement',
           assignedVerticals: [mapped?.primary || formData.stakeholderType || '6.2 Startups & Business Enablement', ...(mapped?.additional || [])],
-          submissionDate: new Date().toLocaleDateString('en-GB'),
+          submissionDate,
+          submissionTime,
+          submissionDateTime,
           isStrategic: (formData.stakeholderType || '').includes('6.8') || (formData.stakeholderType || '').includes('Industry') || (formData.stakeholderType || '').includes('Government'),
           history: [
             {
-              date: new Date().toLocaleString('en-GB'),
+              date: submissionDateTime,
               action: 'Proposal Dossier Submitted',
               user: `${formData.name} (Applicant)`,
               details: `Submitted proposal under ${formData.stakeholderType || mapped?.primary}. Assigned vertical: ${mapped?.primary}. Awaiting operations screening.`
@@ -623,78 +597,71 @@ export default function OnboardingForm({
         };
       }
 
-      if (onSubmitApplication) {
-        onSubmitApplication(registeredApp);
+      committedRef.current = true;
+      submittedFileRef.current = fileNumber;
+      setAlreadySubmittedFile(fileNumber);
+      if (currentUser?.id) {
+        saveProposalFormSession(currentUser.id, formData, fileNumber);
       }
 
-      if (onNavigateToTab) {
-        onNavigateToTab('overview');
-      } else {
-        setSubmittedData(registeredApp);
+      if (onSubmitApplication) {
+        onSubmitApplication(registeredApp, { skipNavigation: true });
       }
+
+      if (onAlignedTrackChange) {
+        onAlignedTrackChange(formData.stakeholderType);
+      }
+
+      if (!skipNavigate) {
+        if (onNavigateToTab) {
+          onNavigateToTab('overview', { alignedTrack: formData.stakeholderType });
+        } else {
+          setSubmittedData(registeredApp);
+        }
+      }
+
+      return true;
     } catch (err) {
       setFormErrors({ api: err.message || 'Submission failed. Please check inputs.' });
-      const apiErrEl = document.getElementById('field-name');
-      if (apiErrEl) apiErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (showErrors) {
+        const apiErrEl = document.getElementById('field-name') || document.getElementById('form-top-error');
+        if (apiErrEl) apiErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return false;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      organization: '',
-      email: '',
-      phone: '',
-      location: '',
-      password: '',
-      confirmPassword: '',
-      stakeholderType: '',
-      otherStakeholderType: '',
-      domains: [],
-      otherDomain: '',
-      intentOfEngagement: '',
-      otherIntent: '',
-      techStage: 'TRL 3 - Proof of Concept',
-      techDomain: '',
-      techTargetTrl: 'TRL 6 - Field Prototype Demonstration',
-      techLabRequirements: '',
-      techMilestones: '',
-      startupStage: 'Prototype',
-      startupDomain: '',
-      startupTeamSize: '1 - 5',
-      startupPreviousWork: '',
-      studentProgram: 'Chanakya Ph.D. Fellow',
-      studentDepartment: '',
-      studentResearchArea: '',
-      skillTargetAudience: 'Engineering Students & Faculty',
-      skillDomain: 'GIS & Spatial Analytics',
-      skillTrainingFormat: 'Hands-on Bootcamp (3-5 Days)',
-      skillCohortSize: '50 - 100 Participants',
-      collabPartnerName: '',
-      collabMode: 'Joint R&D Project',
-      collabCoordinator: '',
-      collabExpectedOutcome: '',
-      schoolCurriculum: 'CBSE',
-      schoolInterest: 'VidyaGIS & Spatial Intelligence Lab Setup',
-      schoolStudentCount: '100 - 500 Students',
-      institutionType: 'University',
-      institutionInterest: ['SPIN Lab Setup', 'Faculty Upskilling'],
-      industryDepartment: '',
-      industryEngagementMode: 'Collaborative R&D / Tech Transfer',
-      industryProblemStatementScope: '',
-      expertAreaOfExpertise: '',
-      expertExperience: '',
-      expertAffiliation: '',
-      expertWillingness: ['Mentor', 'Advisory Panel'],
-      otherEntityCategory: '',
-      otherFocusArea: '',
-      otherEngagementDetails: '',
-      problemStatement: '',
-      agreeToTerms: false,
-      acknowledgeNonIncubation: false
+  submitRef.current = submitOnboarding;
+
+  useEffect(() => {
+    if (!onRegisterLeaveHandler) return undefined;
+    onRegisterLeaveHandler(async () => {
+      if (committedRef.current || submittedFileRef.current) return true;
+      return submitRef.current?.({ skipNavigate: true, showErrors: false });
     });
+    return () => onRegisterLeaveHandler(null);
+  }, [onRegisterLeaveHandler]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await submitOnboarding({ skipNavigate: false, showErrors: true });
+  };
+
+  const resetForm = () => {
+    committedRef.current = false;
+    submittedFileRef.current = null;
+    setAlreadySubmittedFile(null);
+    const blank = getBlankProposalForm(currentUser || {});
+    setFormData(blank);
     setFormErrors({});
     setSubmittedData(null);
+    if (currentUser?.id) {
+      saveProposalFormSession(currentUser.id, blank, null);
+    } else {
+      clearProposalFormSession();
+    }
   };
 
   return (
@@ -1009,6 +976,16 @@ export default function OnboardingForm({
             </div>
           )}
 
+          {alreadySubmittedFile && (
+            <div className="submitted-session-banner mb-16">
+              <CheckCircle2 size={16} />
+              <span>
+                This proposal is already logged as <strong className="font-mono">{alreadySubmittedFile}</strong>.
+                Your answers stay on this form for this session. Track status in My Dashboard &amp; Status. A new login starts a blank form.
+              </span>
+            </div>
+          )}
+
           {formErrors.api && (
             <div className="alert-error-banner mb-16 animate-shake" id="form-top-error">
               <AlertCircle size={16} />
@@ -1153,6 +1130,13 @@ export default function OnboardingForm({
                 </p>
               </div>
             </div>
+
+            {formErrors.stakeholderType && (
+              <div className="alert-error-banner mb-16">
+                <AlertCircle size={15} />
+                <span>{formErrors.stakeholderType}</span>
+              </div>
+            )}
 
             {/* VIKAS Verticals Selector */}
             <div className="track-selector-bar mb-20">
@@ -1808,26 +1792,25 @@ export default function OnboardingForm({
 
           {/* Form Action Buttons */}
           <div className="form-submit-footer">
-            <button
-              type="button"
-              className="btn btn-primary btn-submit-large"
-              onClick={() => {
-                if (!formData.stakeholderType) {
-                  setFormErrors(prev => ({
-                    ...prev,
-                    stakeholderType: 'Please select an Engagement Track / VIKAS Vertical in Section 3.'
-                  }));
-                  document.getElementById('field-dynamicDetails')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  return;
-                }
-                if (onAlignedTrackChange) onAlignedTrackChange(formData.stakeholderType);
-                onNavigateToTab('overview', { alignedTrack: formData.stakeholderType });
-              }}
-            >
-              <Layers size={18} />
-              Way to our verticals
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={resetForm}>
+            <div className="submit-primary-wrap">
+              <button
+                type="button"
+                className="btn btn-primary btn-submit-large"
+                disabled={isSubmitting}
+                onClick={async () => {
+                  await submitOnboarding({ skipNavigate: false, showErrors: true });
+                }}
+              >
+                <Layers size={18} />
+                {isSubmitting ? 'Saving proposal...' : 'Way to our verticals'}
+              </button>
+              <p className="submit-helper-text">
+                {alreadySubmittedFile
+                  ? 'Already submitted this session — opens VIKAS Verticals without creating a duplicate file.'
+                  : 'Saves your proposal, opens VIKAS Verticals, and updates My Dashboard & Status.'}
+              </p>
+            </div>
+            <button type="button" className="btn btn-secondary" onClick={resetForm} disabled={isSubmitting}>
               <RefreshCw size={16} />
               Reset All Fields
             </button>
@@ -2551,9 +2534,49 @@ export default function OnboardingForm({
         /* Form Footer Actions */
         .form-submit-footer {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 14px;
           margin-top: 28px;
+          flex-wrap: wrap;
+        }
+
+        .submit-primary-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 6px;
+        }
+
+        .submit-helper-text {
+          margin: 0;
+          font-size: 12px;
+          color: var(--text-muted);
+          max-width: 380px;
+          line-height: 1.4;
+        }
+
+        .submitted-session-banner {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 12px 16px;
+          border-radius: 12px;
+          background: #ecfdf5;
+          border: 1px solid #6ee7b7;
+          color: #047857;
+          font-size: 13px;
+          line-height: 1.45;
+        }
+
+        html[data-theme="dark"] .submitted-session-banner {
+          background: rgba(16, 185, 129, 0.12);
+          border-color: rgba(16, 185, 129, 0.35);
+          color: #6ee7b7;
+        }
+
+        .btn-submit-large:disabled {
+          opacity: 0.7;
+          cursor: wait;
         }
 
         .btn-submit-large {

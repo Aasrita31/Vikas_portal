@@ -217,8 +217,10 @@ export default function LandingPage({
             </div>
           </article>
         </section>
+      </div>
 
-        <section className="landing-section" id="who-can-join">
+      <section className="landing-band" id="who-can-join">
+        <div className="landing-container">
           <div className="landing-section-header">
             <div className="section-eyebrow-pill">
               <Users size={13} /> Who Can Join
@@ -242,30 +244,36 @@ export default function LandingPage({
               );
             })}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="landing-section" id="what-you-can-do">
+      <section className="landing-band band-soft" id="what-you-can-do">
+        <div className="landing-container">
           <div className="landing-section-header">
             <div className="section-eyebrow-pill">
               <Target size={13} /> What You Can Do
             </div>
             <h2 className="section-main-heading">Engage with purpose</h2>
           </div>
-          <div className="feature-grid">
+          <div className="feature-list">
             {WHAT_YOU_CAN_DO.map((item) => {
               const Icon = item.icon;
               return (
                 <article key={item.title} className="feature-card">
                   <div className="feature-icon"><Icon size={20} /></div>
-                  <h3>{item.title}</h3>
-                  <p>{item.desc}</p>
+                  <div className="feature-copy">
+                    <h3>{item.title}</h3>
+                    <p>{item.desc}</p>
+                  </div>
                 </article>
               );
             })}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="landing-section" id="how-it-works">
+      <section className="landing-band" id="how-it-works">
+        <div className="landing-container">
           <div className="landing-section-header">
             <div className="section-eyebrow-pill">
               <Layers size={13} /> How It Works
@@ -273,18 +281,19 @@ export default function LandingPage({
             <h2 className="section-main-heading">A clear journey from interest to participation</h2>
           </div>
           <div className="journey-track">
-            {HOW_IT_WORKS.map((item, idx) => (
+            {HOW_IT_WORKS.map((item) => (
               <div key={item.step} className="journey-step">
                 <span className="journey-num">{item.step}</span>
                 <h3>{item.title}</h3>
                 <p>{item.desc}</p>
-                {idx < HOW_IT_WORKS.length - 1 && <span className="journey-connector" />}
               </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="landing-section" id="explore-tracks">
+      <section className="landing-band band-soft" id="explore-tracks">
+        <div className="landing-container">
           <div className="landing-section-header">
             <div className="section-eyebrow-pill">
               <Compass size={13} /> Explore Tracks
@@ -303,9 +312,11 @@ export default function LandingPage({
               );
             })}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="landing-section" id="impact" ref={impactRef}>
+      <section className="landing-band" id="impact" ref={impactRef}>
+        <div className="landing-container">
           <div className="landing-section-header">
             <div className="section-eyebrow-pill">
               <BarChart3 size={13} /> Impact
@@ -317,8 +328,10 @@ export default function LandingPage({
               <ImpactStat key={stat.label} {...stat} active={impactVisible} />
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
+      <div className="landing-container">
         <section className="landing-final-cta-section" id="join">
           <div className="final-cta-glass-box">
             <h2 className="final-cta-title">Join the VIKAS Platform</h2>

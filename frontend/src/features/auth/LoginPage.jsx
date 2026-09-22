@@ -183,12 +183,12 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
               className="pillar-item admin-portal-pillar"
               onClick={onNavigateToAdmin}
             >
-              <div className="pillar-icon-box" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', color: '#f59e0b' }}>
+              <div className="pillar-icon-box" style={{ backgroundColor: 'rgba(217, 119, 6, 0.18)', color: '#fbbf24' }}>
                 <Shield size={18} />
               </div>
               <div className="pillar-text-wrap">
-                <h4 className="pillar-title">Administrator</h4>
-                <p className="pillar-desc">Executive Portal</p>
+                <h4 className="pillar-title">Admin Panel</h4>
+                <p className="pillar-desc">Restricted officer access</p>
               </div>
             </button>
           </div>
@@ -332,6 +332,15 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
                     Register here <ChevronRight size={14} />
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  className="btn-admin-panel-entry"
+                  onClick={onNavigateToAdmin}
+                >
+                  <Shield size={16} />
+                  <span>Admin Panel</span>
+                </button>
               </div>
             ) : (
 
@@ -1117,6 +1126,33 @@ export default function LoginPage({ onNavigateToRegister, onLoginSuccess, onNavi
         .btn-link-switch:hover {
           color: #fbbf24;
           text-decoration: underline;
+        }
+
+        .btn-admin-panel-entry {
+          width: 100%;
+          margin-top: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 11px 14px;
+          background: rgba(217, 119, 6, 0.1);
+          border: 1px solid rgba(217, 119, 6, 0.45);
+          border-radius: 8px;
+          color: #fbbf24;
+          font-size: 13px;
+          font-weight: 800;
+          letter-spacing: 0.3px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-family: inherit;
+        }
+
+        .btn-admin-panel-entry:hover {
+          background: rgba(217, 119, 6, 0.2);
+          border-color: #f59e0b;
+          color: #fde68a;
+          transform: translateY(-1px);
         }
 
         /* Alerts */

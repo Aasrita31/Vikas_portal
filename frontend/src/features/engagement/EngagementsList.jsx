@@ -332,30 +332,48 @@ export default function EngagementsList({
       <div className="verticals-square-grid">
         {verticalsData.map((vert) => {
           const IconComponent = vert.icon;
-          
+          const isHighlighted = vert.id === activePreference;
+          const isFaded = activePreference && vert.id !== activePreference;
+
           return (
-            <button 
-              key={vert.id} 
-              className="vertical-square-card" 
+            <button
+              key={vert.id}
+              className={`vertical-square-card${isHighlighted ? ' highlighted-track-card' : ''}${isFaded ? ' faded-card' : ''}`}
+              style={isHighlighted ? {
+                borderColor: vert.color,
+                borderWidth: '2px',
+                boxShadow: `0 8px 28px ${vert.color}30`,
+                background: `linear-gradient(160deg, #ffffff 0%, ${vert.color}08 100%)`
+              } : {}}
               onClick={() => handleCardClick(vert.id)}
             >
+              {isHighlighted && (
+                <span
+                  className="user-selected-badge"
+                  style={{ backgroundColor: vert.color }}
+                >
+                  <CheckCircle2 size={10} />
+                  Your Track
+                </span>
+              )}
+
               {/* Top-Left: Icon block in a square wrapper */}
-              <div 
-                className="vert-square-icon-box"
-                style={{ 
-                  backgroundColor: `${vert.color}12`, 
+              <div
+                className={`vert-square-icon-box${isHighlighted ? ' icon-box-pulsing' : ''}`}
+                style={{
+                  backgroundColor: `${vert.color}12`,
                   border: `1px solid ${vert.color}35`,
                   color: vert.color
                 }}
               >
                 <IconComponent size={26} />
               </div>
-              
+
               {/* Title Section */}
               <h4 className="vert-square-title">
                 <span className="vert-square-code">{vert.code}</span> {vert.title}
               </h4>
-              
+
               {/* Description Section */}
               <p className="vert-square-desc">
                 {vert.desc}
@@ -363,9 +381,9 @@ export default function EngagementsList({
 
               {/* Card Footer Pill */}
               <div className="vert-card-footer">
-                <span 
+                <span
                   className="vert-tag-pill"
-                  style={{ 
+                  style={{
                     backgroundColor: `${vert.color}10`,
                     color: vert.color,
                     border: `1px solid ${vert.color}25`
@@ -381,6 +399,7 @@ export default function EngagementsList({
           );
         })}
       </div>
+
 
       {/* Deep-Dive Modal Details Overlay when a vertical card is clicked */}
       {selectedVertical && activeVerticalData && (

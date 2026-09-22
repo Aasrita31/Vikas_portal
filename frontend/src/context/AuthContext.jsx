@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { clearProposalFormSession } from '../features/entry/proposalFormSession';
 
 // The 6 Roles supported by VIKAS Platform
 export const ROLES = {
@@ -90,9 +91,11 @@ export function AuthProvider({ children }) {
   const token = session?.token || null;
   const isAuthenticated = Boolean(currentUser && token);
 
-  // Normalize role
+  // Normalize role (backend may return PROJECT_DIRECTOR or pd)
   const rawRole = currentUser?.role?.toLowerCase() || ROLES.APPLICANT;
-  const currentRole = rawRole === 'pd' ? ROLES.PROJECT_DIRECTOR : rawRole;
+  const currentRole = (rawRole === 'pd' || rawRole === 'project_director')
+    ? ROLES.PROJECT_DIRECTOR
+    : rawRole;
 
   // Persist session to localStorage
   useEffect(() => {
@@ -112,7 +115,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password })
@@ -144,6 +147,7 @@ export function AuthProvider({ children }) {
       };
 
       setSession(newSession);
+      clearProposalFormSession();
       return { success: true, user: newSession.user, application: data.application, applications: data.applications };
     } catch (err) {
       setAuthError(err.message);
@@ -158,7 +162,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/v1/auth/register', {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registrationData)
@@ -196,6 +200,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     setSession(null);
     localStorage.removeItem(SESSION_STORAGE_KEY);
+    clearProposalFormSession();
   }, []);
 
   // Strict Role & Authority Matrix Permission Checkers
@@ -236,13 +241,10 @@ export function AuthProvider({ children }) {
       return { authorized: false, reason: 'Conflict of Interest: You cannot authorize an application you submitted.' };
     }
 
-    if (isAdmin) return { authorized: true };
+    if (isAdmin || isProjectDirector) return { authorized: true };
 
     const isPdLevel = app.approvalAuthority === 'pd' || app.isStrategic;
     if (isPdLevel) {
-      if (currentRole === ROLES.PROJECT_DIRECTOR) {
-        return { authorized: true };
-      }
       return { 
         authorized: false, 
         reason: 'Authority Matrix: Direct sign-off of the Project Director (PD) is required for strategic/high-value files.' 
@@ -268,13 +270,6 @@ export function AuthProvider({ children }) {
         };
       }
       return { authorized: true };
-    }
-
-    if (currentRole === ROLES.PROJECT_DIRECTOR) {
-      return { 
-        authorized: false, 
-        reason: `Delegated Authority: This file is assigned to the relevant Pillar Lead (${app.assignedVertical || 'Vertical Lead'}). Project Director intervention not required.` 
-      };
     }
 
     return { authorized: false, reason: 'Requires authorization from the relevant Pillar Lead.' };

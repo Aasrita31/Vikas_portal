@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  ShieldCheck, 
   User, 
   Bell, 
   ChevronDown, 
   Check, 
   ExternalLink,
-  Shield,
   Briefcase,
   GraduationCap,
   School,
@@ -15,7 +13,6 @@ import {
   Layers,
   LogIn,
   LogOut,
-  UserPlus,
   LayoutDashboard,
   FileText,
   Sparkles,
@@ -37,7 +34,7 @@ export default function Header({
   onNotificationClick,
   portalTheme = 'bright'
 }) {
-  const { currentUser, currentRole, isAuthenticated, logout, isApplicant, isAdmin } = useAuth();
+  const { currentUser, currentRole, isAuthenticated, logout, isApplicant, isAdmin, isProjectDirector } = useAuth();
   const [notifDropdownOpen, setNotifDropdownOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const menusRef = useRef(null);
@@ -87,10 +84,10 @@ export default function Header({
       case ROLES.PROJECT_DIRECTOR:
       case ROLES.PD:
         return [
-          { id: 'approval', label: '1. Approval Matrix', count: pendingApprovalCount },
-          { id: 'overview', label: '2. Overview' },
-          { id: 'tracking', label: '3. System Monitoring' },
-          { id: 'flow', label: '4. Process Flow' }
+          { id: 'admin', label: 'Admin Panel' },
+          { id: 'approval', label: 'Approval', count: pendingApprovalCount },
+          { id: 'overview', label: 'Overview' },
+          { id: 'tracking', label: 'Monitoring' }
         ];
 
       case ROLES.EXECUTION:
@@ -102,12 +99,10 @@ export default function Header({
 
       case ROLES.ADMIN:
         return [
-          { id: 'overview', label: '1. Overview' },
-          { id: 'entry', label: '2. Registry Intake' },
-          { id: 'screening', label: '3. Screening Queue', count: pendingScreeningCount },
-          { id: 'approval', label: '4. Approval Matrix', count: pendingApprovalCount },
-          { id: 'tracking', label: '5. Monitoring' },
-          { id: 'flow', label: '6. System Flow' }
+          { id: 'admin', label: 'Admin Panel' },
+          { id: 'overview', label: 'Overview' },
+          { id: 'approval', label: 'Approval', count: pendingApprovalCount },
+          { id: 'tracking', label: 'Monitoring' }
         ];
 
       default:
@@ -203,7 +198,7 @@ export default function Header({
                       <LayoutDashboard size={14} /> My Dashboard
                     </button>
                   )}
-                  {isAdmin && (
+                  {(isAdmin || isProjectDirector) && (
                     <button 
                       className="btn-popover-dash"
                       onClick={() => {
@@ -211,7 +206,7 @@ export default function Header({
                         setProfileModalOpen(false);
                       }}
                     >
-                      <LayoutDashboard size={14} /> Admin Dashboard
+                      <LayoutDashboard size={14} /> Admin Panel
                     </button>
                   )}
                   <button 
@@ -341,24 +336,6 @@ export default function Header({
 
       {/* Column 3: Right Action Area with Admin Dashboard Button & Nav/Logo */}
       <div className="navbar-right-action-wrapper">
-        {isAdmin && !isAuthScreen && (
-          <button
-            type="button"
-            onClick={() => {
-              if (activeTab === 'admin' || activeTab === 'admin-login') {
-                setActiveTab('landing');
-              } else {
-                setActiveTab('admin');
-              }
-            }}
-            className={`btn-header-admin-dash ${isDarkMode ? 'admin-btn-dark' : 'admin-btn-light'} ${activeTab === 'admin' || activeTab === 'admin-login' ? 'active' : ''}`}
-            title="Go to Admin Dashboard"
-          >
-            <Shield size={14} className="text-amber-500" />
-            <span>Admin Dashboard</span>
-          </button>
-        )}
-
         {isAuthenticated && !isAuthScreen && (
           <nav className="navbar-links-right">
             {mainNavs.map((nav) => {
@@ -633,7 +610,7 @@ export default function Header({
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 6px;
+          gap: 4px;
           flex-shrink: 1;
           flex-wrap: nowrap;
           min-width: 0;
@@ -668,7 +645,7 @@ export default function Header({
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 7px 12px;
+          padding: 7px 10px;
           border-radius: var(--radius-full);
           font-size: 12px;
           font-weight: 600;

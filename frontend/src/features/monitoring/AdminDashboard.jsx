@@ -1,877 +1,1056 @@
-import React, { useState } from 'react';
-import { 
-  ShieldCheck, 
-  Users, 
-  FileText, 
-  Layers, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  Key, 
-  BarChart3, 
-  Search, 
-  Filter, 
-  Building2, 
-  ArrowUpRight, 
-  UserPlus, 
-  Download, 
-  Shield, 
-  Activity,
-  History,
-  CheckCircle,
-  XCircle,
-  ExternalLink,
-  ChevronRight
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ShieldCheck,
+  Users,
+  FileText,
+  CheckCircle2,
+  Clock,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Lock,
+  Award
 } from 'lucide-react';
 import { useAuth, ROLES } from '../../context/AuthContext';
-import ScreeningQueue from '../screening/ScreeningQueue';
 import ApprovalPanel from '../approval/ApprovalPanel';
 import AuditLogs from '../audit/AuditLogs';
+import CertificateOfAssociation from './CertificateOfAssociation';
 
-export default function AdminDashboard({ 
-  applications = [], 
-  onRouteApplication, 
-  onApproveApplication, 
-  onRejectApplication,
-  onNavigateToTab,
-  onNavigateToAdminRegister
-}) {
-  const { currentUser, currentRole } = useAuth();
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState('overview'); // 'overview' | 'users' | 'screening' | 'approval' | 'audit'
-  const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [userTypeFilter, setUserTypeFilter] = useState('ALL');
+const GENERIC_VERTICAL_LABELS = new Set([
+  'startup',
+  'startups',
+  'general stakeholder',
+  'general',
+  'other'
+]);
 
-  // Derive Stakeholder & User List from persistent Applications & Current User
-  const allUsersMap = new Map();
-  
-  // Seed default core platform accounts
-  allUsersMap.set('admin@iittnif.in', {
-    id: 'usr_admin',
-    name: 'System Administrator',
-    email: 'admin@iittnif.in',
-    organization: 'IITTNiF Central Administration',
-    role: 'ADMIN',
-    stakeholderType: 'Central Governance',
-    phone: '+91 98765 00006',
-    location: 'Tirupati, AP',
-    status: 'ACTIVE',
-    filesCount: applications.length
-  });
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  allUsersMap.set('director@iittnif.in', {
-    id: 'usr_pd',
-    name: 'Dr. C. P. Sharma',
-    email: 'director@iittnif.in',
-    organization: 'Directorate, IITTNiF',
-    role: 'PROJECT_DIRECTOR',
-    stakeholderType: 'Executive Authority',
-    phone: '+91 98765 00004',
-    location: 'Tirupati, AP',
-    status: 'ACTIVE',
-    filesCount: applications.filter(a => a.approvalAuthority === 'pd').length
-  });
+function formatDisplayDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
 
-  allUsersMap.set('ops@iittnif.in', {
-    id: 'usr_ops',
-    name: 'Vikram Malhotra',
-    email: 'ops@iittnif.in',
-    organization: 'IITTNiF Operations & Screening Cell',
-    role: 'OPERATIONS',
-    stakeholderType: 'Operations Lead',
-    phone: '+91 98765 00001',
-    location: 'Tirupati, AP',
-    status: 'ACTIVE',
-    filesCount: applications.filter(a => a.status === 'pending_screening').length
-  });
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    return `${iso[3]} ${MONTH_SHORT[Number(iso[2]) - 1]} ${iso[1]}`;
+  }
 
-  // Extract from real applications
-  applications.forEach(app => {
-    if (app.email) {
-      const emailLower = app.email.toLowerCase();
-      const existing = allUsersMap.get(emailLower);
-      allUsersMap.set(emailLower, {
-        id: app.userId || `usr_${Math.random().toString(36).substr(2, 9)}`,
-        name: app.contactPerson || app.applicantName || app.name || 'Registered Applicant',
-        email: app.email,
-        organization: app.organization || 'Registered Entity',
-        role: existing?.role || 'APPLICANT',
-        stakeholderType: app.stakeholderType || 'Startup',
-        phone: app.phone || '+91 98765 43210',
-        location: app.location || 'India',
-        status: app.status === 'rejected' ? 'INACTIVE' : 'ACTIVE',
-        filesCount: (existing?.filesCount || 0) + 1,
-        latestFile: app.fileNumber,
-        assignedVertical: app.assignedVertical
-      });
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmy) {
+    return `${dmy[1].padStart(2, '0')} ${MONTH_SHORT[Number(dmy[2]) - 1] || dmy[2]} ${dmy[3]}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  return raw;
+}
+
+function formatDisplayTime(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!match) return raw;
+
+  let hour = Number(match[1]);
+  const minute = match[2];
+  const meridiem = (match[4] || '').toLowerCase();
+
+  if (meridiem) {
+    return `${hour}:${minute} ${meridiem.toUpperCase()}`;
+  }
+
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const twelve = hour % 12 || 12;
+  return `${twelve}:${minute} ${suffix}`;
+}
+
+function formatMonitorDateTime(app) {
+  const candidates = [
+    app?.history?.[0]?.date,
+    app?.submissionDateTime,
+    app?.submission_date_time,
+    app?.lastUpdated,
+    app?.last_updated,
+    app?.createdAt,
+    app?.created_at,
+    app?.submissionDate,
+    app?.submission_date
+  ].filter(Boolean);
+
+  const raw = String(candidates[0] || '').trim();
+  if (!raw) {
+    return { date: '—', time: app?.submissionTime || '—' };
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return {
+        date: parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        time: parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      };
     }
+  }
+
+  if (raw.includes(',')) {
+    const [datePart, ...timeParts] = raw.split(',');
+    return {
+      date: formatDisplayDate(datePart),
+      time: formatDisplayTime(timeParts.join(','))
+    };
+  }
+
+  return {
+    date: formatDisplayDate(raw),
+    time: formatDisplayTime(app?.submissionTime || app?.submission_time || '')
+  };
+}
+
+function getApplicationVerticals(app) {
+  const raw = [
+    ...(Array.isArray(app?.assignedVerticals) ? app.assignedVerticals : []),
+    ...(Array.isArray(app?.assigned_verticals) ? app.assigned_verticals : []),
+    app?.assignedVertical,
+    app?.assigned_vertical
+  ];
+
+  const seen = new Set();
+  const cleaned = [];
+
+  raw.forEach((item) => {
+    const label = String(item || '').trim();
+    if (!label) return;
+    const key = label.toLowerCase();
+    if (seen.has(key) || GENERIC_VERTICAL_LABELS.has(key)) return;
+    seen.add(key);
+    cleaned.push(label);
   });
 
-  const registeredUsersList = Array.from(allUsersMap.values());
+  if (cleaned.length > 0) return cleaned;
 
-  const filteredUsers = registeredUsersList.filter(user => {
-    const matchesSearch = 
-      user.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      user.organization.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      user.role.toLowerCase().includes(userSearchQuery.toLowerCase());
-    
-    if (userTypeFilter === 'ALL') return matchesSearch;
-    if (userTypeFilter === 'STAFF') return matchesSearch && ['ADMIN', 'OPERATIONS', 'PROJECT_DIRECTOR', 'PILLAR_LEAD'].includes(user.role);
-    if (userTypeFilter === 'APPLICANTS') return matchesSearch && user.role === 'APPLICANT';
-    return matchesSearch && user.stakeholderType.toUpperCase().includes(userTypeFilter.toUpperCase());
+  const fallbackRaw = String(app?.stakeholderType || app?.stakeholder_type || '').trim();
+  const fallbackKey = fallbackRaw.toUpperCase();
+  if (fallbackKey.includes('6.1') || fallbackKey.includes('TECH')) return ['6.1 Technology Development'];
+  if (fallbackKey.includes('6.3') || fallbackKey.includes('STUDENT') || fallbackKey.includes('RESEARCH') || fallbackKey.includes('HRD')) return ['6.3 Human Resource Development'];
+  if (fallbackKey.includes('6.4') || fallbackKey.includes('SKILL')) return ['6.4 Skill Development'];
+  if (fallbackKey.includes('6.5') || fallbackKey.includes('COLLAB') || fallbackKey.includes('MOU')) return ['6.5 Academic Collaborations & MoUs'];
+  if (fallbackKey.includes('6.6') || fallbackKey.includes('SCHOOL')) return ['6.6 Schools & Academic Outreach (VidyaGIS)'];
+  if (fallbackKey.includes('6.7') || fallbackKey.includes('LAB') || fallbackKey.includes('INSTITUTION')) return ['6.7 Institutions & Labs Network (SPIN Lab)'];
+  if (fallbackKey.includes('6.8') || fallbackKey.includes('INDUSTRY') || fallbackKey.includes('GOVERNMENT')) return ['6.8 Industry & Government Interface'];
+  if (fallbackKey.includes('6.9') || fallbackKey.includes('EXPERT')) return ['6.9 Experts & Advisory Network'];
+  return ['6.2 Startups & Business Enablement'];
+}
+
+function isAutoRegisterStub(app) {
+  const title = String(app?.name || app?.problemStatement || '').toLowerCase();
+  const intent = String(Array.isArray(app?.intentOfEngagement) ? app.intentOfEngagement.join(' ') : (app?.intentOfEngagement || '')).toLowerCase();
+  return title.includes('ecosystem registration') || intent.includes('vikas portal incubation');
+}
+
+function getDashboardStatus(app) {
+  const status = String(app?.status || '').toLowerCase();
+  if (['approved', 'engagement', 'completed'].includes(status)) {
+    return { key: 'approved', label: 'Approved', screening: 'Completed', monthly: 'Active' };
+  }
+  if (status === 'rejected') {
+    return { key: 'rejected', label: 'Declined', screening: 'Declined', monthly: 'N/A' };
+  }
+  return { key: 'pending', label: 'Pending', screening: 'Completed', monthly: 'Pending' };
+}
+
+function getApplicantName(app) {
+  return app?.contactPerson || app?.applicantName || app?.name || 'Registered applicant';
+}
+
+export default function AdminDashboard({
+  applications = [],
+  onRouteApplication,
+  onApproveApplication,
+  onRejectApplication,
+  onSendToEsign,
+  onNavigateToTab,
+  onNavigateToAdminRegister,
+  initialSubTab = null,
+  certificateFileNumber = null,
+  onOpenCertificate
+}) {
+  const { currentUser, isAdmin, isProjectDirector } = useAuth();
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState(initialSubTab || 'status');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [okInputs, setOkInputs] = useState({});
+  const [okErrors, setOkErrors] = useState({});
+  const [expandedKey, setExpandedKey] = useState(null);
+  const [selectedCertificateFile, setSelectedCertificateFile] = useState(certificateFileNumber);
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveAdminSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
+
+  useEffect(() => {
+    if (certificateFileNumber) {
+      setSelectedCertificateFile(certificateFileNumber);
+    }
+  }, [certificateFileNumber]);
+
+  const openCertificate = (fileNumber) => {
+    setSelectedCertificateFile(fileNumber);
+    setActiveAdminSubTab('certificate');
+    onOpenCertificate?.(fileNumber);
+  };
+
+  const canIssueOk = isAdmin || isProjectDirector;
+  const officerTitle = isProjectDirector ? 'Project Director' : isAdmin ? 'Administrator' : 'Officer';
+
+  const applicantFiles = useMemo(
+    () => (Array.isArray(applications) ? applications.filter((app) => !isAutoRegisterStub(app)) : []),
+    [applications]
+  );
+
+  const statusRows = useMemo(() => {
+    return applicantFiles.map((app) => {
+      const { date, time } = formatMonitorDateTime(app);
+      const dashboard = getDashboardStatus(app);
+      return {
+        key: app.fileNumber || app.id,
+        app,
+        name: getApplicantName(app),
+        email: app.email || '—',
+        organization: app.organization || '—',
+        phone: app.phone || '—',
+        verticals: getApplicationVerticals(app),
+        date,
+        time,
+        dashboard
+      };
+    });
+  }, [applicantFiles]);
+
+  const filteredRows = statusRows.filter((row) => {
+    const haystack = `${row.name} ${row.email} ${row.organization} ${row.app.fileNumber || ''} ${row.verticals.join(' ')}`.toLowerCase();
+    const matchesSearch = haystack.includes(userSearchQuery.trim().toLowerCase());
+    if (!matchesSearch) return false;
+    if (statusFilter === 'PENDING') return row.dashboard.key === 'pending';
+    if (statusFilter === 'APPROVED') return row.dashboard.key === 'approved';
+    if (statusFilter === 'REJECTED') return row.dashboard.key === 'rejected';
+    return true;
   });
 
-  // KPI Calculations
-  const totalRegistrations = applications.length;
-  const pendingScreening = applications.filter(a => a.status === 'pending_screening').length;
-  const pendingApproval = applications.filter(a => a.status === 'pending_approval').length;
-  const approvedTotal = applications.filter(a => a.status === 'approved').length;
-  const strategicTotal = applications.filter(a => a.isStrategic).length;
+  const pendingCount = statusRows.filter((row) => row.dashboard.key === 'pending').length;
+  const approvedCount = statusRows.filter((row) => row.dashboard.key === 'approved').length;
+  const rejectedCount = statusRows.filter((row) => row.dashboard.key === 'rejected').length;
+  const uniqueApplicants = new Set(statusRows.map((row) => String(row.email || row.name).toLowerCase())).size;
 
-  // Verticals breakdown
-  const verticalCounts = {};
-  applications.forEach(a => {
-    const v = a.assignedVertical || '6.2 Startups & Business Enablement';
-    verticalCounts[v] = (verticalCounts[v] || 0) + 1;
-  });
+  const handleOkSubmit = (row) => {
+    if (!canIssueOk || !row.app.fileNumber) return;
+    const typed = String(okInputs[row.key] || '').trim().toLowerCase();
+    if (typed !== 'ok') {
+      setOkErrors((prev) => ({ ...prev, [row.key]: 'Type ok to send this file for e-signature.' }));
+      return;
+    }
+
+    setOkErrors((prev) => ({ ...prev, [row.key]: '' }));
+    setOkInputs((prev) => ({ ...prev, [row.key]: '' }));
+    if (onSendToEsign) {
+      onSendToEsign(row.app.fileNumber);
+      return;
+    }
+    onNavigateToTab?.('approval', { fileNumber: row.app.fileNumber });
+  };
 
   return (
-    <div className="admin-dashboard-container animate-fade-in">
-      {/* Top Executive Header Bar */}
-      <div className="admin-top-banner">
-        <div className="admin-banner-left">
-          <div className="admin-shield-icon-wrap">
-            <ShieldCheck size={28} className="text-amber-500" />
+    <div className="admin-console animate-fade-in">
+      <section className="admin-hero">
+        <div className="admin-hero-copy">
+          <div className="admin-hero-kicker">
+            <ShieldCheck size={16} />
+            <span>Admin Panel</span>
+            <span className="admin-live-dot" />
+            <span>Secure session</span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge badge-amber font-bold" style={{ fontSize: '11px', letterSpacing: '0.5px' }}>
-                EXECUTIVE APEX CONSOLE
-              </span>
-              <span className="badge badge-success font-bold" style={{ fontSize: '11px' }}>
-                SYSTEM LIVE
-              </span>
-            </div>
-            <h2 className="admin-title">VIKAS Central Administration & Governance Panel</h2>
-            <p className="admin-subtitle">
-              Single-Window Intake Oversight • Authority Matrix Routing • User Registry & Audit Trail
-            </p>
-          </div>
+          <h1>VIKAS Admin Panel</h1>
+          <p>
+            Review every applicant submission and dashboard status.
+            Type <strong>ok</strong> to open the Approval page and complete e-sign.
+          </p>
         </div>
+      </section>
 
-        <div className="admin-banner-right">
-          <button 
-            type="button" 
-            className="btn-admin-action"
-            onClick={onNavigateToAdminRegister}
+      <section className="admin-kpi-row">
+        <article className="admin-kpi">
+          <span>Registered users</span>
+          <strong>{uniqueApplicants}</strong>
+          <small><Users size={14} /> Distinct applicant identities</small>
+        </article>
+        <article className="admin-kpi">
+          <span>Filled submissions</span>
+          <strong>{statusRows.length}</strong>
+          <small><FileText size={14} /> Dashboard records in view</small>
+        </article>
+        <article className="admin-kpi warn">
+          <span>Approval pending</span>
+          <strong>{pendingCount}</strong>
+          <small><Clock size={14} /> Awaiting officer OK</small>
+        </article>
+        <article className="admin-kpi good">
+          <span>Approved</span>
+          <strong>{approvedCount}</strong>
+          <small><CheckCircle2 size={14} /> Live on user dashboards</small>
+        </article>
+      </section>
+
+      <nav className="admin-tabs" aria-label="Admin panel sections">
+        {[
+          { id: 'status', label: 'All user status' },
+          { id: 'users', label: 'User registry' },
+          { id: 'approval', label: 'Approval matrix' },
+          { id: 'certificate', label: 'Certificate' },
+          { id: 'audit', label: 'Audit trail' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`admin-tab ${activeAdminSubTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveAdminSubTab(tab.id)}
           >
-            <UserPlus size={15} /> Provision Admin Account
+            {tab.label}
           </button>
-          <button 
-            type="button" 
-            className="btn-admin-action-outline"
-            onClick={() => onNavigateToTab('flow')}
-          >
-            <Activity size={15} /> View System Flow
-          </button>
-        </div>
-      </div>
+        ))}
+      </nav>
 
-      {/* KPI Metric Cards */}
-      <div className="admin-kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-label">Total Applications</span>
-            <div className="kpi-icon-wrap bg-amber-500-10 text-amber-500">
-              <FileText size={18} />
+      {activeAdminSubTab === 'status' && (
+        <section className="admin-panel-card">
+          <div className="admin-toolbar">
+            <div>
+              <h2>Every user dashboard status</h2>
+              <p>Review filled proposal data and the same screening / approval / monthly reporting status shown to each applicant.</p>
             </div>
-          </div>
-          <div className="kpi-value-row">
-            <h3 className="kpi-value">{totalRegistrations}</h3>
-            <span className="badge badge-info font-bold">100% Logged</span>
-          </div>
-          <span className="kpi-subtext">{strategicTotal} Strategic National Mission Files</span>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-label">Pending Screening</span>
-            <div className="kpi-icon-wrap bg-blue-500-10 text-blue-500">
-              <Clock size={18} />
-            </div>
-          </div>
-          <div className="kpi-value-row">
-            <h3 className="kpi-value">{pendingScreening}</h3>
-            {pendingScreening > 0 ? (
-              <span className="badge badge-warning font-bold animate-pulse">Action Required</span>
-            ) : (
-              <span className="badge badge-success font-bold">Queue Clear</span>
-            )}
-          </div>
-          <span className="kpi-subtext">Operations Verification Stage</span>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-label">Pending Authority Sign-Off</span>
-            <div className="kpi-icon-wrap bg-rose-500-10 text-rose-500">
-              <Key size={18} />
-            </div>
-          </div>
-          <div className="kpi-value-row">
-            <h3 className="kpi-value">{pendingApproval}</h3>
-            {pendingApproval > 0 ? (
-              <span className="badge badge-danger font-bold animate-pulse">Apex Sign-Off</span>
-            ) : (
-              <span className="badge badge-success font-bold">All Authorized</span>
-            )}
-          </div>
-          <span className="kpi-subtext">Pillar Lead & PD Delegated Matrix</span>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-label">Enrolled & Approved</span>
-            <div className="kpi-icon-wrap bg-emerald-500-10 text-emerald-500">
-              <CheckCircle2 size={18} />
-            </div>
-          </div>
-          <div className="kpi-value-row">
-            <h3 className="kpi-value">{approvedTotal}</h3>
-            <span className="badge badge-success font-bold">Active Enrolled</span>
-          </div>
-          <span className="kpi-subtext">Distributed across 9 Verticals</span>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-label">Total Registered Users</span>
-            <div className="kpi-icon-wrap bg-purple-500-10 text-purple-500">
-              <Users size={18} />
-            </div>
-          </div>
-          <div className="kpi-value-row">
-            <h3 className="kpi-value">{registeredUsersList.length}</h3>
-            <span className="badge badge-amber font-bold">Registry Live</span>
-          </div>
-          <span className="kpi-subtext">Stakeholders, Mentors & Officers</span>
-        </div>
-      </div>
-
-      {/* Admin Sub-Tab Navigation Bar */}
-      <div className="admin-subtab-bar">
-        <button 
-          type="button" 
-          className={`admin-subtab-btn ${activeAdminSubTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveAdminSubTab('overview')}
-        >
-          <BarChart3 size={16} /> Overview & Analytics
-        </button>
-        <button 
-          type="button" 
-          className={`admin-subtab-btn ${activeAdminSubTab === 'users' ? 'active' : ''}`}
-          onClick={() => setActiveAdminSubTab('users')}
-        >
-          <Users size={16} /> User & Stakeholder Registry ({registeredUsersList.length})
-        </button>
-        <button 
-          type="button" 
-          className={`admin-subtab-btn ${activeAdminSubTab === 'screening' ? 'active' : ''}`}
-          onClick={() => setActiveAdminSubTab('screening')}
-        >
-          <Clock size={16} /> Screening Queue {pendingScreening > 0 && <span className="subtab-count badge-warning">{pendingScreening}</span>}
-        </button>
-        <button 
-          type="button" 
-          className={`admin-subtab-btn ${activeAdminSubTab === 'approval' ? 'active' : ''}`}
-          onClick={() => setActiveAdminSubTab('approval')}
-        >
-          <ShieldCheck size={16} /> Authority Matrix & E-Sign {pendingApproval > 0 && <span className="subtab-count badge-danger">{pendingApproval}</span>}
-        </button>
-        <button 
-          type="button" 
-          className={`admin-subtab-btn ${activeAdminSubTab === 'audit' ? 'active' : ''}`}
-          onClick={() => setActiveAdminSubTab('audit')}
-        >
-          <History size={16} /> System Audit Trail
-        </button>
-      </div>
-
-      {/* SUB-TAB 1: OVERVIEW & ANALYTICS */}
-      {activeAdminSubTab === 'overview' && (
-        <div className="admin-tab-pane animate-fade-in">
-          <div className="grid grid-cols-2 gap-5">
-            {/* Verticals Distribution */}
-            <div className="card admin-content-card">
-              <div className="card-header-row">
-                <h4 className="card-title flex items-center gap-2">
-                  <Layers size={18} className="text-amber-500" /> Verticals Portfolio Breakdown
-                </h4>
-                <span className="badge badge-secondary">9 Verticals Active</span>
-              </div>
-
-              <div className="verticals-distribution-list">
-                {Object.entries(verticalCounts).map(([vert, count], idx) => (
-                  <div key={idx} className="vert-dist-row">
-                    <div className="vert-dist-info">
-                      <span className="vert-name font-bold">{vert}</span>
-                      <span className="vert-count font-mono">{count} File{count > 1 ? 's' : ''}</span>
-                    </div>
-                    <div className="vert-progress-bar">
-                      <div 
-                        className="vert-progress-fill" 
-                        style={{ width: `${Math.min(100, (count / Math.max(1, totalRegistrations)) * 100)}%` }} 
-                      />
-                    </div>
-                  </div>
+            <div className="admin-toolbar-actions">
+              <label className="admin-search">
+                <Search size={15} />
+                <input
+                  type="search"
+                  placeholder="Search name, email, file or vertical"
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                />
+              </label>
+              <div className="admin-filter-pills">
+                {[
+                  { id: 'ALL', label: 'All' },
+                  { id: 'PENDING', label: `Pending (${pendingCount})` },
+                  { id: 'APPROVED', label: `Approved (${approvedCount})` },
+                  { id: 'REJECTED', label: `Declined (${rejectedCount})` }
+                ].map((pill) => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    className={`admin-pill ${statusFilter === pill.id ? 'active' : ''}`}
+                    onClick={() => setStatusFilter(pill.id)}
+                  >
+                    {pill.label}
+                  </button>
                 ))}
               </div>
             </div>
-
-            {/* Authority Matrix Compliance & Quick Stats */}
-            <div className="card admin-content-card">
-              <div className="card-header-row">
-                <h4 className="card-title flex items-center gap-2">
-                  <Shield size={18} className="text-emerald-500" /> Governance & Authority SOP
-                </h4>
-                <span className="badge badge-success">SOP 7.2 Compliant</span>
-              </div>
-
-              <div className="authority-summary-box">
-                <div className="authority-item">
-                  <span className="auth-lbl">Screening Authority:</span>
-                  <span className="auth-val">Operations & Screening Officer (SOP 3.1)</span>
-                </div>
-                <div className="authority-item">
-                  <span className="auth-lbl">Delegated Pillar Sign-off:</span>
-                  <span className="auth-val">Assigned Pillar Lead (Startups, Tech Dev, etc.)</span>
-                </div>
-                <div className="authority-item">
-                  <span className="auth-lbl">Apex Strategic Sign-off:</span>
-                  <span className="auth-val">Project Director (PD) with Digital E-Sign</span>
-                </div>
-                <div className="authority-item">
-                  <span className="auth-lbl">Audit Protocol:</span>
-                  <span className="auth-val">Immutable tamper-evident transaction log</span>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
-                <span className="text-xs text-slate-500">Need to inspect recent filings?</span>
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  style={{ fontSize: '12px', padding: '6px 14px' }}
-                  onClick={() => setActiveAdminSubTab('screening')}
-                >
-                  Open Screening Queue →
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
-      )}
 
-      {/* SUB-TAB 2: USER & STAKEHOLDER REGISTRY */}
-      {activeAdminSubTab === 'users' && (
-        <div className="admin-tab-pane animate-fade-in">
-          <div className="card admin-content-card">
-            <div className="user-registry-controls">
-              <div className="search-input-wrap flex-1">
-                <Search size={16} className="search-icon-inside" />
-                <input 
-                  type="text"
-                  className="form-control font-medium"
-                  placeholder="Search user by name, email, organization, or system role..."
-                  value={userSearchQuery}
-                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                  style={{ paddingLeft: '38px' }}
-                />
-              </div>
-
-              <div className="filter-pill-group">
-                <button 
-                  type="button" 
-                  className={`filter-pill ${userTypeFilter === 'ALL' ? 'active' : ''}`}
-                  onClick={() => setUserTypeFilter('ALL')}
-                >
-                  All ({registeredUsersList.length})
-                </button>
-                <button 
-                  type="button" 
-                  className={`filter-pill ${userTypeFilter === 'STAFF' ? 'active' : ''}`}
-                  onClick={() => setUserTypeFilter('STAFF')}
-                >
-                  Officers & Staff
-                </button>
-                <button 
-                  type="button" 
-                  className={`filter-pill ${userTypeFilter === 'STARTUP' ? 'active' : ''}`}
-                  onClick={() => setUserTypeFilter('STARTUP')}
-                >
-                  Startups
-                </button>
-                <button 
-                  type="button" 
-                  className={`filter-pill ${userTypeFilter === 'APPLICANTS' ? 'active' : ''}`}
-                  onClick={() => setUserTypeFilter('APPLICANTS')}
-                >
-                  Applicants
-                </button>
-              </div>
-            </div>
-
-            <div className="table-container mt-4">
-              <table className="custom-table">
-                <thead>
+          <div className="admin-table-wrap">
+            <table className="admin-status-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Vertical</th>
+                  <th>Registered</th>
+                  <th>Screening</th>
+                  <th>Dashboard status</th>
+                  <th>Monthly reporting</th>
+                  <th>Officer action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 && (
                   <tr>
-                    <th>User & Identity</th>
-                    <th>Organization</th>
-                    <th>Stakeholder Track</th>
-                    <th>System Role</th>
-                    <th>Contact Phone</th>
-                    <th>Applications</th>
-                    <th>Status</th>
+                    <td colSpan={7} className="admin-empty">
+                      No applicant records match this view yet.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((u, i) => (
-                    <tr key={i}>
-                      <td>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-900">{u.name}</span>
-                          <span className="text-xs font-mono text-slate-500">{u.email}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="font-medium text-slate-800">{u.organization}</span>
-                        <span className="text-xs text-slate-400 block">{u.location}</span>
-                      </td>
-                      <td>
-                        <span className="badge badge-info font-bold">{u.stakeholderType}</span>
-                      </td>
-                      <td>
-                        <span className={`badge font-bold ${
-                          u.role === 'ADMIN' ? 'badge-danger' :
-                          u.role === 'PROJECT_DIRECTOR' ? 'badge-warning' :
-                          u.role === 'OPERATIONS' ? 'badge-info' : 'badge-secondary'
-                        }`}>
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="font-mono text-xs text-slate-600">{u.phone}</td>
-                      <td>
-                        <span className="badge badge-amber font-mono font-bold">{u.filesCount} File(s)</span>
-                      </td>
-                      <td>
-                        <span className={`badge ${u.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
-                          {u.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                )}
+                {filteredRows.map((row) => {
+                  const isOpen = expandedKey === row.key;
+                  return (
+                    <React.Fragment key={row.key}>
+                      <tr className={`status-row ${row.dashboard.key}`}>
+                        <td>
+                          <button
+                            type="button"
+                            className="user-expand-btn"
+                            onClick={() => setExpandedKey(isOpen ? null : row.key)}
+                          >
+                            {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            <span className="user-identity">
+                              <strong>{row.name}</strong>
+                              <em>{row.email}</em>
+                              <small>{row.organization}</small>
+                            </span>
+                          </button>
+                        </td>
+                        <td>
+                          <div className="vertical-stack">
+                            {row.verticals.map((vertical) => (
+                              <span key={vertical} className="vertical-chip">{vertical}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td>
+                          <div className="datetime-cell">
+                            <strong>{row.date}</strong>
+                            <span>{row.time}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`status-chip ${row.dashboard.key === 'rejected' ? 'closed' : 'done'}`}>
+                            {row.dashboard.screening}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-chip ${row.dashboard.key}`}>
+                            {row.dashboard.label}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-chip ${row.dashboard.key === 'approved' ? 'approved' : row.dashboard.key === 'rejected' ? 'closed' : 'pending'}`}>
+                            {row.dashboard.monthly}
+                          </span>
+                        </td>
+                        <td>
+                          {row.dashboard.key === 'approved' && (
+                            <button
+                              type="button"
+                              className="esign-open-btn"
+                              onClick={() => openCertificate(row.app.fileNumber)}
+                            >
+                              <Award size={13} /> Certificate
+                            </button>
+                          )}
+                          {row.dashboard.key === 'rejected' && (
+                            <span className="ok-complete declined">Closed</span>
+                          )}
+                          {row.dashboard.key === 'pending' && canIssueOk && row.app.okForApproval && (
+                            <button
+                              type="button"
+                              className="esign-open-btn"
+                              onClick={() => onNavigateToTab?.('approval', { fileNumber: row.app.fileNumber })}
+                            >
+                              Open e-sign
+                            </button>
+                          )}
+                          {row.dashboard.key === 'pending' && canIssueOk && !row.app.okForApproval && (
+                            <form
+                              className="ok-form"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleOkSubmit(row);
+                              }}
+                            >
+                              <input
+                                type="text"
+                                aria-label={`Type ok to send ${row.name} for e-signature`}
+                                placeholder="Type ok"
+                                value={okInputs[row.key] || ''}
+                                onChange={(e) => {
+                                  setOkInputs((prev) => ({ ...prev, [row.key]: e.target.value }));
+                                  if (okErrors[row.key]) {
+                                    setOkErrors((prev) => ({ ...prev, [row.key]: '' }));
+                                  }
+                                }}
+                              />
+                              <button type="submit">Confirm</button>
+                              {okErrors[row.key] && <span className="ok-error">{okErrors[row.key]}</span>}
+                            </form>
+                          )}
+                          {row.dashboard.key === 'pending' && !canIssueOk && (
+                            <span className="ok-locked"><Lock size={12} /> Restricted</span>
+                          )}
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="filled-data-row">
+                          <td colSpan={7}>
+                            <div className="filled-data-grid">
+                              <div>
+                                <span>File number</span>
+                                <strong>{row.app.fileNumber || '—'}</strong>
+                              </div>
+                              <div>
+                                <span>Organization</span>
+                                <strong>{row.organization}</strong>
+                              </div>
+                              <div>
+                                <span>Phone</span>
+                                <strong>{row.phone}</strong>
+                              </div>
+                              <div>
+                                <span>Stakeholder type</span>
+                                <strong>{row.app.stakeholderType || row.app.stakeholder_type || '—'}</strong>
+                              </div>
+                              <div>
+                                <span>Location</span>
+                                <strong>{row.app.location || '—'}</strong>
+                              </div>
+                              <div>
+                                <span>Last updated</span>
+                                <strong>{row.app.lastUpdated || row.app.last_updated || row.date}</strong>
+                              </div>
+                              <div className="span-2">
+                                <span>Intent of engagement</span>
+                                <strong>
+                                  {Array.isArray(row.app.intentOfEngagement)
+                                    ? row.app.intentOfEngagement.join(', ')
+                                    : (row.app.intentOfEngagement || row.app.intent_of_engagement || '—')}
+                                </strong>
+                              </div>
+                              <div className="span-2">
+                                <span>Domains</span>
+                                <strong>
+                                  {Array.isArray(row.app.domains) ? row.app.domains.join(', ') : (row.app.domains || '—')}
+                                </strong>
+                              </div>
+                              {row.app.description && (
+                                <div className="span-full">
+                                  <span>Submitted description</span>
+                                  <strong>{row.app.description}</strong>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {activeAdminSubTab === 'users' && (
+        <section className="admin-panel-card">
+          <div className="admin-toolbar">
+            <div>
+              <h2>User registry</h2>
+              <p>Directory of applicant identities derived from submitted onboarding records.</p>
             </div>
           </div>
-        </div>
+          <div className="admin-table-wrap">
+            <table className="admin-status-table">
+              <thead>
+                <tr>
+                  <th>Identity</th>
+                  <th>Organization</th>
+                  <th>Contact</th>
+                  <th>Files</th>
+                  <th>Latest dashboard status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((row) => (
+                  <tr key={`reg-${row.key}`}>
+                    <td>
+                      <div className="user-identity">
+                        <strong>{row.name}</strong>
+                        <em>{row.email}</em>
+                      </div>
+                    </td>
+                    <td>{row.organization}</td>
+                    <td className="mono">{row.phone}</td>
+                    <td>{row.app.fileNumber || '—'}</td>
+                    <td>
+                      <span className={`status-chip ${row.dashboard.key}`}>{row.dashboard.label}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
-      {/* SUB-TAB 3: SCREENING MASTER QUEUE */}
-      {activeAdminSubTab === 'screening' && (
-        <div className="admin-tab-pane animate-fade-in">
-          <ScreeningQueue 
-            currentRole={ROLES.ADMIN} 
-            applications={applications} 
-            onRouteApplication={onRouteApplication} 
-          />
-        </div>
-      )}
-
-      {/* SUB-TAB 4: AUTHORITY MATRIX & E-SIGN */}
       {activeAdminSubTab === 'approval' && (
-        <div className="admin-tab-pane animate-fade-in">
-          <ApprovalPanel 
-            currentRole={ROLES.ADMIN} 
-            applications={applications} 
-            onApproveApplication={onApproveApplication}
+        <div className="admin-embedded">
+          <ApprovalPanel
+            currentRole={isProjectDirector ? ROLES.PROJECT_DIRECTOR : ROLES.ADMIN}
+            applications={applications}
+            initialFileNumber={null}
+            onApproveApplication={(fileNumber, updates) => onApproveApplication(fileNumber, updates, { skipNavigation: true, openCertificate: true })}
             onRejectApplication={onRejectApplication}
           />
         </div>
       )}
 
-      {/* SUB-TAB 5: SYSTEM AUDIT TRAIL */}
+      {activeAdminSubTab === 'certificate' && (
+        <CertificateOfAssociation
+          applications={applications}
+          selectedFileNumber={selectedCertificateFile}
+          onSelectFile={(fileNumber) => {
+            setSelectedCertificateFile(fileNumber);
+            onOpenCertificate?.(fileNumber);
+          }}
+        />
+      )}
+
       {activeAdminSubTab === 'audit' && (
-        <div className="admin-tab-pane animate-fade-in">
+        <div className="admin-embedded">
           <AuditLogs applications={applications} />
         </div>
       )}
 
       <style>{`
-        .admin-dashboard-container {
+        .admin-console {
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 18px;
+          padding-bottom: 24px;
         }
 
-        .admin-top-banner {
+        .admin-hero {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          padding: 20px 24px;
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 16px;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-          flex-wrap: wrap;
-          gap: 16px;
+          gap: 24px;
+          padding: 24px 28px;
+          border-radius: 18px;
+          background:
+            radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 42%),
+            linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+          color: #f8fafc;
         }
 
-        .admin-banner-left {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .admin-shield-icon-wrap {
-          width: 52px;
-          height: 52px;
-          border-radius: 12px;
-          background: rgba(217, 119, 6, 0.12);
-          border: 1px solid rgba(217, 119, 6, 0.25);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .admin-title {
-          font-size: 20px;
+        .admin-hero-copy h1 {
+          margin: 10px 0 8px;
+          font-size: 28px;
+          letter-spacing: -0.5px;
           font-weight: 800;
-          color: #0f172a;
-          margin: 4px 0 2px 0;
-          letter-spacing: -0.3px;
-        }
-
-        .admin-subtitle {
-          font-size: 12.5px;
-          color: #64748b;
-          margin: 0;
-        }
-
-        .admin-banner-right {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .btn-admin-action {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 9px 16px;
-          background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
-          color: #ffffff;
-          border: none;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
-        }
-
-        .btn-admin-action:hover {
-          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-          transform: translateY(-1px);
-        }
-
-        .btn-admin-action-outline {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 9px 16px;
-          background: #f8fafc;
-          color: #334155;
-          border: 1px solid #cbd5e1;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .btn-admin-action-outline:hover {
-          background: #f1f5f9;
-          color: #0f172a;
-        }
-
-        /* KPI Grid */
-        .admin-kpi-grid {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 14px;
-        }
-
-        @media (max-width: 1200px) {
-          .admin-kpi-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-        }
-
-        @media (max-width: 768px) {
-          .admin-kpi-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        .kpi-card {
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 14px;
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-          transition: all 0.2s ease;
-        }
-
-        .kpi-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
-          border-color: #cbd5e1;
-        }
-
-        .kpi-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .kpi-label {
-          font-size: 12px;
-          font-weight: 700;
-          color: #64748b;
-          text-transform: uppercase;
-          letter-spacing: 0.4px;
-        }
-
-        .kpi-icon-wrap {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .bg-amber-500-10 { background: rgba(217, 119, 6, 0.1); }
-        .bg-blue-500-10 { background: rgba(59, 130, 246, 0.1); }
-        .bg-rose-500-10 { background: rgba(244, 63, 94, 0.1); }
-        .bg-emerald-500-10 { background: rgba(16, 185, 129, 0.1); }
-        .bg-purple-500-10 { background: rgba(139, 92, 246, 0.1); }
-
-        .kpi-value-row {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-          margin-top: 2px;
-        }
-
-        .kpi-value {
-          font-size: 26px;
-          font-weight: 800;
-          color: #0f172a;
-          margin: 0;
-          font-family: 'Outfit', sans-serif;
-        }
-
-        .kpi-subtext {
-          font-size: 11.5px;
-          color: #94a3b8;
-        }
-
-        /* SubTab Bar */
-        .admin-subtab-bar {
-          display: flex;
-          gap: 8px;
-          background: #f8fafc;
-          padding: 6px;
-          border-radius: 12px;
-          border: 1px solid #e2e8f0;
-          overflow-x: auto;
-        }
-
-        .admin-subtab-btn {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 9px 16px;
-          border-radius: 8px;
-          background: transparent;
-          border: none;
-          color: #64748b;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-          transition: all 0.2s ease;
           white-space: nowrap;
         }
 
-        .admin-subtab-btn:hover:not(.active) {
-          background: #f1f5f9;
-          color: #0f172a;
-        }
-
-        .admin-subtab-btn.active {
-          background: #ffffff;
-          color: #b45309;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-          border: 1px solid #e2e8f0;
-        }
-
-        .subtab-count {
-          font-size: 10.5px;
-          padding: 2px 6px;
-          border-radius: 9999px;
-        }
-
-        /* Content Card */
-        .admin-content-card {
-          padding: 22px;
-          background: #ffffff;
-        }
-
-        .card-header-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 18px;
-        }
-
-        .card-title {
-          font-size: 16px;
-          font-weight: 800;
-          color: #0f172a;
+        .admin-hero-copy p {
           margin: 0;
+          max-width: 640px;
+          color: #cbd5e1;
+          font-size: 14px;
+          line-height: 1.55;
         }
 
-        /* Verticals Distribution */
-        .verticals-distribution-list {
+        .admin-hero-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.6px;
+          text-transform: uppercase;
+          color: #fde68a;
+        }
+
+        .admin-live-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #34d399;
+          box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.18);
+        }
+
+        .admin-hero-meta {
           display: flex;
           flex-direction: column;
+          align-items: flex-end;
           gap: 12px;
         }
 
-        .vert-dist-row {
+        .admin-officer-card {
           display: flex;
-          flex-direction: column;
-          gap: 4px;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 14px;
+          border-radius: 14px;
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.12);
+          min-width: 240px;
         }
 
-        .vert-dist-info {
-          display: flex;
-          justify-content: space-between;
-          font-size: 13px;
-        }
-
-        .vert-name {
-          color: #334155;
-        }
-
-        .vert-count {
-          color: #b45309;
-          font-weight: 700;
-        }
-
-        .vert-progress-bar {
-          width: 100%;
-          height: 8px;
-          background: #f1f5f9;
-          border-radius: 9999px;
-          overflow: hidden;
-        }
-
-        .vert-progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #f59e0b, #d97706);
-          border-radius: 9999px;
-        }
-
-        /* Authority summary box */
-        .authority-summary-box {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          padding: 14px;
-          background: #f8fafc;
+        .admin-officer-avatar {
+          width: 40px;
+          height: 40px;
           border-radius: 10px;
-          border: 1px solid #e2e8f0;
+          display: grid;
+          place-items: center;
+          background: #f59e0b;
+          color: #111827;
+          font-weight: 800;
         }
 
-        .authority-item {
-          display: flex;
-          flex-direction: column;
-          font-size: 12px;
+        .admin-officer-card strong,
+        .admin-officer-card span,
+        .admin-officer-card em {
+          display: block;
         }
 
-        .auth-lbl {
-          font-weight: 700;
-          color: #64748b;
-        }
+        .admin-officer-card strong { font-size: 14px; }
+        .admin-officer-card span { font-size: 12px; color: #cbd5e1; }
+        .admin-officer-card em { font-size: 11px; color: #fbbf24; font-style: normal; font-weight: 700; }
 
-        .auth-val {
-          color: #0f172a;
-          font-weight: 600;
-        }
-
-        /* User registry controls */
-        .user-registry-controls {
-          display: flex;
-          gap: 14px;
+        .admin-ghost-btn {
+          display: inline-flex;
           align-items: center;
-          flex-wrap: wrap;
-        }
-
-        .search-input-wrap {
-          position: relative;
-          display: flex;
-          align-items: center;
-        }
-
-        .search-icon-inside {
-          position: absolute;
-          left: 12px;
-          color: #94a3b8;
-        }
-
-        .filter-pill-group {
-          display: flex;
           gap: 6px;
-        }
-
-        .filter-pill {
-          padding: 7px 14px;
-          border-radius: 9999px;
-          background: #f8fafc;
-          border: 1px solid #cbd5e1;
-          color: #475569;
+          border: 1px solid rgba(255,255,255,0.18);
+          background: transparent;
+          color: #e2e8f0;
+          border-radius: 8px;
+          padding: 8px 12px;
           font-size: 12px;
           font-weight: 700;
           cursor: pointer;
-          transition: all 0.15s ease;
         }
 
-        .filter-pill:hover {
-          background: #f1f5f9;
+        .admin-kpi-row {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+        }
+
+        .admin-kpi {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          padding: 16px 18px;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+        }
+
+        .admin-kpi span {
+          display: block;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.4px;
+          text-transform: uppercase;
+          color: #64748b;
+        }
+
+        .admin-kpi strong {
+          display: block;
+          margin: 8px 0 6px;
+          font-size: 28px;
           color: #0f172a;
         }
 
-        .filter-pill.active {
-          background: #d97706;
-          border-color: #d97706;
-          color: #ffffff;
+        .admin-kpi small {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .admin-kpi.warn strong { color: #b45309; }
+        .admin-kpi.good strong { color: #047857; }
+
+        .admin-tabs {
+          display: flex;
+          gap: 6px;
+          padding: 6px;
+          background: #eef2f7;
+          border-radius: 12px;
+          width: fit-content;
+          flex-wrap: wrap;
+        }
+
+        .admin-tab {
+          border: none;
+          background: transparent;
+          color: #475569;
+          font-size: 13px;
+          font-weight: 700;
+          padding: 9px 14px;
+          border-radius: 8px;
+          cursor: pointer;
+        }
+
+        .admin-tab.active {
+          background: #ffffff;
+          color: #0f172a;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+        }
+
+        .admin-panel-card {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+        }
+
+        .admin-toolbar {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 16px;
+          flex-wrap: wrap;
+        }
+
+        .admin-toolbar h2 {
+          margin: 0 0 4px;
+          font-size: 18px;
+          color: #0f172a;
+        }
+
+        .admin-toolbar p {
+          margin: 0;
+          color: #64748b;
+          font-size: 13px;
+        }
+
+        .admin-toolbar-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 8px;
+        }
+
+        .admin-search {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid #cbd5e1;
+          border-radius: 10px;
+          padding: 8px 12px;
+          min-width: 280px;
+          background: #f8fafc;
+          color: #64748b;
+        }
+
+        .admin-search input {
+          border: none;
+          outline: none;
+          background: transparent;
+          width: 100%;
+          font-size: 13px;
+          color: #0f172a;
+        }
+
+        .admin-filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        .admin-pill {
+          border: 1px solid #cbd5e1;
+          background: #fff;
+          color: #475569;
+          border-radius: 999px;
+          padding: 5px 10px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .admin-pill.active {
+          background: #0f172a;
+          color: #fff;
+          border-color: #0f172a;
+        }
+
+        .admin-table-wrap {
+          overflow-x: auto;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+        }
+
+        .admin-status-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 980px;
+        }
+
+        .admin-status-table th {
+          text-align: left;
+          font-size: 11px;
+          letter-spacing: 0.4px;
+          text-transform: uppercase;
+          color: #64748b;
+          background: #f8fafc;
+          padding: 12px 14px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .admin-status-table td {
+          padding: 14px;
+          border-bottom: 1px solid #f1f5f9;
+          vertical-align: top;
+          font-size: 13px;
+          color: #1e293b;
+        }
+
+        .admin-empty {
+          text-align: center;
+          color: #64748b;
+          padding: 36px 14px !important;
+        }
+
+        .user-expand-btn {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          background: none;
+          border: none;
+          padding: 0;
+          text-align: left;
+          cursor: pointer;
+          color: inherit;
+        }
+
+        .user-identity strong,
+        .user-identity em,
+        .user-identity small {
+          display: block;
+        }
+
+        .user-identity strong { color: #0f172a; }
+        .user-identity em { font-style: normal; color: #64748b; font-size: 12px; }
+        .user-identity small { color: #94a3b8; font-size: 12px; }
+
+        .vertical-stack { display: flex; flex-direction: column; gap: 6px; }
+        .vertical-chip {
+          display: inline-flex;
+          width: fit-content;
+          background: #eff6ff;
+          color: #1d4ed8;
+          border-radius: 999px;
+          padding: 4px 8px;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .datetime-cell strong, .datetime-cell span { display: block; }
+        .datetime-cell span { color: #64748b; font-size: 12px; }
+
+        .status-chip {
+          display: inline-flex;
+          border-radius: 999px;
+          padding: 4px 9px;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .status-chip.pending, .status-chip.done { background: #fffbeb; color: #b45309; }
+        .status-chip.approved { background: #ecfdf5; color: #047857; }
+        .status-chip.rejected, .status-chip.closed { background: #fef2f2; color: #b91c1c; }
+
+        .ok-form {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 6px;
+          min-width: 170px;
+        }
+
+        .ok-form input {
+          border: 1px solid #cbd5e1;
+          border-radius: 8px;
+          padding: 7px 8px;
+          font-size: 12px;
+        }
+
+        .ok-form button {
+          border: none;
+          border-radius: 8px;
+          background: #0f172a;
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          padding: 7px 10px;
+        }
+
+        .esign-open-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          border: none;
+          border-radius: 8px;
+          background: #0f172a;
+          color: #fff;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          padding: 8px 12px;
+        }
+
+        .ok-error {
+          grid-column: 1 / -1;
+          color: #b91c1c;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .ok-complete {
+          font-size: 12px;
+          font-weight: 800;
+          color: #047857;
+        }
+
+        .ok-complete.declined { color: #b91c1c; }
+        .ok-locked {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .filled-data-row td {
+          background: #f8fafc;
+        }
+
+        .filled-data-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px 16px;
+        }
+
+        .filled-data-grid div span {
+          display: block;
+          font-size: 11px;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+          margin-bottom: 4px;
+        }
+
+        .filled-data-grid div strong {
+          font-size: 13px;
+          color: #0f172a;
+          font-weight: 700;
+        }
+
+        .span-2 { grid-column: span 2; }
+        .span-full { grid-column: 1 / -1; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+        .admin-embedded {
+          background: #fff;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          padding: 12px;
+        }
+
+        @media (max-width: 980px) {
+          .admin-hero, .admin-toolbar, .admin-hero-meta { flex-direction: column; align-items: flex-start; }
+          .admin-kpi-row { grid-template-columns: 1fr 1fr; }
+          .filled-data-grid { grid-template-columns: 1fr; }
+          .span-2, .span-full { grid-column: auto; }
         }
       `}</style>
     </div>

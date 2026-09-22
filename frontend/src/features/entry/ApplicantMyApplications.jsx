@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   FileText, 
   CheckCircle2, 
@@ -26,17 +26,146 @@ import {
   Info,
   Calendar,
   Tag,
-  Share2,
-  Bell,
-  CheckCheck,
-  Search,
-  Filter,
-  Trash2,
-  Forward,
-  CornerDownRight
+  Share2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { NOTIFICATION_EVENTS } from '../../services/notificationService';
+
+const GENERIC_VERTICAL_LABELS = new Set([
+  'startup',
+  'startups',
+  'general stakeholder',
+  'general',
+  'other'
+]);
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatDisplayDate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    return `${iso[3]} ${MONTH_SHORT[Number(iso[2]) - 1]} ${iso[1]}`;
+  }
+
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (dmy) {
+    return `${dmy[1].padStart(2, '0')} ${MONTH_SHORT[Number(dmy[2]) - 1] || dmy[2]} ${dmy[3]}`;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  return raw;
+}
+
+function formatDisplayTime(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '—';
+
+  const match = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!match) return raw;
+
+  let hour = Number(match[1]);
+  const minute = match[2];
+  const meridiem = (match[4] || '').toLowerCase();
+
+  if (meridiem) {
+    return `${hour}:${minute} ${meridiem.toUpperCase()}`;
+  }
+
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minute} ${suffix}`;
+}
+
+function formatMonitorDateTime(app) {
+  const candidates = [
+    app?.history?.[0]?.date,
+    app?.submissionDateTime,
+    app?.submission_date_time,
+    app?.lastUpdated,
+    app?.last_updated,
+    app?.createdAt,
+    app?.created_at,
+    app?.submissionDate,
+    app?.submission_date
+  ].filter(Boolean);
+
+  const raw = String(candidates[0] || '').trim();
+  if (!raw) {
+    return { date: '—', time: app?.submissionTime || '—' };
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return {
+        date: parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+        time: parsed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      };
+    }
+  }
+
+  if (raw.includes(',')) {
+    const [datePart, ...timeParts] = raw.split(',');
+    return {
+      date: formatDisplayDate(datePart),
+      time: formatDisplayTime(timeParts.join(','))
+    };
+  }
+
+  return {
+    date: formatDisplayDate(raw),
+    time: formatDisplayTime(app?.submissionTime || app?.submission_time || '')
+  };
+}
+
+function getApplicationVerticals(app) {
+  const raw = [
+    ...(Array.isArray(app?.assignedVerticals) ? app.assignedVerticals : []),
+    ...(Array.isArray(app?.assigned_verticals) ? app.assigned_verticals : []),
+    app?.assignedVertical,
+    app?.assigned_vertical
+  ];
+
+  const seen = new Set();
+  const cleaned = [];
+
+  raw.forEach((item) => {
+    const label = String(item || '').trim();
+    if (!label) return;
+    const key = label.toLowerCase();
+    if (seen.has(key) || GENERIC_VERTICAL_LABELS.has(key)) return;
+    seen.add(key);
+    cleaned.push(label);
+  });
+
+  if (cleaned.length > 0) return cleaned;
+
+  const fallbackRaw = String(app?.stakeholderType || app?.stakeholder_type || '').trim();
+  const fallbackKey = fallbackRaw.toUpperCase();
+  if (fallbackKey.includes('6.1') || fallbackKey.includes('TECH')) return ['6.1 Technology Development'];
+  if (fallbackKey.includes('6.3') || fallbackKey.includes('STUDENT') || fallbackKey.includes('RESEARCH') || fallbackKey.includes('HRD')) return ['6.3 Human Resource Development'];
+  if (fallbackKey.includes('6.4') || fallbackKey.includes('SKILL')) return ['6.4 Skill Development'];
+  if (fallbackKey.includes('6.5') || fallbackKey.includes('COLLAB') || fallbackKey.includes('MOU')) return ['6.5 Academic Collaborations & MoUs'];
+  if (fallbackKey.includes('6.6') || fallbackKey.includes('SCHOOL')) return ['6.6 Schools & Academic Outreach (VidyaGIS)'];
+  if (fallbackKey.includes('6.7') || fallbackKey.includes('LAB') || fallbackKey.includes('INSTITUTION')) return ['6.7 Institutions & Labs Network (SPIN Lab)'];
+  if (fallbackKey.includes('6.8') || fallbackKey.includes('INDUSTRY') || fallbackKey.includes('GOVERNMENT')) return ['6.8 Industry & Government Interface'];
+  if (fallbackKey.includes('6.9') || fallbackKey.includes('EXPERT')) return ['6.9 Experts & Advisory Network'];
+  return ['6.2 Startups & Business Enablement'];
+}
+
+function splitVerticalLabel(name) {
+  const match = String(name || '').match(/^(6\.\d)\s+(.*)$/);
+  if (match) {
+    return { code: match[1], title: match[2] };
+  }
+  return { code: null, title: name };
+}
 
 export default function ApplicantMyApplications({ 
   applications = [], 
@@ -48,13 +177,9 @@ export default function ApplicantMyApplications({
 }) {
   const { currentUser } = useAuth();
   const [copiedFileNo, setCopiedFileNo] = useState(null);
-  const [dashboardView, setDashboardView] = useState('applications'); // 'applications' | 'notifications'
+  const [dashboardView, setDashboardView] = useState('applications'); // 'applications' | 'monitoring'
   const [activeFilterTab, setActiveFilterTab] = useState('all'); // 'all' | 'under_review' | 'approved' | 'rejected'
   const [highlightedFileNo, setHighlightedFileNo] = useState(null);
-
-  // Notifications View Filters
-  const [notifCategoryFilter, setNotifCategoryFilter] = useState('all'); // 'all' | 'unread' | 'approvals' | 'reviews'
-  const [notifSearchQuery, setNotifSearchQuery] = useState('');
 
   // Modal States
   const [selectedDocApp, setSelectedDocApp] = useState(null);
@@ -88,17 +213,30 @@ export default function ApplicantMyApplications({
     return !isAutoRegisterStub;
   });
 
-  const myFileNumbers = new Set(myApplications.map(a => a.fileNumber));
+  const monitorRows = useMemo(() => {
+    return myApplications.flatMap((app) => {
+      const verticals = getApplicationVerticals(app);
+      const { date, time } = formatMonitorDateTime(app);
+      const status = String(app.status || '').toLowerCase();
+      const isApproved = ['approved', 'engagement', 'completed'].includes(status);
+      const isRejected = status === 'rejected';
 
-  // 2. Filter strictly to current applicant's notifications
-  const applicantNotifications = (notifications || []).filter(n => {
-    if (!currentUser) return false;
-    const emailMatch = n.recipientEmail && currentUser.email && n.recipientEmail.toLowerCase() === currentUser.email.toLowerCase();
-    const fileMatch = n.fileNumber && myFileNumbers.has(n.fileNumber);
-    return emailMatch || fileMatch;
-  });
+      return verticals.map((vertical) => ({
+        key: `${app.fileNumber || app.id || 'app'}-${vertical}`,
+        app,
+        vertical,
+        date,
+        time,
+        isApproved,
+        isRejected,
+        status
+      }));
+    });
+  }, [myApplications]);
 
-  const unreadNotifCount = applicantNotifications.filter(n => !n.read).length;
+  const screeningCompletedCount = monitorRows.filter((row) => !row.isRejected).length;
+  const approvalPendingCount = monitorRows.filter((row) => !row.isApproved && !row.isRejected).length;
+  const monthlyPendingCount = monitorRows.filter((row) => !row.isApproved && !row.isRejected).length;
 
   // Filter applications by tab
   const filteredApplications = myApplications.filter(app => {
@@ -114,59 +252,10 @@ export default function ApplicantMyApplications({
     return true;
   });
 
-  // Filter notifications by category & search
-  const filteredNotifications = applicantNotifications.filter(n => {
-    if (notifCategoryFilter === 'unread' && n.read) return false;
-    if (notifCategoryFilter === 'approvals') {
-      const isApprovalOrOutcome = [
-        NOTIFICATION_EVENTS.APPLICATION_APPROVED,
-        NOTIFICATION_EVENTS.ENGAGEMENT_ASSIGNED,
-        NOTIFICATION_EVENTS.OUTCOME_STATUS_CHANGED,
-        'File Digitally Authorized & Signed',
-        'File Approved & Enrolled'
-      ].includes(n.event || n.title);
-      if (!isApprovalOrOutcome) return false;
-    }
-    if (notifCategoryFilter === 'reviews') {
-      const isReviewOrIntake = [
-        NOTIFICATION_EVENTS.APPLICATION_SUBMITTED,
-        NOTIFICATION_EVENTS.SCREENING_COMPLETED,
-        NOTIFICATION_EVENTS.CORRECTION_REQUESTED,
-        NOTIFICATION_EVENTS.APPLICATION_ROUTED,
-        NOTIFICATION_EVENTS.APPROVAL_PENDING,
-        NOTIFICATION_EVENTS.APPLICATION_REJECTED
-      ].includes(n.event || n.title);
-      if (!isReviewOrIntake) return false;
-    }
-
-    if (notifSearchQuery.trim()) {
-      const q = notifSearchQuery.toLowerCase().trim();
-      const matchFile = n.fileNumber?.toLowerCase().includes(q);
-      const matchMsg = n.message?.toLowerCase().includes(q);
-      const matchEvent = (n.event || n.title)?.toLowerCase().includes(q);
-      if (!matchFile && !matchMsg && !matchEvent) return false;
-    }
-
-    return true;
-  });
-
   const handleCopy = (fileNo) => {
     navigator.clipboard.writeText(fileNo);
     setCopiedFileNo(fileNo);
     setTimeout(() => setCopiedFileNo(null), 2000);
-  };
-
-  // Helper to switch to applications view and focus on a specific application
-  const handleJumpToApplication = (fileNumber) => {
-    setDashboardView('applications');
-    setActiveFilterTab('all');
-    setHighlightedFileNo(fileNumber);
-    setTimeout(() => {
-      const el = document.getElementById(`dossier-${fileNumber}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 150);
   };
 
   // Helper to determine the standard 6-stage applicant workflow progression
@@ -253,33 +342,6 @@ export default function ApplicantMyApplications({
       badgeType: 'badge-secondary',
       stepStatus: 'current'
     };
-  };
-
-  // Helper for notification event badges
-  const getNotificationEventBadge = (event = '') => {
-    switch (event) {
-      case NOTIFICATION_EVENTS.APPLICATION_APPROVED:
-      case 'File Digitally Authorized & Signed':
-      case 'File Approved & Enrolled':
-        return <span className="notif-badge badge-approved"><CheckCircle2 size={12} /> Approved & Onboarded</span>;
-      case NOTIFICATION_EVENTS.CORRECTION_REQUESTED:
-        return <span className="notif-badge badge-correction"><AlertTriangle size={12} /> Correction Requested</span>;
-      case NOTIFICATION_EVENTS.SCREENING_COMPLETED:
-        return <span className="notif-badge badge-screening"><Check size={12} /> Screening Completed</span>;
-      case NOTIFICATION_EVENTS.APPLICATION_ROUTED:
-        return <span className="notif-badge badge-routed"><Forward size={12} /> Routed to Vertical</span>;
-      case NOTIFICATION_EVENTS.APPROVAL_PENDING:
-        return <span className="notif-badge badge-pending"><Clock size={12} /> Approval Pending</span>;
-      case NOTIFICATION_EVENTS.ENGAGEMENT_ASSIGNED:
-        return <span className="notif-badge badge-engagement"><Layers size={12} /> Engagement Assigned</span>;
-      case NOTIFICATION_EVENTS.OUTCOME_STATUS_CHANGED:
-        return <span className="notif-badge badge-outcome"><Award size={12} /> Milestone Verified</span>;
-      case NOTIFICATION_EVENTS.APPLICATION_REJECTED:
-        return <span className="notif-badge badge-rejected"><XCircle size={12} /> Application Declined</span>;
-      case NOTIFICATION_EVENTS.APPLICATION_SUBMITTED:
-      default:
-        return <span className="notif-badge badge-submitted"><FileText size={12} /> Application Submitted</span>;
-    }
   };
 
   // 8-Clause Onboarding Letter Download Helper
@@ -471,7 +533,7 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
       {/* 3. Primary View Mode Switcher Tabs */}
       <div className="applicant-view-mode-tabs mt-24">
         <button 
-          className={`view-mode-btn ${dashboardView === 'applications' ? 'active' : ''}`}
+          className={`view-mode-btn ${dashboardView !== 'monitoring' ? 'active' : ''}`}
           onClick={() => setDashboardView('applications')}
         >
           <Layers size={17} />
@@ -479,207 +541,19 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
         </button>
 
         <button 
-          className={`view-mode-btn ${dashboardView === 'notifications' ? 'active' : ''}`}
-          onClick={() => setDashboardView('notifications')}
+          className={`view-mode-btn ${dashboardView === 'monitoring' ? 'active' : ''}`}
+          onClick={() => setDashboardView('monitoring')}
         >
-          <Bell size={17} />
-          <span>Workflow Notifications</span>
-          {unreadNotifCount > 0 ? (
-            <span className="badge badge-danger notif-tab-badge">
-              {unreadNotifCount} New
-            </span>
-          ) : (
-            <span className="badge badge-secondary notif-tab-badge">
-              {applicantNotifications.length}
-            </span>
-          )}
+          <Eye size={17} />
+          <span>Onboarding Monitor</span>
+          <span className="badge badge-secondary notif-tab-badge">{monitorRows.length}</span>
         </button>
       </div>
 
       {/* ========================================================================= */}
-      {/* VIEW A: NOTIFICATIONS CENTER */}
-      {/* ========================================================================= */}
-      {dashboardView === 'notifications' && (
-        <div className="notifications-center-wrap mt-16 animate-fade-in">
-          {/* Notifications Toolbar */}
-          <div className="card notif-control-card">
-            <div className="notif-header-flex">
-              <div>
-                <h3 className="notif-center-title">
-                  <Bell size={20} className="text-accent" />
-                  <span>Applicant Workflow Notifications</span>
-                </h3>
-                <p className="notif-center-sub">
-                  Real-time alerts tracking submission logging, screening milestones, routing decisions, authority approvals, and project outcomes.
-                </p>
-              </div>
-
-              <div className="notif-bulk-actions">
-                {unreadNotifCount > 0 && onMarkAllNotificationsRead && (
-                  <button 
-                    className="btn btn-sm btn-outline"
-                    onClick={() => onMarkAllNotificationsRead(currentUser.email)}
-                    title="Mark all notifications as read"
-                  >
-                    <CheckCheck size={14} className="text-emerald" />
-                    <span>Mark All as Read</span>
-                  </button>
-                )}
-                {applicantNotifications.length > 0 && onClearNotifications && (
-                  <button 
-                    className="btn btn-sm btn-outline"
-                    onClick={onClearNotifications}
-                    title="Clear all notification history"
-                  >
-                    <Trash2 size={14} className="text-muted" />
-                    <span>Clear All</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Filter Pills & Search Bar */}
-            <div className="notif-filter-row mt-16">
-              <div className="notif-filter-pills">
-                <button 
-                  className={`pill-btn ${notifCategoryFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setNotifCategoryFilter('all')}
-                >
-                  All Alerts ({applicantNotifications.length})
-                </button>
-                <button 
-                  className={`pill-btn ${notifCategoryFilter === 'unread' ? 'active' : ''}`}
-                  onClick={() => setNotifCategoryFilter('unread')}
-                >
-                  Unread ({unreadNotifCount})
-                </button>
-                <button 
-                  className={`pill-btn ${notifCategoryFilter === 'approvals' ? 'active' : ''}`}
-                  onClick={() => setNotifCategoryFilter('approvals')}
-                >
-                  Approvals & Outcomes
-                </button>
-                <button 
-                  className={`pill-btn ${notifCategoryFilter === 'reviews' ? 'active' : ''}`}
-                  onClick={() => setNotifCategoryFilter('reviews')}
-                >
-                  Screening & Routing
-                </button>
-              </div>
-
-              <div className="notif-search-wrap">
-                <Search size={14} className="search-icon" />
-                <input 
-                  type="text"
-                  placeholder="Filter by file number or keyword..."
-                  value={notifSearchQuery}
-                  onChange={(e) => setNotifSearchQuery(e.target.value)}
-                  className="notif-search-input"
-                />
-                {notifSearchQuery && (
-                  <button className="search-clear-btn" onClick={() => setNotifSearchQuery('')}>
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Notifications Feed */}
-          <div className="notifications-feed-list mt-16">
-            {filteredNotifications.length === 0 ? (
-              <div className="card notif-empty-card">
-                <Bell size={48} className="text-muted" style={{ opacity: 0.3 }} />
-                <h4>No Notifications Found</h4>
-                <p>There are no workflow alerts matching your current filter criteria.</p>
-                {notifCategoryFilter !== 'all' || notifSearchQuery ? (
-                  <button 
-                    className="btn btn-outline mt-10"
-                    onClick={() => {
-                      setNotifCategoryFilter('all');
-                      setNotifSearchQuery('');
-                    }}
-                  >
-                    Reset Filters
-                  </button>
-                ) : null}
-              </div>
-            ) : (
-              filteredNotifications.map((notif) => (
-                <div 
-                  key={notif.id} 
-                  className={`card notif-feed-card ${notif.read ? 'read' : 'unread'}`}
-                  style={{ borderLeft: notif.type === 'success' ? '4px solid #10b981' : notif.type === 'warning' ? '4px solid #f59e0b' : notif.type === 'error' ? '4px solid #ef4444' : '4px solid #06b6d4' }}
-                >
-                  <div className="notif-card-header">
-                    <div className="notif-meta-left">
-                      {getNotificationEventBadge(notif.event || notif.title)}
-                      {notif.fileNumber && (
-                        <div className="notif-file-tag font-mono">
-                          <span>{notif.fileNumber}</span>
-                          <button 
-                            className="btn-copy-mini"
-                            onClick={() => handleCopy(notif.fileNumber)}
-                            title="Copy File Number"
-                          >
-                            {copiedFileNo === notif.fileNumber ? <Check size={11} className="text-success" /> : <Copy size={11} />}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="notif-meta-right">
-                      <span className="notif-timestamp-text font-mono">
-                        <Calendar size={12} />
-                        <span>{notif.timestamp || notif.date || 'Recent'}</span>
-                      </span>
-                      {!notif.read && (
-                        <span className="unread-dot-badge">● Unread</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Message Body */}
-                  <div className="notif-card-body mt-10">
-                    <p className="notif-message-text">{notif.message}</p>
-                  </div>
-
-                  {/* Card Actions Footer */}
-                  <div className="notif-card-footer mt-12">
-                    <div className="notif-footer-left">
-                      {onToggleReadNotification && (
-                        <button 
-                          className="btn-text-link"
-                          onClick={() => onToggleReadNotification(notif.id)}
-                        >
-                          {notif.read ? 'Mark as Unread' : 'Mark as Read'}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="notif-footer-right">
-                      {notif.fileNumber && myFileNumbers.has(notif.fileNumber) && (
-                        <button 
-                          className="btn btn-sm btn-outline"
-                          onClick={() => handleJumpToApplication(notif.fileNumber)}
-                        >
-                          <span>View Related Application</span>
-                          <ChevronRight size={13} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* VIEW B: APPLICATIONS LIST & DOSSIERS */}
       {/* ========================================================================= */}
-      {dashboardView === 'applications' && (
+      {dashboardView !== 'monitoring' && (
         <div className="applications-view-wrap animate-fade-in">
           {/* Filter Nav Tabs */}
           <div className="applicant-filter-nav mt-16">
@@ -741,9 +615,6 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
                 const isCorrection = app.status === 'returned_for_correction';
                 const isHighlighted = highlightedFileNo === app.fileNumber;
 
-                // Check if this application has unread notifications
-                const appUnreadNotifs = applicantNotifications.filter(n => n.fileNumber === app.fileNumber && !n.read);
-
                 return (
                   <div 
                     key={app.fileNumber} 
@@ -767,19 +638,6 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
                       </div>
 
                       <div className="dossier-status-pill-wrap">
-                        {appUnreadNotifs.length > 0 && (
-                          <span 
-                            className="badge badge-warning cursor-pointer mr-8"
-                            onClick={() => {
-                              setDashboardView('notifications');
-                              setNotifSearchQuery(app.fileNumber);
-                            }}
-                            title="Click to view notifications for this application"
-                          >
-                            <Bell size={11} /> {appUnreadNotifs.length} New Update{appUnreadNotifs.length > 1 ? 's' : ''}
-                          </span>
-                        )}
-
                         <span className={`badge ${stage.badgeType}`}>
                           {isApproved ? <CheckCircle2 size={13} /> : isRejected ? <XCircle size={13} /> : <Clock size={13} />}
                           <span>{stage.badgeText}</span>
@@ -790,12 +648,18 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
                     {/* Dossier Body */}
                     <div className="dossier-body mt-14">
                       <div className="dossier-title-line">
-                        <h3 className="dossier-entity-name">{app.name}</h3>
+                        <h3 className="dossier-entity-name">
+                          {(() => {
+                            const rawName = String(app.name || '').trim();
+                            const problem = String(app.problemStatement || '').trim();
+                            const looksLikeProblem = rawName && problem && (rawName === problem || problem.startsWith(rawName) || rawName.startsWith(problem.slice(0, 40)));
+                            if (!rawName || looksLikeProblem) {
+                              return app.applicantName || app.contactPerson || app.organization || currentUser?.name || 'Registered Application';
+                            }
+                            return rawName;
+                          })()}
+                        </h3>
                       </div>
-
-                      <p className="dossier-desc-text">
-                        {app.problemStatement || app.description || 'No detailed technical statement provided.'}
-                      </p>
 
                       {/* Structured Details Matrix */}
                       <div className="dossier-meta-grid mt-14">
@@ -1107,17 +971,6 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
                             <span>Explore Enrolled Vertical ({app.assignedVertical || '6.2'})</span>
                           </button>
                         )}
-
-                        <button 
-                          className="btn btn-outline btn-sm"
-                          onClick={() => {
-                            setDashboardView('notifications');
-                            setNotifSearchQuery(app.fileNumber);
-                          }}
-                        >
-                          <Bell size={13} />
-                          <span>View Workflow Notifications</span>
-                        </button>
                       </div>
 
                       <div className="footer-right-actions">
@@ -1142,6 +995,155 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
               })
             )}
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VIEW C: REAL-TIME ONBOARDING MONITORING TABLE */}
+      {/* ========================================================================= */}
+      {dashboardView === 'monitoring' && (
+        <div className="monitoring-view-wrap mt-16 animate-fade-in">
+
+          <div className="card monitor-header-card">
+            <div className="monitor-header-inner">
+              <div className="monitor-header-left">
+                <div className="monitor-icon-circle">
+                  <Eye size={22} />
+                </div>
+                <div>
+                  <h2 className="monitor-main-title">Real-Time Onboarding Monitor</h2>
+                  <p className="monitor-main-sub">
+                    One row per registered vertical, with the exact date and time you enrolled, plus screening, approval, and monthly reporting.
+                  </p>
+                </div>
+              </div>
+              <div className="monitor-stats-row">
+                <div className="monitor-stat-chip">
+                  <span className="stat-chip-val">{monitorRows.length}</span>
+                  <span className="stat-chip-label">Verticals</span>
+                </div>
+                <div className="monitor-stat-chip chip-green">
+                  <span className="stat-chip-val">{screeningCompletedCount}</span>
+                  <span className="stat-chip-label">Screening Done</span>
+                </div>
+                <div className="monitor-stat-chip chip-amber">
+                  <span className="stat-chip-val">{approvalPendingCount}</span>
+                  <span className="stat-chip-label">Approval Pending</span>
+                </div>
+                <div className="monitor-stat-chip chip-blue">
+                  <span className="stat-chip-val">{monthlyPendingCount}</span>
+                  <span className="stat-chip-label">Reporting Pending</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {monitorRows.length === 0 ? (
+            <div className="card monitor-empty-card">
+              <Eye size={48} style={{ opacity: 0.2, color: 'var(--color-accent)' }} />
+              <h4>No Registrations to Monitor</h4>
+              <p>Submit an application to a vertical to see real-time onboarding data here.</p>
+              <button className="btn btn-primary mt-12" onClick={() => onNavigateToTab('entry')}>
+                <PlusCircle size={15} />
+                <span>Submit Application</span>
+              </button>
+            </div>
+          ) : (
+            <div className="monitor-table-outer card">
+              <div className="monitor-table-legend">
+                <span className="legend-item"><span className="legend-dot dot-green" />Completed / Approved</span>
+                <span className="legend-item"><span className="legend-dot dot-amber" />Pending</span>
+                <span className="legend-item"><span className="legend-dot dot-red" />Declined</span>
+                <span className="legend-item"><span className="legend-dot dot-gray" />Not started</span>
+              </div>
+
+              <div className="monitor-table-scroll">
+                <table className="monitor-table">
+                  <thead>
+                    <tr>
+                      <th className="col-sno" rowSpan={2}>#</th>
+                      <th className="col-vertical" rowSpan={2}>Vertical</th>
+                      <th className="col-onboard-header" colSpan={2}>Registered On</th>
+                      <th className="col-outcome-header" colSpan={2}>Outcome Tracking</th>
+                      <th className="col-monthly" rowSpan={2}>Monthly Reporting</th>
+                    </tr>
+                    <tr className="sub-header-row">
+                      <th className="col-date">Date</th>
+                      <th className="col-time">Time</th>
+                      <th className="col-screening">Screening</th>
+                      <th className="col-approval">Approval Pending</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monitorRows.map((row, idx) => {
+                      const { code, title } = splitVerticalLabel(row.vertical);
+
+                      const screeningBadge = row.isRejected
+                        ? <span className="monitor-badge badge-mon-red"><XCircle size={13} />Declined</span>
+                        : <span className="monitor-badge badge-mon-green"><CheckCircle2 size={13} />Completed</span>;
+
+                      const approvalBadge = row.isRejected
+                        ? <span className="monitor-badge badge-mon-red"><XCircle size={13} />Declined</span>
+                        : row.isApproved
+                          ? <span className="monitor-badge badge-mon-green"><CheckCircle2 size={13} />Approved</span>
+                          : <span className="monitor-badge badge-mon-amber"><Clock size={13} />Pending</span>;
+
+                      const monthlyBadge = row.isRejected
+                        ? <span className="monitor-badge badge-mon-gray"><FileText size={13} />N/A</span>
+                        : row.isApproved
+                          ? <span className="monitor-badge badge-mon-green"><CheckCircle2 size={13} />Active</span>
+                          : <span className="monitor-badge badge-mon-gray"><FileText size={13} />Pending</span>;
+
+                      return (
+                        <tr
+                          key={row.key}
+                          className={`monitor-row ${row.isApproved ? 'row-approved' : row.isRejected ? 'row-rejected' : 'row-pending'}`}
+                        >
+                          <td className="col-sno">
+                            <span className="row-sno">{idx + 1}</span>
+                          </td>
+                          <td className="col-vertical">
+                            <div className="vertical-cell">
+                              <div className="vertical-name-row">
+                                {code && <span className="vertical-code-badge">{code}</span>}
+                                <span className="vertical-name">{title}</span>
+                              </div>
+                              <span className="file-no-sub font-mono">{row.app.fileNumber}</span>
+                            </div>
+                          </td>
+                          <td className="col-date">
+                            <span className="date-cell">
+                              <Calendar size={13} />
+                              <strong>{row.date}</strong>
+                            </span>
+                          </td>
+                          <td className="col-time">
+                            <span className="time-cell">
+                              <Clock size={13} />
+                              <span className="font-mono">{row.time}</span>
+                            </span>
+                          </td>
+                          <td className="col-screening">{screeningBadge}</td>
+                          <td className="col-approval">{approvalBadge}</td>
+                          <td className="col-monthly">{monthlyBadge}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="monitor-table-footer">
+                <span className="footer-note">
+                  <Info size={12} />
+                  Visiting this monitor after registration marks screening as completed. Approval stays pending until governance signs off.
+                </span>
+                <span className="footer-refresh font-mono">
+                  Last synced: {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1383,8 +1385,8 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
                   </div>
 
                   <div className="cert-meta-right text-right">
-                    <div className="cert-sign-name font-script">Roshan K. Srivastav</div>
-                    <strong className="cert-sign-title">Dr. Roshan K. Srivastav</strong><br />
+                    <div className="cert-sign-name font-script">{selectedDocApp.eSignature || 'E-signature pending'}</div>
+                    <strong className="cert-sign-title">{selectedDocApp.eSignature || 'Authorized Signatory'}</strong><br />
                     <span className="text-xs">Project Director, IITTNiF</span>
                   </div>
                 </div>
@@ -2550,6 +2552,463 @@ For inquiries, contact secretariat@iittnif.in quoting the official file number.
           font-size: 13px;
           color: #0f172a;
         }
+
+        /* =============================================
+           MONITORING VIEW STYLES
+           ============================================= */
+
+        .monitoring-view-wrap {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        /* Monitor Header */
+        .monitor-header-card {
+          padding: 20px 24px;
+          background: linear-gradient(135deg, rgba(var(--color-accent-rgb, 217, 119, 6), 0.06) 0%, var(--bg-surface) 60%);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-lg);
+        }
+
+        .monitor-header-inner {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 20px;
+        }
+
+        .monitor-header-left {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .monitor-icon-circle {
+          width: 48px;
+          height: 48px;
+          border-radius: var(--radius-full);
+          background: rgba(var(--color-accent-rgb, 217, 119, 6), 0.12);
+          border: 1px solid rgba(var(--color-accent-rgb, 217, 119, 6), 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--color-accent);
+          flex-shrink: 0;
+        }
+
+        .monitor-main-title {
+          font-size: 18px;
+          font-weight: 800;
+          color: var(--text-primary);
+          letter-spacing: -0.3px;
+          margin: 0;
+        }
+
+        .monitor-main-sub {
+          font-size: 12.5px;
+          color: var(--text-secondary);
+          margin: 3px 0 0 0;
+          max-width: 480px;
+        }
+
+        /* Stats Chips */
+        .monitor-stats-row {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .monitor-stat-chip {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          min-width: 72px;
+          padding: 10px 14px;
+          background: var(--bg-primary);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          gap: 2px;
+        }
+
+        .monitor-stat-chip.chip-amber { border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.06); }
+        .monitor-stat-chip.chip-blue  { border-color: rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.06); }
+        .monitor-stat-chip.chip-green { border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.06); }
+
+        .stat-chip-val {
+          font-size: 22px;
+          font-weight: 800;
+          color: var(--text-primary);
+          line-height: 1;
+        }
+
+        .chip-amber .stat-chip-val { color: #d97706; }
+        .chip-blue  .stat-chip-val { color: #3b82f6; }
+        .chip-green .stat-chip-val { color: #10b981; }
+
+        .stat-chip-label {
+          font-size: 10px;
+          font-weight: 600;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          white-space: nowrap;
+        }
+
+        /* Empty state */
+        .monitor-empty-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 60px 24px;
+          gap: 12px;
+          text-align: center;
+          color: var(--text-muted);
+        }
+
+        .monitor-empty-card h4 {
+          font-size: 16px;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin: 0;
+        }
+
+        .monitor-empty-card p {
+          font-size: 13px;
+          color: var(--text-secondary);
+          margin: 0;
+        }
+
+        /* Main table container */
+        .monitor-table-outer {
+          padding: 0;
+          overflow: hidden;
+          border-radius: var(--radius-lg);
+        }
+
+        /* Legend */
+        .monitor-table-legend {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          flex-wrap: wrap;
+          padding: 12px 20px;
+          background: var(--bg-primary);
+          border-bottom: 1px solid var(--border-color);
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11.5px;
+          color: var(--text-secondary);
+          font-weight: 500;
+        }
+
+        .legend-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        .dot-green { background: #10b981; }
+        .dot-amber { background: #f59e0b; }
+        .dot-blue  { background: #3b82f6; }
+        .dot-red   { background: #ef4444; }
+        .dot-gray  { background: #94a3b8; }
+
+        /* Table scroll wrapper */
+        .monitor-table-scroll {
+          overflow-x: auto;
+          width: 100%;
+        }
+
+        /* The table itself */
+        .monitor-table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          min-width: 880px;
+          font-size: 13px;
+        }
+
+        .monitor-table thead tr:first-child th {
+          background: #fff7ed;
+          color: #9a3412;
+          font-size: 11.5px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.7px;
+          padding: 14px 16px 10px;
+          border-bottom: 1px solid #fed7aa;
+          white-space: nowrap;
+          vertical-align: bottom;
+        }
+
+        .monitor-table thead .sub-header-row th {
+          background: #fffbeb;
+          color: #92400e;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.45px;
+          padding: 8px 16px 10px;
+          border-bottom: 2px solid #f59e0b;
+          white-space: nowrap;
+        }
+
+        .col-onboard-header,
+        .col-outcome-header {
+          text-align: center !important;
+        }
+
+        .col-outcome-header {
+          background: #ffedd5 !important;
+          border-left: 2px solid #f59e0b !important;
+          border-right: 2px solid #f59e0b !important;
+        }
+
+        .col-screening,
+        .col-approval {
+          background: rgba(245, 158, 11, 0.06);
+          text-align: center;
+        }
+
+        .monitor-table tbody tr {
+          border-bottom: 1px solid var(--border-color);
+          transition: background 0.15s ease;
+        }
+
+        .monitor-table tbody tr:hover {
+          background: rgba(217, 119, 6, 0.05);
+        }
+
+        .monitor-table tbody tr.row-pending td {
+          background: #ffffff;
+        }
+
+        .monitor-table tbody tr.row-approved td {
+          background: rgba(16, 185, 129, 0.04);
+        }
+
+        .monitor-table tbody tr.row-rejected td {
+          background: rgba(239, 68, 68, 0.04);
+        }
+
+        .monitor-table td {
+          padding: 16px;
+          vertical-align: middle;
+          color: var(--text-secondary);
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .col-sno     { width: 48px; text-align: center; }
+        .col-vertical { min-width: 220px; }
+        .col-date    { width: 150px; }
+        .col-time    { width: 130px; }
+        .col-screening { width: 150px; text-align: center; }
+        .col-approval  { width: 170px; text-align: center; }
+        .col-monthly   { width: 160px; text-align: center; }
+
+        .row-sno {
+          display: inline-flex;
+          width: 26px;
+          height: 26px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #fff7ed;
+          border: 1px solid #fed7aa;
+          font-size: 11px;
+          font-weight: 800;
+          color: #c2410c;
+        }
+
+        .vertical-cell {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .vertical-name-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .vertical-code-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 32px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          background: #d97706;
+          color: #fff;
+          font-size: 10.5px;
+          font-weight: 800;
+          letter-spacing: 0.3px;
+        }
+
+        .vertical-name {
+          font-weight: 800;
+          font-size: 14px;
+          color: var(--text-primary);
+          line-height: 1.3;
+        }
+
+        .file-no-sub {
+          font-size: 11px;
+          color: var(--text-muted);
+          letter-spacing: 0.3px;
+        }
+
+        .date-cell,
+        .time-cell {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+          color: var(--text-primary);
+          font-size: 13px;
+        }
+
+        .date-cell strong {
+          font-weight: 700;
+        }
+
+        .time-cell {
+          color: #475569;
+        }
+
+        .monitor-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          font-size: 12px;
+          font-weight: 700;
+          padding: 6px 12px;
+          border-radius: var(--radius-full);
+          white-space: nowrap;
+        }
+
+        .badge-mon-green {
+          background: #ecfdf5;
+          color: #047857;
+          border: 1px solid #6ee7b7;
+        }
+
+        .badge-mon-amber {
+          background: #fffbeb;
+          color: #b45309;
+          border: 1px solid #fcd34d;
+        }
+
+        .badge-mon-blue {
+          background: #eff6ff;
+          color: #1d4ed8;
+          border: 1px solid #93c5fd;
+        }
+
+        .badge-mon-red {
+          background: #fef2f2;
+          color: #dc2626;
+          border: 1px solid #fca5a5;
+        }
+
+        .badge-mon-gray {
+          background: #f8fafc;
+          color: #64748b;
+          border: 1px solid #cbd5e1;
+        }
+
+        /* Table footer */
+        .monitor-table-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+          padding: 12px 20px;
+          background: var(--bg-primary);
+          border-top: 1px solid var(--border-color);
+        }
+
+        .footer-note {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 11px;
+          color: var(--text-muted);
+          line-height: 1.4;
+        }
+
+        .footer-refresh {
+          font-size: 10.5px;
+          color: var(--text-muted);
+          background: var(--bg-surface);
+          border: 1px solid var(--border-color);
+          padding: 3px 8px;
+          border-radius: var(--radius-full);
+        }
+
+        html[data-theme="dark"] .monitor-table thead tr:first-child th {
+          background: #1c1408;
+          color: #fdba74;
+          border-bottom-color: #9a3412;
+        }
+
+        html[data-theme="dark"] .monitor-table thead .sub-header-row th {
+          background: #22180b;
+          color: #fbbf24;
+          border-bottom-color: #d97706;
+        }
+
+        html[data-theme="dark"] .col-outcome-header {
+          background: #3b2710 !important;
+          border-left-color: #d97706 !important;
+          border-right-color: #d97706 !important;
+        }
+
+        html[data-theme="dark"] .col-screening,
+        html[data-theme="dark"] .col-approval {
+          background: rgba(217, 119, 6, 0.12);
+        }
+
+        html[data-theme="dark"] .monitor-table tbody tr.row-pending td {
+          background: #111827;
+        }
+
+        html[data-theme="dark"] .monitor-table td {
+          border-bottom-color: #334155;
+        }
+
+        html[data-theme="dark"] .row-sno {
+          background: #1c1408;
+          border-color: #9a3412;
+          color: #fdba74;
+        }
+
+        html[data-theme="dark"] .vertical-name,
+        html[data-theme="dark"] .date-cell {
+          color: #f8fafc;
+        }
+
+        @media (max-width: 900px) {
+          .monitor-header-inner {
+            align-items: flex-start;
+          }
+          .monitor-main-sub {
+            max-width: 100%;
+          }
+        }
+
       `}</style>
     </div>
   );

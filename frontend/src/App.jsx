@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CheckCircle2, Info, AlertTriangle, X, Award, FileText } from 'lucide-react';
 import { AuthProvider, useAuth, ROLES } from './context/AuthContext';
 import Header from './components/Header';
@@ -15,6 +15,7 @@ import EngagementsList from './features/engagement/EngagementsList';
 import AuditLogs from './features/audit/AuditLogs';
 import VikasFlow from './features/flow/VikasFlow';
 import LandingPage from './features/landing/LandingPage';
+import { clearProposalFormSession } from './features/entry/proposalFormSession';
 import { 
   NOTIFICATION_EVENTS, 
   createNotification
@@ -34,7 +35,11 @@ const INITIAL_SEED_APPLICATIONS = [
     stakeholderType: 'Startup',
     domains: ['PNT / NavIC / GNSS', 'IoT / Sensor Fusion'],
     status: 'pending_screening',
+    assignedVertical: '6.2 Startups & Business Enablement',
+    assignedVerticals: ['6.2 Startups & Business Enablement'],
     submissionDate: '08/09/2026',
+    submissionTime: '11:30 AM',
+    submissionDateTime: '08/09/2026, 11:30:00',
     description: 'Indigenous low-power NavIC L5/S-band embedded tracking receiver prototype for spatial mapping and asset telemetry.',
     isStrategic: false,
     history: [
@@ -238,10 +243,14 @@ const INITIAL_SEED_APPLICATIONS = [
 ];
 
 function AppContent() {
-  const { currentRole, currentUser, isAuthenticated, isApplicant, canScreen, canRoute, canApprove, canApproveApplication } = useAuth();
+  const { currentRole, currentUser, isAuthenticated, isApplicant, isAdmin, isProjectDirector, canScreen, canRoute, canApprove, canApproveApplication } = useAuth();
   const [activeTab, setActiveTab] = useState('landing');
   const [featureSubTab, setFeatureSubTab] = useState('onboard');
   const [overviewKey, setOverviewKey] = useState(0);
+  const pendingOnboardingFlushRef = useRef(null);
+  const registerOnboardingLeaveHandler = useCallback((fn) => {
+    pendingOnboardingFlushRef.current = fn;
+  }, []);
   const [highlightedVerticalTrack, setHighlightedVerticalTrack] = useState(() => {
     try {
       return localStorage.getItem('VIKAS_ALIGNED_TRACK') || null;
@@ -249,6 +258,9 @@ function AppContent() {
       return null;
     }
   });
+  const [approvalFocusFile, setApprovalFocusFile] = useState(null);
+  const [certificateFocusFile, setCertificateFocusFile] = useState(null);
+  const [adminFocusTab, setAdminFocusTab] = useState(null);
   const [portalTheme, setPortalTheme] = useState(() => {
     try {
       return localStorage.getItem('VIKAS_PORTAL_THEME') || 'bright';
@@ -281,23 +293,30 @@ function AppContent() {
 
   // Sync state and route upon successful login
   const handleUserLoggedIn = (user, loggedInApplications) => {
-    if (loggedInApplications && Array.isArray(loggedInApplications) && loggedInApplications.length > 0) {
-      setApplications(prev => {
-        const existingFileNos = new Set(prev.map(a => a.fileNumber));
-        const newItems = loggedInApplications.filter(a => !existingFileNos.has(a.fileNumber));
-        return newItems.length > 0 ? [...newItems, ...prev] : prev;
-      });
-    }
-    
-    // Redirect to Proposal Submission ('entry') for applicants, or appropriate role queue for staff
+    clearProposalFormSession();
+
+    const incoming = Array.isArray(loggedInApplications) ? loggedInApplications : [];
+    setApplications(prev => {
+      const existingFileNos = new Set(prev.map(a => a.fileNumber).filter(Boolean));
+      const newItems = incoming.filter(a => a?.fileNumber && !existingFileNos.has(a.fileNumber));
+      return newItems.length > 0 ? [...newItems, ...prev] : prev;
+    });
+
     const userRole = (user?.role || '').toLowerCase();
+    if (userRole === 'admin' || userRole === 'pd' || userRole === 'project_director') {
+      executeTabNavigation('admin');
+      return;
+    }
     if (userRole === 'operations') {
       executeTabNavigation('screening');
-    } else if (userRole === 'pd' || userRole === 'pillar_lead') {
-      executeTabNavigation('approval');
-    } else {
-      executeTabNavigation('entry');
+      return;
     }
+    if (userRole === 'pillar_lead') {
+      executeTabNavigation('approval');
+      return;
+    }
+
+    executeTabNavigation('entry');
   };
 
   // Approval notifications only (persisted). Seed demo alerts are not loaded.
@@ -373,23 +392,45 @@ function AppContent() {
       setOverviewKey(prev => prev + 1);
     }
     setActiveTab(tabId);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }, 0);
   };
 
-  const handleTabChange = (tabId, extra) => {
+  const handleTabChange = async (tabId, extra) => {
     if (extra?.alignedTrack) {
       setHighlightedVerticalTrack(extra.alignedTrack);
     }
-    if (tabId === activeTab && !extra?.alignedTrack) return;
+    if (extra?.fileNumber) {
+      setApprovalFocusFile(extra.fileNumber);
+    }
+    if (tabId === activeTab && !extra?.alignedTrack && !extra?.fileNumber) return;
 
     // Strict RBAC Navigation Guard: Applicants cannot enter internal workflow tabs
-    if (isApplicant && (tabId === 'screening' || tabId === 'approval')) {
+    if (isApplicant && (tabId === 'screening' || tabId === 'approval' || tabId === 'admin')) {
       showToast(
         'Access Denied',
-        'External applicants cannot access internal operations screening or approval matrices.',
+        'External applicants cannot access internal operations screening, approval matrices, or the Admin Panel.',
         'warning'
       );
       return;
+    }
+
+    if (tabId === 'admin' && isAuthenticated && !(isAdmin || isProjectDirector)) {
+      showToast(
+        'Access Denied',
+        'Only Administrator or Project Director credentials stored in the database can open the Admin Panel.',
+        'warning'
+      );
+      executeTabNavigation('admin-login');
+      return;
+    }
+
+    const leavingProposalForm = activeTab === 'entry' && tabId !== 'entry';
+    if (leavingProposalForm && pendingOnboardingFlushRef.current) {
+      try {
+        await pendingOnboardingFlushRef.current();
+      } catch (e) {}
     }
 
     executeTabNavigation(tabId);
@@ -450,10 +491,11 @@ function AppContent() {
   }, [applications]);
 
   // Operations Handlers
-  const handleAddNewApplication = (newApp) => {
+  const handleAddNewApplication = (newApp, options = {}) => {
     const track = newApp.stakeholderType || (currentUser?.stakeholderType === 'STARTUP' ? 'Startup' : currentUser?.stakeholderType) || 'Startup';
     setHighlightedVerticalTrack(track);
 
+    const stampedAt = new Date();
     const stampedApp = {
       ...newApp,
       userId: newApp.userId || newApp.user_id || currentUser?.id || `usr_app_${Date.now()}`,
@@ -465,20 +507,29 @@ function AppContent() {
       location: newApp.location || currentUser?.location || '',
       stakeholderType: track,
       assignedVertical: newApp.assignedVertical || (newApp.assignedVerticals ? newApp.assignedVerticals[0] : '6.2 Startups & Business Enablement'),
-      assignedVerticals: newApp.assignedVerticals || (newApp.assignedVertical ? [newApp.assignedVertical] : ['6.2 Startups & Business Enablement'])
+      assignedVerticals: newApp.assignedVerticals || (newApp.assignedVertical ? [newApp.assignedVertical] : ['6.2 Startups & Business Enablement']),
+      submissionDate: newApp.submissionDate || stampedAt.toLocaleDateString('en-GB'),
+      submissionTime: newApp.submissionTime || stampedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      submissionDateTime: newApp.submissionDateTime || stampedAt.toLocaleString('en-GB')
     };
 
-    setApplications(prev => [stampedApp, ...prev]);
+    setApplications(prev => {
+      if (stampedApp.fileNumber && prev.some(app => app.fileNumber === stampedApp.fileNumber)) {
+        return prev;
+      }
+      return [stampedApp, ...prev];
+    });
 
     showToast(
       'Proposal Dossier Submitted Successfully',
-      `File ${stampedApp.fileNumber} has been logged in registry and routed to ${stampedApp.assignedVertical}.`,
+      `File ${stampedApp.fileNumber} is logged and routed to ${stampedApp.assignedVertical}. Open My Dashboard & Status to track screening and approval.`,
       'success',
       stampedApp.fileNumber
     );
 
-    // Steer directly to VIKAS Verticals page
-    executeTabNavigation('overview');
+    if (!options.skipNavigation) {
+      executeTabNavigation('overview');
+    }
   };
 
   const handleRouteApplication = (fileNumber, updates) => {
@@ -555,12 +606,12 @@ function AppContent() {
     }
   };
 
-  const handleApproveApplication = (fileNumber, updates) => {
+  const handleApproveApplication = (fileNumber, updates, options = {}) => {
     // 1. Authority Matrix Gate: Verify current persona has authority to approve this specific file
     const targetApp = applications.find(a => a.fileNumber === fileNumber);
     if (canApproveApplication && targetApp) {
       const authCheck = canApproveApplication(targetApp);
-      if (!authCheck.canApprove) {
+      if (!authCheck.authorized) {
         showToast(
           'Authority Matrix Violation',
           authCheck.reason || 'You are not authorized to approve this application under the VIKAS Authority Matrix.',
@@ -600,13 +651,55 @@ function AppContent() {
     setNotifications(prev => [approvedNotif, ...prev]);
 
     showToast(
-      'Authorization & E-Sign Complete!',
-      `File ${fileNumber} (${approvedApp?.name || 'Record'}) is now officially authorized and enrolled in ${approvedApp?.assignedVertical || 'Vertical'}.`,
+      'Authorization Complete',
+      `File ${fileNumber} (${approvedApp?.contactPerson || approvedApp?.name || 'Record'}) is now approved. Open the Certificate of Association to view the e-signed certificate.`,
       'success',
       fileNumber
     );
 
-    setActiveTab('overview');
+    if (options.openCertificate) {
+      setCertificateFocusFile(fileNumber);
+      setAdminFocusTab('certificate');
+      executeTabNavigation('admin');
+      return;
+    }
+
+    if (!options.skipNavigation) {
+      setActiveTab('overview');
+    }
+  };
+
+  const handleSendToEsign = (fileNumber) => {
+    const targetApp = applications.find(a => a.fileNumber === fileNumber);
+    if (!targetApp) return;
+
+    setApplications(prev => prev.map(app => {
+      if (app.fileNumber !== fileNumber) return app;
+      return {
+        ...app,
+        status: 'pending_approval',
+        okForApproval: true,
+        lastUpdated: new Date().toLocaleString('en-GB'),
+        history: [
+          ...(app.history || []),
+          {
+            date: new Date().toLocaleString('en-GB'),
+            action: 'OK recorded — sent for e-signature',
+            user: currentUser?.name || 'Approver',
+            details: 'Officer typed OK in Admin Panel. File opened on the Approval page for digital e-sign.'
+          }
+        ]
+      };
+    }));
+
+    setApprovalFocusFile(fileNumber);
+    showToast(
+      'Sent for e-signature',
+      `Type your name on the Approval page to e-sign and approve ${targetApp.contactPerson || targetApp.name || fileNumber}.`,
+      'info',
+      fileNumber
+    );
+    executeTabNavigation('approval');
   };
 
   const handleRejectApplication = (fileNumber, updates) => {
@@ -616,7 +709,7 @@ function AppContent() {
     // If issuing formal rejection at approval stage, check authority matrix
     if (isFormalRejection && targetApp && canApproveApplication) {
       const authCheck = canApproveApplication(targetApp);
-      if (!authCheck.canApprove) {
+      if (!authCheck.authorized) {
         showToast(
           'Authority Matrix Violation',
           authCheck.reason || 'You are not authorized to decline this application under the VIKAS Authority Matrix.',
@@ -724,14 +817,35 @@ function AppContent() {
           />
         );
       case 'admin':
+        if (!isAuthenticated || !(isAdmin || isProjectDirector)) {
+          return (
+            <AdminLoginPage 
+              theme={portalTheme}
+              onNavigateToApplicantLogin={() => handleTabChange('login')}
+              onNavigateToAdminDashboard={() => handleTabChange('admin')}
+              onNavigateToLanding={() => handleTabChange('landing')}
+              onAdminLoginSuccess={(user, userApps) => {
+                handleUserLoggedIn(user, userApps);
+                executeTabNavigation('admin');
+              }}
+            />
+          );
+        }
         return (
           <AdminDashboard 
             applications={applications}
             onRouteApplication={handleRouteApplication}
             onApproveApplication={handleApproveApplication}
             onRejectApplication={handleRejectApplication}
-            onNavigateToTab={(tab) => handleTabChange(tab)}
+            onSendToEsign={handleSendToEsign}
+            onNavigateToTab={(tab, extra) => handleTabChange(tab, extra)}
             onNavigateToAdminRegister={() => handleTabChange('admin-login')}
+            initialSubTab={adminFocusTab}
+            certificateFileNumber={certificateFocusFile}
+            onOpenCertificate={(fileNumber) => {
+              setCertificateFocusFile(fileNumber);
+              setAdminFocusTab('certificate');
+            }}
           />
         );
       case 'entry':
@@ -742,6 +856,7 @@ function AppContent() {
             onNavigateToLanding={() => handleTabChange('landing')}
             onNavigateToTab={(tab, extra) => handleTabChange(tab, extra)}
             onAlignedTrackChange={setHighlightedVerticalTrack}
+            onRegisterLeaveHandler={registerOnboardingLeaveHandler}
           />
         );
 
@@ -782,6 +897,7 @@ function AppContent() {
           <ApprovalPanel 
             currentRole={currentRole} 
             applications={applications} 
+            initialFileNumber={approvalFocusFile}
             onApproveApplication={handleApproveApplication}
             onRejectApplication={handleRejectApplication}
           />

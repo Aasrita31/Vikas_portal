@@ -1,12 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShieldAlert, Award, FileText, CheckCircle, XCircle, ExternalLink, Lock, AlertTriangle } from 'lucide-react';
 import { useAuth, ROLES } from '../../context/AuthContext';
 
-export default function ApprovalPanel({ currentRole, applications, onApproveApplication, onRejectApplication }) {
+export default function ApprovalPanel({ currentRole, applications, onApproveApplication, onRejectApplication, initialFileNumber = null }) {
   const { currentUser, canApproveApplication, isProjectDirector, isPillarLead, isApplicant } = useAuth();
   const [selectedApp, setSelectedApp] = useState(null);
   const [signatureName, setSignatureName] = useState('');
   const [comment, setComment] = useState('');
+
+  useEffect(() => {
+    if (!initialFileNumber) return;
+    const match = (applications || []).find((app) => app.fileNumber === initialFileNumber);
+    if (match) {
+      setSelectedApp(match);
+      setSignatureName('');
+      setComment('');
+    }
+  }, [initialFileNumber, applications]);
 
   // Access validation: Only Project Director, Pillar Leads, and Admin can access the Approval Matrix
   const isAuthorized = currentRole === 'pd' || currentRole === 'pillar_lead' || currentRole === 'admin';
@@ -59,11 +69,13 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
     );
   }
 
-  // Filter pending approvals based on roles and authority level
+  // Files waiting for e-sign: pending_approval, officer-OK'd records, or the file just opened from Admin Panel
   const pendingApprovals = applications.filter(app => {
-    if (app.status !== 'pending_approval') return false;
-    // Both PD and Pillar Leads see the active approval matrix for institutional transparency
-    return true;
+    const status = String(app.status || '').toLowerCase();
+    if (['approved', 'rejected', 'engagement', 'completed'].includes(status)) return false;
+    if (initialFileNumber && app.fileNumber === initialFileNumber) return true;
+    if (app.okForApproval) return true;
+    return status === 'pending_approval';
   });
 
   const getAuthorityDetails = (app) => {
@@ -114,7 +126,7 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
       approvalDate: new Date().toLocaleDateString('en-GB'),
       history: updatedHistory,
       approvalComments: comment
-    });
+    }, { skipNavigation: true, openCertificate: true });
 
     setSelectedApp(null);
     setSignatureName('');
@@ -191,7 +203,7 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
                     return (
                       <tr key={app.fileNumber} className={selectedApp?.fileNumber === app.fileNumber ? 'selected-row' : ''}>
                         <td className="font-mono text-accent">{app.fileNumber}</td>
-                        <td className="font-bold">{app.name}</td>
+                        <td className="font-bold">{app.contactPerson || app.applicantName || app.name}</td>
                         <td>
                           <span className="badge badge-info">{app.assignedVertical}</span>
                         </td>
@@ -227,11 +239,18 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
       {selectedApp && (
         <div className="review-side-panel card animate-fade-in">
           <div className="panel-header">
-            <h3>Authorization Review</h3>
+            <h3>Authorization & E-Sign</h3>
             <button className="btn-close" onClick={() => setSelectedApp(null)}>×</button>
           </div>
 
           <div className="panel-content">
+            {selectedApp.okForApproval && (
+              <div className="authority-warning-box" style={{ background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.35)' }}>
+                <span className="warning-title" style={{ color: '#047857' }}>OK RECEIVED — E-SIGNATURE REQUIRED</span>
+                <p className="warning-desc">An officer typed OK in Admin Panel. Type your name below to digitally e-sign. The applicant dashboard becomes Approved only after this e-sign.</p>
+              </div>
+            )}
+
             <div className="authority-warning-box">
               <span className="warning-title">AUTHORITY COMPLIANCE RULE</span>
               <p className="warning-desc">{getAuthorityDetails(selectedApp).rule}</p>
@@ -244,7 +263,7 @@ export default function ApprovalPanel({ currentRole, applications, onApproveAppl
               </div>
               <div className="sum-row">
                 <span className="sum-lbl">Entity:</span>
-                <span className="sum-val font-bold">{selectedApp.name}</span>
+                <span className="sum-val font-bold">{selectedApp.contactPerson || selectedApp.applicantName || selectedApp.name}</span>
               </div>
               {selectedApp.fundingRequested !== '0' && (
                 <div className="sum-row">
