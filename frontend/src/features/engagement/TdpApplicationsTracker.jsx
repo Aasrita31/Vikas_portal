@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../config/api';
 import { 
   ArrowLeft, 
   Search, 
@@ -79,7 +80,7 @@ export default function TdpApplicationsTracker({
   const fetchApplications = async () => {
     setLoading(true);
     try {
-      const res = await authFetch('http://localhost:5000/api/v1/vikas/technology-development/applications');
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/applications`);
       if (res.ok) {
         const data = await res.json();
         setTdpApps(data);

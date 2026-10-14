@@ -378,6 +378,11 @@ export default function OnboardingForm({
     // Section 4: Problem Statement / Interest
     if (!formData.problemStatement.trim()) {
       errors.problemStatement = 'Please articulate the challenge or interest in Section 4';
+    } else {
+      const words = formData.problemStatement.trim().split(/\s+/).filter(Boolean);
+      if (words.length > 200) {
+        errors.problemStatement = `Please limit your response to not more than 200 words (currently ${words.length} words)`;
+      }
     }
 
     // Section 5: Consent
@@ -1700,7 +1705,7 @@ export default function OnboardingForm({
               <div className="section-number-badge">4</div>
               <div className="section-header-text">
                 <h3>Section 4: Problem Statement / Interest <span className="text-danger">*</span></h3>
-                <p>Open text — Articulate the challenge, technological problem, or specific interest you wish to pursue</p>
+                <p>Open text — Articulate the challenge, technological problem, or specific interest you wish to pursue (not more than 200 words)</p>
               </div>
             </div>
 
@@ -1708,16 +1713,36 @@ export default function OnboardingForm({
               <textarea 
                 className={`form-control text-area-large ${formErrors.problemStatement ? 'input-error' : ''}`}
                 rows="5"
-                placeholder="Articulate the challenge, technological problem, or specific innovation scope..."
+                placeholder="Articulate the challenge, technological problem, or specific innovation scope (not more than 200 words)..."
                 value={formData.problemStatement}
                 onChange={(e) => {
-                  setFormData({...formData, problemStatement: e.target.value});
-                  if (formErrors.problemStatement) setFormErrors({...formErrors, problemStatement: null});
+                  const val = e.target.value;
+                  setFormData({...formData, problemStatement: val});
+                  const words = val.trim() ? val.trim().split(/\s+/).filter(Boolean).length : 0;
+                  if (words > 200) {
+                    setFormErrors(prev => ({
+                      ...prev,
+                      problemStatement: `Please limit your response to not more than 200 words (currently ${words} words)`
+                    }));
+                  } else if (formErrors.problemStatement) {
+                    setFormErrors(prev => ({...prev, problemStatement: null}));
+                  }
                 }}
                 required
               />
               <div className="textarea-footer">
-                <span className="char-count">{formData.problemStatement.length} characters</span>
+                {(() => {
+                  const words = formData.problemStatement.trim() ? formData.problemStatement.trim().split(/\s+/).filter(Boolean).length : 0;
+                  const isOver = words > 200;
+                  return (
+                    <span 
+                      className={`char-count ${isOver ? 'limit-exceeded' : ''}`}
+                      style={isOver ? { color: '#dc2626', fontWeight: 600 } : {}}
+                    >
+                      {words} / 200 words
+                    </span>
+                  );
+                })()}
                 {formErrors.problemStatement && (
                   <span className="field-error-msg">{formErrors.problemStatement}</span>
                 )}
@@ -1801,8 +1826,8 @@ export default function OnboardingForm({
                   await submitOnboarding({ skipNavigate: false, showErrors: true });
                 }}
               >
-                <Layers size={18} />
-                {isSubmitting ? 'Saving proposal...' : 'Way to our verticals'}
+                {isSubmitting ? 'Saving proposal...' : 'Next'}
+                {!isSubmitting && <ArrowRight size={18} />}
               </button>
               <p className="submit-helper-text">
                 {alreadySubmittedFile
@@ -2468,6 +2493,12 @@ export default function OnboardingForm({
         .char-count {
           font-size: 12px;
           color: #94a3b8;
+          font-weight: 500;
+        }
+
+        .char-count.limit-exceeded {
+          color: #dc2626 !important;
+          font-weight: 700;
         }
 
         /* SECTION 7: Consent */

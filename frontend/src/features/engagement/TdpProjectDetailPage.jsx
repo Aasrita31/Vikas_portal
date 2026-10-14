@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import { 
   ArrowLeft, 
   Cpu, 
@@ -36,7 +37,7 @@ export default function TdpProjectDetailPage({
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`http://localhost:5000/api/v1/vikas/technology-development/projects/${projectId}`);
+        const res = await fetch(`${API_BASE_URL}/api/v1/vikas/technology-development/projects/${projectId}`);
         if (!res.ok) {
           throw new Error(`Failed to load project with ID ${projectId} (Status: ${res.status})`);
         }

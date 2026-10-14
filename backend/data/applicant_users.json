@@ -13,8 +13,8 @@
     "hashed_password": "pbkdf2_sha256$e5fd43908af38042e3a55fd36132a29e$6011f09499172b529458895cec4288226fad3a4e29a0b46ac3f79d7fc5a52e2f",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:46.651588",
-    "updated_at": "2026-09-22T10:08:46.663595"
+    "created_at": "2026-09-27T11:22:02.442251",
+    "updated_at": "2026-09-27T11:22:02.450362"
   },
   {
     "id": "usr_ops",
@@ -30,8 +30,8 @@
     "hashed_password": "pbkdf2_sha256$7db6b411b2d51fa5a9f415076c343de1$74cad713a82f66939fdc74865e405e45834424cec0145a322641ebae4bb79cd7",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:46.730907",
-    "updated_at": "2026-09-22T11:33:49.264725"
+    "created_at": "2026-09-27T11:22:02.515276",
+    "updated_at": "2026-09-28T16:11:10.765118"
   },
   {
     "id": "usr_pl_startup",
@@ -47,8 +47,8 @@
     "hashed_password": "pbkdf2_sha256$87a539f3569b5597fcc0ea63fb098c72$d6afc78ac9f673fce72af50bee2205460b90920bc508476dca2b770f21a7a742",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:46.840097",
-    "updated_at": "2026-09-22T10:08:46.842604"
+    "created_at": "2026-09-27T11:22:02.581150",
+    "updated_at": "2026-09-27T11:22:02.582167"
   },
   {
     "id": "usr_pl_tech",
@@ -64,8 +64,8 @@
     "hashed_password": "pbkdf2_sha256$4f9277c205fbe27b4be34be001464dec$58145ac8f590637eda3cc5380d4db08ad026e0df7bfb2b91590f94a2ed68081f",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:46.910404",
-    "updated_at": "2026-09-22T10:08:46.912403"
+    "created_at": "2026-09-27T11:22:02.648448",
+    "updated_at": "2026-09-27T11:22:02.650448"
   },
   {
     "id": "usr_pd",
@@ -81,8 +81,8 @@
     "hashed_password": "pbkdf2_sha256$f5694b9f4cec55672279b83bc1651404$139da7fd53605ff7f4ed97f71e4258eca6d9ab9a489796660c8d6cf59e15c2ee",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:46.981308",
-    "updated_at": "2026-09-22T11:33:49.170953"
+    "created_at": "2026-09-27T11:22:02.716623",
+    "updated_at": "2026-09-27T11:22:02.717622"
   },
   {
     "id": "usr_exec",
@@ -98,8 +98,8 @@
     "hashed_password": "pbkdf2_sha256$f7a0ea039e8356184484fb1ab90521db$15d38e23ef755107d84c10255a631ab87abd7efeae5dc52117e3f19097258d61",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.046769",
-    "updated_at": "2026-09-22T10:08:47.049770"
+    "created_at": "2026-09-27T11:22:02.782711",
+    "updated_at": "2026-09-27T11:22:02.783725"
   },
   {
     "id": "usr_admin",
@@ -115,25 +115,25 @@
     "hashed_password": "pbkdf2_sha256$d4ab4716317ed15708cec37b4a69d689$fae1812a61e70680f462980b976bd51a1d239754d2652b32d43872268be723c8",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.112958",
-    "updated_at": "2026-09-22T11:33:18.110795"
+    "created_at": "2026-09-27T11:22:02.849835",
+    "updated_at": "2026-09-27T11:22:02.852837"
   },
   {
     "id": "usr_8",
-    "email": "test_postgres_sync@vikas.in",
-    "name": "Test Postgres User",
-    "phone": "9876543210",
-    "organization": null,
+    "email": "test_user_unique@example.com",
+    "name": "Test User",
+    "phone": null,
+    "organization": "IIT Tirupati",
     "location": null,
     "stakeholder_type": "STARTUP",
     "role": "APPLICANT",
     "is_active": true,
     "is_verified": true,
-    "hashed_password": "pbkdf2_sha256$33536ad564f73529299caa94665617df$00042171372a69f76b76959a8223c5ee25b9ccb89dad5619e5c6a238bb38df9b",
+    "hashed_password": "pbkdf2_sha256$928cdaa8c31896bb3732ba50b4ba53c2$1bab7a3fd600a6fa0be568dad94d6701d573784b65481b41dba89e85946a915a",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.125358",
-    "updated_at": "2026-09-22T10:08:47.125358"
+    "created_at": "2026-09-27T11:26:51.599915",
+    "updated_at": "2026-09-27T11:27:10.974580"
   },
   {
     "id": "usr_10",
@@ -149,25 +149,8 @@
     "hashed_password": "pbkdf2_sha256$b3ffc95b9c8a4db856c74f4eea02046f$00c0aedb8364d39a08a1a1c365461bd5016cd8c85cce91e7b2173833bb726e98",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.125358",
-    "updated_at": "2026-09-22T10:08:47.125358"
-  },
-  {
-    "id": "usr_13",
-    "email": "",
-    "name": "",
-    "phone": "N/A",
-    "organization": null,
-    "location": null,
-    "stakeholder_type": "STARTUP",
-    "role": "APPLICANT",
-    "is_active": true,
-    "is_verified": true,
-    "hashed_password": "pbkdf2_sha256$fc4b787058371ddad03f9347ad68264f$3b189a75f0bb3be434f1d2496ccfe7e06553b23a13b4be0c38d870a3d7e80eab",
-    "auth_provider": "postgresql",
-    "session_token": null,
-    "created_at": "2026-09-22T10:08:47.125358",
-    "updated_at": "2026-09-22T10:08:47.125358"
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
   },
   {
     "id": "usr_16",
@@ -183,8 +166,8 @@
     "hashed_password": "pbkdf2_sha256$0bf854ca147b1fe9b50248479e908a38$fac202c378e849b68430666020db2e853212b63232aca6ae1e55f0d598fd08b6",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.126366",
-    "updated_at": "2026-09-22T10:08:47.126366"
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
   },
   {
     "id": "usr_17",
@@ -200,8 +183,8 @@
     "hashed_password": "pbkdf2_sha256$dbffa5c22bbcd5276d90a0307875771a$b9fd9d820543fe14e352360cada8e654704a304830b8111d894842267541bf21",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.126366",
-    "updated_at": "2026-09-22T10:08:47.126366"
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
   },
   {
     "id": "usr_18",
@@ -217,8 +200,8 @@
     "hashed_password": "pbkdf2_sha256$6f7ecb59f85aeda5a65a2ac61354a624$7a6d83bb671ba535050b8605faf9448c2d86674d249cdeda1e5ea214ccce8df0",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.126366",
-    "updated_at": "2026-09-22T10:08:47.126366"
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
   },
   {
     "id": "usr_19",
@@ -234,8 +217,8 @@
     "hashed_password": "pbkdf2_sha256$513591c52060bdcc75128fae5ad1b866$9589f3fa89b91a0f5a6209affc3767d1d856683f522479ec077e7f28860251a5",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.126366",
-    "updated_at": "2026-09-22T10:08:47.126366"
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
   },
   {
     "id": "usr_20",
@@ -251,8 +234,8 @@
     "hashed_password": "pbkdf2_sha256$5414a362df8ebdf7ef7d10399e5a7317$4e0767a3fb0857cb31bf5af46d7f854178382e31cd71d60d4bdaa7475ffe79d2",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.126366",
-    "updated_at": "2026-09-22T10:08:47.126366"
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
   },
   {
     "id": "usr_21",
@@ -268,8 +251,59 @@
     "hashed_password": "pbkdf2_sha256$cbb0d05dae51ec15c7fbeb03136a5a63$6eedcb56ef2f1d63881cef8e5d4a7fa53b6c41247eb90875a1d78ef78717de97",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T10:08:47.126366",
-    "updated_at": "2026-09-22T11:40:28.510278"
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
+  },
+  {
+    "id": "usr_22",
+    "email": "gt.ai..2@iittnif.com",
+    "name": "SIR",
+    "phone": "+91 98765 00006",
+    "organization": "IITTNiF Central Administration",
+    "location": null,
+    "stakeholder_type": "STARTUP",
+    "role": "ADMIN",
+    "is_active": true,
+    "is_verified": true,
+    "hashed_password": "pbkdf2_sha256$ca292e3cbc7853025ce169d8caa92d7c$3a6fa6445a54ce54758c5bba7a44340bc994dfd0282f209e5c4e18d57f9a89c1",
+    "auth_provider": "postgresql",
+    "session_token": null,
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
+  },
+  {
+    "id": "usr_23",
+    "email": "admin@123gmail.com",
+    "name": "ADMIN",
+    "phone": null,
+    "organization": "TIH",
+    "location": null,
+    "stakeholder_type": "STARTUP",
+    "role": "ADMIN",
+    "is_active": true,
+    "is_verified": true,
+    "hashed_password": "pbkdf2_sha256$a48700b2cd7d4139ee1670cc361d2847$7f7c01a0f1dd8587af5481e887a8750c208d4c27f304e067f05f41981ac9355f",
+    "auth_provider": "postgresql",
+    "session_token": null,
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
+  },
+  {
+    "id": "usr_24",
+    "email": "gt.ai.4@iittnif.com",
+    "name": "krishna",
+    "phone": "7676765432",
+    "organization": "kendriyavidyalaya",
+    "location": null,
+    "stakeholder_type": "STARTUP",
+    "role": "APPLICANT",
+    "is_active": true,
+    "is_verified": true,
+    "hashed_password": "pbkdf2_sha256$c6a2524581b80993954088a88a133384$633affde1c20119a402e4090fd3c1c798a7fab3fe6fd79eca52a0fec501ac33d",
+    "auth_provider": "postgresql",
+    "session_token": null,
+    "created_at": "2026-09-22T16:12:26.187073",
+    "updated_at": "2026-09-22T16:12:26.187073"
   },
   {
     "id": "usr_99834a0a7725953f",
@@ -306,37 +340,20 @@
     "updated_at": "2026-09-19T09:47:18.016302"
   },
   {
-    "id": "usr_22",
-    "email": "gt.ai..2@iittnif.com",
-    "name": "SIR",
-    "phone": "+91 98765 00006",
-    "organization": "IITTNiF Central Administration",
+    "id": "usr_25",
+    "email": "user@iittnif.com",
+    "name": "user",
+    "phone": "9463728153",
+    "organization": "IITTNiF_TIH",
     "location": null,
-    "stakeholder_type": "OTHER",
-    "role": "ADMIN",
+    "stakeholder_type": "STARTUP",
+    "role": "APPLICANT",
     "is_active": true,
     "is_verified": true,
-    "hashed_password": "pbkdf2_sha256$ca292e3cbc7853025ce169d8caa92d7c$3a6fa6445a54ce54758c5bba7a44340bc994dfd0282f209e5c4e18d57f9a89c1",
+    "hashed_password": "pbkdf2_sha256$8a92b611d7e99ec107c5c6ccf299a8bb$b384a8dfb625f9576ae78aa282e7fdd6834079bf8967f292ac2134e4df7c6de1",
     "auth_provider": "postgresql",
     "session_token": null,
-    "created_at": "2026-09-22T11:32:55.810842",
-    "updated_at": "2026-09-22T11:32:55.830898"
-  },
-  {
-    "id": "usr_23",
-    "email": "admin@123gmail.com",
-    "name": "ADMIN",
-    "phone": null,
-    "organization": "TIH",
-    "location": null,
-    "stakeholder_type": "OTHER",
-    "role": "ADMIN",
-    "is_active": true,
-    "is_verified": true,
-    "hashed_password": "pbkdf2_sha256$a48700b2cd7d4139ee1670cc361d2847$7f7c01a0f1dd8587af5481e887a8750c208d4c27f304e067f05f41981ac9355f",
-    "auth_provider": "postgresql",
-    "session_token": null,
-    "created_at": "2026-09-22T12:00:21.480065",
-    "updated_at": "2026-09-22T12:32:58.548535"
+    "created_at": "2026-09-22T16:48:00.469544",
+    "updated_at": "2026-09-28T16:14:16.654257"
   }
 ]

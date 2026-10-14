@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { clearProposalFormSession } from '../features/entry/proposalFormSession';
+import { API_BASE_URL } from '../config/api';
 
 // The 6 Roles supported by VIKAS Platform
 export const ROLES = {
@@ -115,7 +116,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password })
@@ -162,7 +163,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
     setAuthError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registrationData)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import { 
   Search, 
   Filter, 
@@ -172,7 +173,7 @@ export default function TdpProjectOpportunities({ onApply, onSelectProject }) {
     const fetchProjects = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch('http://localhost:5000/api/v1/vikas/technology-development/projects');
+        const res = await fetch(`${API_BASE_URL}/api/v1/vikas/technology-development/projects`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {

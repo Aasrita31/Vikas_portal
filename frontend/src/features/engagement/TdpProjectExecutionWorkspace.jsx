@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import { 
   ArrowLeft, 
   CheckCircle, 
@@ -110,7 +111,7 @@ export default function TdpProjectExecutionWorkspace({
     setLoading(true);
     setAccessDeniedError(false);
     try {
-      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}`);
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/execution/${applicationId}`);
       if (res.status === 403) {
         setAccessDeniedError(true);
         setLoading(false);
@@ -372,7 +373,7 @@ export default function TdpProjectExecutionWorkspace({
     }
 
     try {
-      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/weekly-progress`, {
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/execution/${applicationId}/weekly-progress`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(weeklyFormData)
@@ -438,7 +439,7 @@ export default function TdpProjectExecutionWorkspace({
         evidenceUrl: milestoneFormData.evidenceUrl || '#'
       };
 
-      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/milestones/${editingMilestone.id}`, {
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/execution/${applicationId}/milestones/${editingMilestone.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedPayload)
@@ -479,7 +480,7 @@ export default function TdpProjectExecutionWorkspace({
         evidenceUrl: deliverableFormData.evidenceUrl || '#'
       };
 
-      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/deliverables/${editingDeliverable.id}`, {
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/execution/${applicationId}/deliverables/${editingDeliverable.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedPayload)
@@ -520,7 +521,7 @@ export default function TdpProjectExecutionWorkspace({
     };
 
     try {
-      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/execution/${applicationId}/mentor-verify`, {
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/execution/${applicationId}/mentor-verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

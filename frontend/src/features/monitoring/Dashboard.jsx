@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import {
+import { 
   Activity,
   CheckCircle2,
   Clock,
-  FileText,
-  Layers,
+  FileText, 
+  Layers, 
   Search,
   XCircle,
   Calendar,
@@ -212,7 +212,7 @@ export default function Dashboard({ applications = [], onNavigateToTab }) {
   return (
     <div className="monitor-page animate-fade-in">
       <header className="monitor-hero">
-        <div>
+            <div>
           <p className="monitor-kicker">
             <Activity size={15} />
             Monitoring
@@ -282,7 +282,7 @@ export default function Dashboard({ applications = [], onNavigateToTab }) {
               </tbody>
             </table>
           )}
-        </div>
+      </div>
 
         <div className="monitor-card">
           <div className="monitor-card-head">
@@ -303,7 +303,7 @@ export default function Dashboard({ applications = [], onNavigateToTab }) {
               ))}
             </ul>
           )}
-        </div>
+                </div>
       </section>
 
       <section className="monitor-card">
@@ -311,7 +311,7 @@ export default function Dashboard({ applications = [], onNavigateToTab }) {
           <div>
             <h2>Onboarding monitor</h2>
             <p>Same screening, approval, and monthly reporting status shown on each user dashboard.</p>
-          </div>
+              </div>
           <div className="monitor-toolbar-controls">
             <label className="monitor-search">
               <Search size={14} />

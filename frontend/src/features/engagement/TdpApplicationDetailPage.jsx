@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../config/api';
 import { 
   ArrowLeft, 
   CheckCircle, 
@@ -60,7 +61,7 @@ export default function TdpApplicationDetailPage({
     setLoading(true);
     setAccessDeniedError(false);
     try {
-      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/applications/${applicationId}`);
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/applications/${applicationId}`);
       if (res.status === 403) {
         setAccessDeniedError(true);
         setLoading(false);
@@ -324,7 +325,7 @@ export default function TdpApplicationDetailPage({
     };
 
     try {
-      const res = await authFetch(`http://localhost:5000/api/v1/vikas/technology-development/applications/${appData.applicationNumber}/status`, {
+      const res = await authFetch(`${API_BASE_URL}/api/v1/vikas/technology-development/applications/${appData.applicationNumber}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -296,7 +296,7 @@ export default function LandingPage({
         <div className="landing-container">
           <div className="landing-section-header">
             <div className="section-eyebrow-pill">
-              <Compass size={13} /> Explore Tracks
+              <Compass size={13} /> Explore Verticals
             </div>
             <h2 className="section-main-heading">Find your pathway into TIH</h2>
           </div>
